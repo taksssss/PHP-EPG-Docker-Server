@@ -25,11 +25,10 @@ $init = [
 function cleanChannelName($channel) {
     global $Config;
 
-    // 频道映射优先级最高，映射成功后不做其他处理
+    // 频道映射
     foreach ($Config['channel_mappings'] as $search => $replace) {
-        if (strripos($channel, $search) !== false) {
-            $channel = str_ireplace($search, $replace, $channel);
-            return strtoupper($channel); // 映射成功后直接返回
+        if (strtoupper($channel) === strtoupper($search)) {
+            $channel = $replace;
         }
     }
 
