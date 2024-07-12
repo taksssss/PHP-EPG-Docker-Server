@@ -27,19 +27,18 @@ function cleanChannelName($channel) {
 
     // 频道映射优先级最高，映射成功后不做其他处理
     foreach ($Config['channel_mappings'] as $search => $replace) {
-        if (strpos($channel, $search) !== false) {
-            $channel = str_replace($search, $replace, $channel);
-            return $channel; // 映射成功后直接返回
+        if (strripos($channel, $search) !== false) {
+            $channel = str_ireplace($search, $replace, $channel);
+            return strtoupper($channel); // 映射成功后直接返回
         }
     }
 
     // 清理特定字符串
-    $channel = strtoupper(str_ireplace($Config['channel_replacements'], '', $channel));
+    $channel = strtoupper(str_replace(' ', '', str_ireplace($Config['channel_replacements'], '', $channel)));
 
     // 处理CCTV相关频道
-    // CCTV1综合、CCTV2财经、CCTV4K 4K……替换成CCTV1、CCTV2、CCTV4K……
-    // (这里也有点小问题，例如不做映射的话，“CCTV4美洲、欧洲”会被识别成“CCTV4”)
-    if (preg_match('/^CCTV[0-9]*[K\+]?/i', $channel, $matches)) {
+    // CCTV1综合、CCTV2财经、CCTV4K 4K……替换成CCTV1、CCTV2、CCTV4K……（排除CCTV4美洲、CCTV4欧洲）
+    if (preg_match('/^CCTV[0-9]+(?:K|\+)?(?!(?:美洲|欧洲))/i', $channel, $matches)) {
         $channel = $matches[0];
     }
     // CCTV风云足球、CCTV风云音乐……替换成风云足球、风云音乐……
