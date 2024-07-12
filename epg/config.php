@@ -17,8 +17,9 @@ $Config = array (
   ),
   'channel_mappings' => 
   array (
-    'CCTV-4美洲' => 'CCTV4美洲',
-    'CCTV-4欧洲' => 'CCTV4欧洲',
+    'regex:/CCTV(?=\\p{Han})/u' => '',
+    'regex:/^(CCTV[0-9]+(?:K|\\+)?)(?!美洲|欧洲).*/i' => '$1',
+    'regex:/^(深圳.*)频道$/i' => '$1',
     'CGTN英语' => 'CGTN',
     'CGTN西班牙语' => 'CGTN西语',
     'CGTN阿拉伯语' => 'CGTN阿语',

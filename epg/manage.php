@@ -145,7 +145,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update'])) {
             padding: 30px;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
             border-radius: 5px;
-            width: 700px;
+            width: 850px;
             margin: auto;
         }
         textarea {
@@ -175,6 +175,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update'])) {
             display: flex;
             gap: 15px;
             align-items: center;
+            justify-content: space-between;
         }
         .button-container a {
             padding: 10px;
@@ -186,7 +187,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update'])) {
             text-align: center;
             cursor: pointer;
             box-sizing: border-box;
-            width: 50%;
+            width: 48%;
         }
         .button-container a:hover {
             background-color: #0b7dda;
@@ -221,16 +222,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update'])) {
             <div class="flex-item">
                 <label for="channel_replacements">频道忽略字符串 (匹配时按先后顺序清除)</label><br><br>
                 <textarea id="channel_replacements" name="channel_replacements" rows="6" required><?php echo implode("\n", array_map('trim', $Config['channel_replacements'])); ?></textarea><br><br>
-                <input type="submit" name="update" value="更新配置">
             </div>
             <div class="flex-item">
-                <label for="channel_mappings">频道映射 (格式：显示频道名,数据库频道名)</label><br><br>
+                <label for="channel_mappings">频道映射 (显示频道名,数据库频道名) (正则表达式 regex: )</label><br><br>
                 <textarea id="channel_mappings" name="channel_mappings" rows="6" required><?php echo implode("\n", array_map(function($search, $replace) { return $search . ',' . $replace; }, array_keys($Config['channel_mappings']), $Config['channel_mappings'])); ?></textarea><br><br>
-                <div class="button-container">
-                    <a href="update.php" target="_blank">更新数据库</a>
-                    <a href="phpliteadmin.php" target="_blank">查看数据库</a>
-                </div>
             </div>
+        </div>
+        <input type="submit" name="update" value="更新配置"><br><br>
+        <div class="button-container">
+            <a href="update.php" target="_blank">更新数据库</a>
+            <a href="phpliteadmin.php" target="_blank">查看数据库</a>
         </div>
     </form>
 </div>
