@@ -12,7 +12,7 @@ PHP-EPG-Server 是一个用 PHP 实现的 EPG（电子节目指南）服务端�
 - 支持频道映射，支持**正则表达式** 🔄
 - 内置 `phpLiteAdmin` 方便管理数据库 🛠️
 
-![设置页面](https://github.com/user-attachments/assets/d0373097-9dfc-4eb5-95b8-e15618a7dc67)
+![设置页面](https://github.com/user-attachments/assets/5e44dcc2-77f4-4e58-970b-e200b54ede3b)
 
 > **内置正则表达式说明：**
 > 
@@ -22,7 +22,7 @@ PHP-EPG-Server 是一个用 PHP 实现的 EPG（电子节目指南）服务端�
 > 
 >   - `regex:/^CCTV[-\s]*(\p{Han})/iu, $1` ：将 `CCTV风云足球`、`cctv-风云音乐` 等替换成 `风云足球`、`风云音乐`
 > 
->   - `regex:/^(CCTV[-\s]*\d+[K\+]?)(?!美洲|欧洲).*/i, $1` ：将 `CCTV1综合`、`CCTV4K频道`、`CCTV5+频道` 等替换成 `CCTV1`、`CCTV4K`、`CCTV5+`（排除 `CCTV4美洲` 和 `CCTV4欧洲`）
+>   - `regex:/^CCTV[-\s]*(\d+[K\+]?)(?!美洲|欧洲).*/i, CCTV$1` ：将 `CCTV 1综合`、`CCTV-4K频道`、`CCTV - 5+频道` 等替换成 `CCTV1`、`CCTV4K`、`CCTV5+`（排除 `CCTV4美洲` 和 `CCTV4欧洲`）
 > 
 >   - `regex:/^(深圳.*?)频道$/i, $1` ：将 `深圳xx频道` 替换成 `深圳xx`
 

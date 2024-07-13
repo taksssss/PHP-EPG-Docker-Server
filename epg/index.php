@@ -32,14 +32,15 @@ function cleanChannelName($channel) {
             $pattern = substr($search, 6);
             if (preg_match($pattern, $channel)) {
                 $channel = preg_replace($pattern, $replace, $channel);
+                return strtoupper($channel);
             }
         } else {
             // 非正则表达式映射
             if (strtoupper($channel) === strtoupper($search)) {
-                $channel = $replace;
+                $channel = $replace;                
+                return strtoupper($channel);
             }
         }
-        return strtoupper($channel);
     }
 
     // 清理特定字符串
