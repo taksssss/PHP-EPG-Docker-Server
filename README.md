@@ -47,7 +47,14 @@ PHP-EPG-Server 是一个用 PHP 实现的 EPG（电子节目指南）服务端�
 - 建议设置定时任务，定时访问 `http://你的php访问路径/epg/update.php` 更新数据
 
 ## 效果示例 🖼️
+
+**DIYP**
+
 ![DIYP 示例](https://github.com/user-attachments/assets/ef926713-f2e1-42b9-aed4-4c9f5c1af1da)
+
+**TiviMate**
+
+![TiviMate](https://github.com/user-attachments/assets/8fbaf4b9-c7b2-4b1a-b221-41d3954fbec8)
 
 ## 特别鸣谢 🙏
 - [celetor/epg](https://github.com/celetor/epg)

@@ -133,12 +133,14 @@ function fetchHandler() {
         'date' => $date,
         'channel_name' => $channel,
         'url' => "https://github.com/TakcC/PHP-EPG-Server",
-        'epg_data' => [
-            'start' => '00:00',
-            'end' => '23:59',
-            'title' => '未知节目',
-            'desc' => ''
-        ]
+        'epg_data' => array_map(function($hour) {
+            return [
+                'start' => sprintf('%02d:00', $hour),
+                'end' => sprintf('%02d:00', ($hour + 2) % 24),
+                'title' => '精彩节目',
+                'desc' => ''
+            ];
+        }, range(0, 22, 2))
     ];
 
     // 返回响应
