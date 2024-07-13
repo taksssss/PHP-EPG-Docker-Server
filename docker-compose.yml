@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  epg-php:
+    image: php:7.2-apache
+    container_name: php-epg
+    ports:
+      - "5678:80"
+    volumes:
+      - ./epg/:/var/www/html/epg/
+    command: /bin/bash -c "chmod -R 777 /var/www/html/epg && apache2-foreground"
+
+volumes:
+  epg:
