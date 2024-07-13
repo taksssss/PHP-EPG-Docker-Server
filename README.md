@@ -12,7 +12,7 @@ PHP-EPG-Server 是一个用 PHP 实现的 EPG（电子节目指南）服务端�
 - 支持频道映射，支持**正则表达式** 🔄
 - 内置 `phpLiteAdmin` 方便管理数据库 🛠️
 
-![设置页面](https://github.com/user-attachments/assets/34e9d8c7-470e-4740-baf7-2cebf2def0f6)
+![设置页面](https://github.com/user-attachments/assets/f3dcd106-ab71-4418-9681-1afe3394cf57)
 
 > **内置正则表达式说明：**
 > 
@@ -20,11 +20,11 @@ PHP-EPG-Server 是一个用 PHP 实现的 EPG（电子节目指南）服务端�
 > 
 > - 示例：
 > 
->   - `'/^CCTV(?=\\p{Han})/u' => '$1'` ：将 `CCTV风云足球`、`CCTV风云音乐` 等替换成 `风云足球`、`风云音乐`
+>   - `'/^CCTV[-\s]*(\p{Han})/iu' => '$1'` ：将 `CCTV风云足球`、`cctv-风云音乐` 等替换成 `风云足球`、`风云音乐`
 > 
->   - `'/^(CCTV[0-9]+(?:K|\\+)?)(?!美洲|欧洲).*/i' => '$1'` ：将 `CCTV1综合`、`CCTV4K频道`、`CCTV5+频道` 等替换成 `CCTV1`、`CCTV4K`、`CCTV5+`，排除 `CCTV4美洲` 和 `CCTV4欧洲`
+>   - `'/^(CCTV[-\s]*\d+[K\+]?)(?!美洲|欧洲)/i' => '$1'` ：将 `CCTV1综合`、`CCTV4K频道`、`CCTV5+频道` 等替换成 `CCTV1`、`CCTV4K`、`CCTV5+`，排除 `CCTV4美洲` 和 `CCTV4欧洲`
 > 
->   - `'/^(深圳.*)频道$/i' => '$1'` ：将 `深圳xx频道` 替换成 `深圳xx`
+>   - `'/^(深圳.*?)频道$/i => '$1'` ：将 `深圳xx频道` 替换成 `深圳xx`
 
 
 ## 部署步骤 🚀

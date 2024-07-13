@@ -25,9 +25,6 @@ $init = [
 function cleanChannelName($channel) {
     global $Config;
 
-    // 清理特定字符串
-    $channel = strtoupper(str_replace(' ', '', str_ireplace($Config['channel_replacements'], '', $channel)));
-
     // 频道映射，支持正则表达式映射，以 regex: 开头
     foreach ($Config['channel_mappings'] as $search => $replace) {
         // 检查是否为正则表达式映射
@@ -43,6 +40,9 @@ function cleanChannelName($channel) {
             }
         }
     }
+
+    // 清理特定字符串
+    $channel = strtoupper(str_replace(' ', '', str_ireplace($Config['channel_replacements'], '', $channel)));
 
     return $channel;
 }
