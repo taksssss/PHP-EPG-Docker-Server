@@ -39,13 +39,17 @@ PHP-EPG-Docker-Server 是一个用 PHP 实现的 EPG（电子节目指南）服�
    git clone https://github.com/TakcC/PHP-EPG-Docker-Server.git    # 拉取源码
    docker-compose up -d    # 部署并运行
    ```
-3. 默认端口为 `5678` ，根据需要，修改 `docker-compose.yml`
-4. 在浏览器中打开 `http://{服务器IP地址}:5678/epg/manage.php`
-5. 使用默认密码 `admin123` 登录
-6. 添加 `EPG 源地址`， GitHub 源确保能够访问
-7. 点击 `更新配置` 按钮
-8. 点击 `更新数据库` 按钮
-9.  点击 `查看数据库` 按钮
+   >
+   > 或 `git clone https://gitee.com/takcheung/PHP-EPG-Docker-Server.git`
+   >
+   > 默认端口为 `5678` ，根据需要自行修改 `docker-compose.yml`
+   >
+3. 在浏览器中打开 `http://{服务器IP地址}:5678/epg/manage.php`
+4. 使用默认密码 `admin123` 登录
+5. 添加 `EPG 源地址`， GitHub 源确保能够访问
+6. 点击 `更新配置` 按钮
+7. 点击 `更新数据库` 按钮
+8. 点击 `查看数据库` 按钮
 
 <kbd><img src="https://github.com/user-attachments/assets/3f80c287-42f7-4766-8082-49ce57e40664"/></kbd>
 
