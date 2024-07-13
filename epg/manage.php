@@ -117,11 +117,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update'])) {
     // 将新配置写回config.php
     file_put_contents('config.php', '<?php' . "\n\n" . '$Config = ' . var_export($newConfig, true) . ';' . "\n\n" . '?>');
 
-    // 输出 JavaScript 弹窗
-    echo "<script>alert('配置已更新');</script>";
+    // 设置标志变量以显示弹窗
+    $configUpdated = true;
 
     // 重新加载配置以确保页面显示更新的数据
     require 'config.php';
+} else {
+    $configUpdated = false;
 }
 
 // 生成配置管理表单
@@ -151,6 +153,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update'])) {
         textarea {
             width: calc(100% - 12px);
             line-height: 1.5;
+            resize: none;
         }
         input[type="number"], textarea {
             width: calc(100% - 12px);
@@ -166,7 +169,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update'])) {
             border-radius: 5px;
             cursor: pointer;
             box-sizing: border-box;
-            font-size: 15px;
+            font-size: 16px;
+            font-weight: bold;
         }
         input[type="submit"]:hover {
             background-color: #e68900;
@@ -206,6 +210,41 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update'])) {
             width: 100%;
             text-align: center;
         }
+        .modal {
+            display: none; /* Hidden by default */
+            position: fixed;
+            z-index: 1;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgb(0,0,0);
+            background-color: rgba(0,0,0,0.4);
+            padding-top: 60px;
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: 5% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 300px;
+            text-align: center;
+            border-radius: 10px;
+        }
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+        }
+        .close:hover,
+        .close:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -239,5 +278,33 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update'])) {
 <div class="footer">
     <a href="https://github.com/TakcC/PHP-EPG-Server" style="color: #888; text-decoration: none;">https://github.com/TakcC/PHP-EPG-Server</a>
 </div>
+
+<!-- 模态框 -->
+<div id="myModal" class="modal">
+    <div class="modal-content">
+        <span class="close">&times;</span>
+        <p>配置已更新</p>
+    </div>
+</div>
+
+<script>
+    var configUpdated = <?php echo json_encode($configUpdated); ?>;
+    if (configUpdated) {
+        var modal = document.getElementById("myModal");
+        var span = document.getElementsByClassName("close")[0];
+
+        modal.style.display = "block";
+
+        span.onclick = function() {
+            modal.style.display = "none";
+        }
+
+        window.onclick = function(event) {
+            if (event.target == modal) {
+                modal.style.display = "none";
+            }
+        }
+    }
+</script>
 </body>
 </html>
