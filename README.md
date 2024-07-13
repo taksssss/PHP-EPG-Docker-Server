@@ -13,7 +13,7 @@ PHP-EPG-Docker-Server 是一个用 PHP 实现的 EPG（电子节目指南）服�
 - 支持频道映射，支持**正则表达式** 🔄
 - 内置 `phpLiteAdmin` 方便管理数据库 🛠️
 
-![设置页面](https://github.com/user-attachments/assets/97170f7c-cf17-48c7-a272-d4b620963913)
+![设置页面](/pic/management.png)
 
 > **内置正则表达式说明：**
 > 
@@ -51,9 +51,9 @@ PHP-EPG-Docker-Server 是一个用 PHP 实现的 EPG（电子节目指南）服�
 7. 点击 `更新数据库` 按钮
 8. 点击 `查看数据库` 按钮
 
-<kbd><img src="https://github.com/user-attachments/assets/3f80c287-42f7-4766-8082-49ce57e40664"/></kbd>
+![更新数据库](/pic/update.png)
 
-![phpLiteAdmin](https://github.com/user-attachments/assets/b166eb69-d52f-42dd-aa45-388e28a82381)
+![phpLiteAdmin](/pic/phpliteadmin.png)
 
 ## 使用步骤 🛠️
 - 将 `http://{服务器IP地址}:5678/epg` 填入 `DIYP`、`TiviMate` 等软件的 `EPG 地址栏`
@@ -63,11 +63,11 @@ PHP-EPG-Docker-Server 是一个用 PHP 实现的 EPG（电子节目指南）服�
 
 **DIYP**
 
-![DIYP 示例](https://github.com/user-attachments/assets/ef926713-f2e1-42b9-aed4-4c9f5c1af1da)
+![DIYP 示例](/pic/DIYP.png)
 
 **TiviMate**
 
-![TiviMate](https://github.com/user-attachments/assets/8fbaf4b9-c7b2-4b1a-b221-41d3954fbec8)
+![TiviMate](/pic/TiviMate.jpg)
 
 ## 特别鸣谢 🙏
 - [celetor/epg](https://github.com/celetor/epg)

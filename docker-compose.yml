@@ -4,6 +4,7 @@ services:
   epg-php:
     image: php:7.2-apache
     container_name: php-epg
+    # 默认使用 5678 端口，按需自行修改
     ports:
       - "5678:80"
     volumes:
