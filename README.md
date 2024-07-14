@@ -34,9 +34,8 @@ PHP-EPG-Docker-Server 是一个用 PHP 实现的 EPG（电子节目指南）服�
 2. 拉取源码：
 
    ```bash
-   mkdir php-epg    # 新建文件夹
-   cd php-epg    # 进入文件夹
    git clone https://github.com/TakcC/PHP-EPG-Docker-Server.git    # 拉取源码
+   cd PHP-EPG-Docker-Server    # 进入文件夹
    docker-compose up -d    # 部署并运行
    ```
    >
