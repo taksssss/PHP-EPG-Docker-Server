@@ -1,32 +1,70 @@
 <?php
+/**
+ * @file update.php
+ * @brief 更新脚本
+ * 
+ * 该脚本用于定期从配置的 XML 源下载节目数据，并将其存入 SQLite 数据库中。
+ * 
+ * 作者: Tak
+ * GitHub: https://github.com/TakcC/PHP-EPG-Docker-Server
+ */
+
+// 设置超时时间为10分钟
+set_time_limit(10*60);
+
 // 设置时区为亚洲/上海
 date_default_timezone_set("Asia/Shanghai");
+
+// 设置时间格式
+$timeformat = "[y-m-d H:i:s]";
 
 // 引入配置文件
 require_once 'config.php';
 
 // 创建或打开数据库
-$db_file = __DIR__ . '/adata.db';
-$db = new SQLite3($db_file);
+try {
+    $db_file = __DIR__ . '/adata.db';
+    $dsn = 'sqlite:' . $db_file;
+    $db = new PDO($dsn);
+    $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-// 创建表格（如果不存在）
-$db->exec("CREATE TABLE IF NOT EXISTS epg_diyp (
-    date TEXT NOT NULL,
-    channel TEXT NOT NULL,
-    epg TEXT,
-    PRIMARY KEY (date, channel)
-)");
+    // 初始化数据库表
+    $db->exec("CREATE TABLE IF NOT EXISTS epg_diyp (
+        date TEXT NOT NULL,
+        channel TEXT NOT NULL,
+        epg TEXT,
+        PRIMARY KEY (date, channel)
+    )");
 
-$db->exec("CREATE TABLE IF NOT EXISTS epg_xml (
-    date TEXT PRIMARY KEY,
-    content TEXT NOT NULL
-)");
+    $db->exec("CREATE TABLE IF NOT EXISTS epg_xml (
+        date TEXT PRIMARY KEY,
+        content TEXT NOT NULL
+    )");
 
-// 删除过期数据
-function deleteOldData($db, $keep_days) {
+    $db->exec("CREATE TABLE IF NOT EXISTS update_log (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        log_message TEXT NOT NULL,
+        timestamp TEXT DEFAULT CURRENT_TIMESTAMP
+    )");
+} catch (PDOException $e) {
+    echo '数据库连接失败: ' . $e->getMessage();
+    exit();
+}
+
+// 删除过期数据和日志
+function deleteOldData($db, $keep_days, &$log_messages) {
+    global $timeformat;
     $threshold_date = date('Y-m-d', strtotime("-$keep_days days + 1 day"));
-    $db->exec("DELETE FROM epg_diyp WHERE date < '$threshold_date'");
-    echo " 共 {$db->changes()} 条。<br>";
+    $stmt = $db->prepare("DELETE FROM epg_diyp WHERE date < :threshold_date");
+    $stmt->bindValue(':threshold_date', $threshold_date, PDO::PARAM_STR);
+    $stmt->execute();
+    $log_messages[] = date($timeformat) . " 【清理数据】 共 {$stmt->rowCount()} 条。";
+
+    // 清除过期日志，保留最近 $keep_days 天的日志
+    $stmt = $db->prepare("DELETE FROM update_log WHERE timestamp < :threshold_date");
+    $stmt->bindValue(':threshold_date', $threshold_date, PDO::PARAM_STR);
+    $stmt->execute();
+    $log_messages[] = date($timeformat) . " 【清理日志】 共 {$stmt->rowCount()} 条。";
 }
 
 // 全局变量，用于标记是否已经清除当天数据
@@ -36,8 +74,14 @@ $cleared_today = false;
 function clearTodayData($date, $db) {
     global $cleared_today;
     if (!$cleared_today) {
-        $db->exec("DELETE FROM epg_diyp WHERE date = '$date'");
-        $db->exec("DELETE FROM epg_xml WHERE date = '$date'");
+        $stmt = $db->prepare("DELETE FROM epg_diyp WHERE date = :date");
+        $stmt->bindValue(':date', $date, PDO::PARAM_STR);
+        $stmt->execute();
+
+        $stmt = $db->prepare("DELETE FROM epg_xml WHERE date = :date");
+        $stmt->bindValue(':date', $date, PDO::PARAM_STR);
+        $stmt->execute();
+
         $cleared_today = true;
     }
 }
@@ -50,7 +94,8 @@ function getFormatTime($time) {
 }
 
 // 下载数据并存入数据库
-function downloadData($xml_url, $db) {
+function downloadData($xml_url, $db, &$log_messages) {
+    global $timeformat;
     // 获取 URL 的最后三个字符来检查扩展名
     $extension = strtolower(substr($xml_url, -3));
 
@@ -69,17 +114,17 @@ function downloadData($xml_url, $db) {
         // 清除当天数据
         clearTodayData(date('Y-m-d'), $db);
 
-        $db->exec('BEGIN');
+        $db->beginTransaction();
         try {
             processXmlData($xml_data, date('Y-m-d'), $db);
-            $db->exec('COMMIT');
+            $db->commit();
         } catch (Exception $e) {
-            $db->exec('ROLLBACK');
-            echo "处理数据时出错: " . $e->getMessage() . "<br>";
+            $db->rollBack();
+            $log_messages[] = "处理数据时出错: " . $e->getMessage();
         }
-        echo date("H:i:s") . " 【更新成功】<br>";
+        $log_messages[] = date($timeformat) . " 【更新成功】";
     } else {
-        echo "下载失败: $xml_url<br>";
+        $log_messages[] = date($timeformat) . " 【下载失败！！！】";
     }
 }
 
@@ -87,8 +132,8 @@ function downloadData($xml_url, $db) {
 function processXmlData($xml_data, $date, $db) {
     // 插入数据到 epg_xml 表，如果有冲突则忽略
     $stmt = $db->prepare('INSERT OR IGNORE INTO epg_xml (date, content) VALUES (:date, :content)');
-    $stmt->bindValue(':date', $date, SQLITE3_TEXT);
-    $stmt->bindValue(':content', $xml_data, SQLITE3_TEXT);
+    $stmt->bindValue(':date', $date, PDO::PARAM_STR);
+    $stmt->bindValue(':content', $xml_data, PDO::PARAM_STR);
     $stmt->execute();
 
     $reader = new XMLReader();
@@ -157,35 +202,51 @@ function processXmlData($xml_data, $date, $db) {
             $content = json_encode([
                 'channel_name' => $channelName,
                 'date' => $date,
-                'url' => 'https://github.com/TakcC/PHP-EPG-Server',
+                'url' => 'https://github.com/TakcC/PHP-EPG-Docker-Server',
                 'epg_data' => $programmes
             ], JSON_UNESCAPED_UNICODE);
 
             $stmt = $db->prepare('INSERT OR IGNORE INTO epg_diyp (date, channel, epg) VALUES (:date, :channel, :epg)');
-            $stmt->bindValue(':date', $date, SQLITE3_TEXT);
-            $stmt->bindValue(':channel', $channelName, SQLITE3_TEXT);
-            $stmt->bindValue(':epg', $content, SQLITE3_TEXT);
+            $stmt->bindValue(':date', $date, PDO::PARAM_STR);
+            $stmt->bindValue(':channel', $channelName, PDO::PARAM_STR);
+            $stmt->bindValue(':epg', $content, PDO::PARAM_STR);
             $stmt->execute();
         }
     }
 }
 
 // 统计更新前数据条数
-$initialCount = $db->querySingle("SELECT COUNT(*) FROM epg_diyp");
+$initialCount = $db->query("SELECT COUNT(*) FROM epg_diyp")->fetchColumn();
 
 // 删除过期数据
-echo date("H:i:s") . " 【删除过期数据】 ";
-deleteOldData($db, $Config['days_to_keep']);
+deleteOldData($db, $Config['days_to_keep'], $log_messages);
 
 // 更新数据
 foreach ($Config['xml_urls'] as $xml_url) {
-    echo "<br>" . date("H:i:s") . " 【更新源】$xml_url<br>";
-    downloadData(trim($xml_url), $db);
+    // 忽略以 # 开头的 URL
+    if (strpos($xml_url, '#') === 0) {
+        continue;
+    }    
+    // 去除 URL 后的注释部分
+    $url_parts = explode('#', $xml_url);
+    $cleaned_url = trim($url_parts[0]);
+
+    $log_messages[] = date($timeformat) . " 【更新地址】 $cleaned_url";
+    downloadData($cleaned_url, $db, $log_messages);
 }
 
 // 统计更新后数据条数
-$finalCount = $db->querySingle("SELECT COUNT(*) FROM epg_diyp");
+$finalCount = $db->query("SELECT COUNT(*) FROM epg_diyp")->fetchColumn();
+$log_messages[] = date($timeformat) . " 【更新完成】 更新前：{$initialCount} 条，更新后：{$finalCount} 条。";
 
+// 将日志信息写入数据库
+$log_message_str = implode("<br>", $log_messages);
+$timestamp = date('Y-m-d H:i:s'); // 使用设定的时区时间
+$stmt = $db->prepare('INSERT INTO update_log (log_message, timestamp) VALUES (:log_message, :timestamp)');
+$stmt->bindValue(':log_message', $log_message_str, PDO::PARAM_STR);
+$stmt->bindValue(':timestamp', $timestamp, PDO::PARAM_STR);
+$stmt->execute();
 
-echo "<br>" . date("H:i:s") . " 【数据更新完成】 更新前：{$initialCount} 条，更新后：{$finalCount} 条。";
+echo implode("<br>", $log_messages);
+
 ?>

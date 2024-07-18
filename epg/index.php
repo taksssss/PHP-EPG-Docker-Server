@@ -1,4 +1,14 @@
 <?php
+/**
+ * @file index.php
+ * @brief 主页处理脚本
+ * 
+ * 该脚本处理来自客户端的请求，根据查询参数获取指定日期和频道的节目信息，
+ * 并从 SQLite 数据库中提取或返回默认数据。
+ * 
+ * 作者: Tak
+ * GitHub: https://github.com/TakcC/PHP-EPG-Docker-Server
+ */
 
 // 禁止输出错误提示
 error_reporting(0);
