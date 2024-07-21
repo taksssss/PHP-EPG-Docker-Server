@@ -9,9 +9,19 @@
  * GitHub: https://github.com/TakcC/PHP-EPG-Docker-Server
  */
 
-// 设置会话变量，表明用户可以访问 phpliteadmin.php 和 update.php
-session_start();
+// 设置时区为亚洲/上海
+date_default_timezone_set("Asia/Shanghai");
+
+ session_start();
+
+// 设置会话变量，表明用户可以访问 phpliteadmin.php
 $_SESSION['can_access_phpliteadmin'] = true;
+
+// 读取 configUpdated 状态
+$configUpdated = isset($_SESSION['configUpdated']) && $_SESSION['configUpdated'];
+if ($configUpdated) {
+    unset($_SESSION['configUpdated']);
+}
 
 // 引入配置文件
 require_once 'config.php';
@@ -272,7 +282,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update'])) {
     file_put_contents('config.php', '<?php' . "\n\n" . '$Config = ' . var_export($newConfig, true) . ';' . "\n\n" . '?>');
 
     // 设置标志变量以显示弹窗
-    $configUpdated = true;
+    $_SESSION['configUpdated'] = true;
 
     // 重新加载配置以确保页面显示更新的数据
     require 'config.php';
@@ -281,9 +291,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update'])) {
     if ($oldConfig['start_time'] !== $start_time || $oldConfig['end_time'] !== $end_time || $oldConfig['interval_time'] !== $interval_time) {
         exec('php cron.php > /dev/null 2>/dev/null &');
     }
+    header('Location: manage.php');
+    exit;
 } else {
-    $configUpdated = false;
-    // // 首次进入界面，检查 cron.php 是否运行正常
+    // 首次进入界面，检查 cron.php 是否运行正常
     // $output = [];
     // exec("ps aux | grep '[c]ron.php'", $output);
     // if(!$output) {
@@ -291,25 +302,34 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update'])) {
     // }
 }
 
-// 连接数据库并获取update_log表中的数据
+// 连接数据库并获取日志表中的数据
 $logData = [];
+$cronLogData = [];
 try {
     $pdo = new PDO('sqlite:adata.db');
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-    $stmt = $pdo->query("SELECT * FROM update_log ORDER BY timestamp DESC");
-    $logData = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    // 处理 AJAX 请求，返回更新日志数据
+    if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['get_update_logs'])) {
+        $stmt = $pdo->query("SELECT * FROM update_log");
+        $logData = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        header('Content-Type: application/json');
+        echo json_encode($logData);
+        exit;
+    }
+
+    // 处理 AJAX 请求，返回定时任务日志数据
+    if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['get_cron_logs'])) {
+        $stmt = $pdo->query("SELECT * FROM cron_log");
+        $cronLogData = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        header('Content-Type: application/json');
+        echo json_encode($cronLogData);
+        exit;
+    }
 } catch (Exception $e) {
     // 处理数据库连接错误
     $logData = [];
-}
-
-// 处理 AJAX 请求，返回更新日志数据
-if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['get_logs'])) {
-    // 输出更新日志的 JSON 数据
-    header('Content-Type: application/json');
-    echo json_encode($logData);
-    exit;
+    $cronLogData = [];
 }
 
 // 生成配置管理表单
@@ -344,12 +364,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['get_logs'])) {
             border: 1px solid #ccc;
             border-radius: 5px;
             box-sizing: border-box;
-            margin-bottom: 10px;
             resize: none;
+            white-space: pre-wrap; 
         }
         .form-row {
             display: flex;
             align-items: center;
+            margin-bottom: 10px;
         }
         .label-days-to-keep {
             width: 98px;
@@ -472,18 +493,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['get_logs'])) {
             border-radius: 10px;
             position: relative;
             box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2);
+            top: 50%;
+            transform: translateY(-50%);
         }
         .log-modal-content {
             max-width: 830px;
             width: auto;
-            top: 10%;
         }
         .cron-log-modal-content,
         .config-modal-content {
             max-width: 65%;
             width: 500px;
-            top: 50%;
-            transform: translateY(-50%);
         }
         .config-modal-content {
             width: 200px;
@@ -500,16 +520,41 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['get_logs'])) {
             text-decoration: none;
             cursor: pointer;
         }
+        .table-container {
+            height: 560px; /* 固定高度 */
+            overflow-y: scroll; /* 启用垂直滚动条 */
+        }
         #logTable {
             width: 100%;
             border-collapse: separate;
             border-spacing: 0 5px; /* 调整行之间的垂直间距 */
+            table-layout: fixed; /* 固定表格布局，防止内容超出 */
         }
-
         #logTable th, #logTable td {
             border: 1px solid black;
             padding: 5px;
             text-align: left;
+        }
+        #logTable th:nth-child(1), 
+        #logTable td:nth-child(1) {
+            width: 4%; /* 第一列宽度 */
+            text-align: center;
+        }
+
+        #logTable th:nth-child(2), 
+        #logTable td:nth-child(2) {
+            width: 9%; /* 第二列宽度 */
+            text-align: center;
+        }
+
+        #logTable th:nth-child(3), 
+        #logTable td:nth-child(3) {
+            width: 88%; /* 第三列宽度 */
+            word-wrap: break-word; /* 自动换行 */
+            overflow-wrap: break-word; /* 自动换行 */
+        }
+        #logTable th:nth-child(3) {
+            text-align: center; /* 第三列表头居中 */
         }
     </style>
 </head>
@@ -519,14 +564,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['get_logs'])) {
     <form method="POST">
 
         <label for="xml_urls">EPG源地址 (支持 xml 跟 xml.gz 格式， # 为注释)</label><br><br>
-        <textarea id="xml_urls" name="xml_urls" rows="4" required><?php echo implode("\n", array_map('trim', $Config['xml_urls'])); ?></textarea><br><br>
+        <textarea placeholder="一行一个，地址前面加 # 可以临时停用，后面加 # 可以备注。" id="xml_urls" name="xml_urls" rows="5" required><?php echo implode("\n", array_map('trim', $Config['xml_urls'])); ?></textarea><br><br>
 
         <div class="form-row">
             <label for="days_to_keep" class="label-days-to-keep">数据保存天数</label>
             <label for="start_time" class="label-time custom-margin1">【定时任务】： 开始时间</label>
             <label for="end_time" class="label-time2 custom-margin2">结束时间</label>
             <label for="interval_time" class="label-time3 custom-margin3">间隔周期 (选0小时0分钟取消)</label>
-        </div><br>
+        </div>
 
         <div class="form-row">
             <select id="days_to_keep" name="days_to_keep" required>
@@ -555,23 +600,24 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['get_logs'])) {
                 <?php endfor; ?>
             </select> 分钟
         </div><br>
-
+        
         <div class="flex-container">
             <div class="flex-item">
                 <label for="channel_replacements">频道忽略字符串 (匹配时按先后顺序清除)</label><br><br>
-                <textarea id="channel_replacements" name="channel_replacements" rows="6" required><?php echo implode("\n", array_map('trim', $Config['channel_replacements'])); ?></textarea><br><br>
+                <textarea id="channel_replacements" name="channel_replacements" rows="5" required><?php echo implode("\n", array_map('trim', $Config['channel_replacements'])); ?></textarea><br><br>
             </div>
             <div class="flex-item">
                 <label for="channel_mappings">频道映射 (显示频道名, 数据库频道名) (正则表达式regex:)</label><br><br>
-                <textarea id="channel_mappings" name="channel_mappings" rows="6" required><?php echo implode("\n", array_map(function($search, $replace) { return $search . ', ' . $replace; }, array_keys($Config['channel_mappings']), $Config['channel_mappings'])); ?></textarea><br><br>
+                <textarea id="channel_mappings" name="channel_mappings" rows="5" required><?php echo implode("\n", array_map(function($search, $replace) { return $search . ', ' . $replace; }, array_keys($Config['channel_mappings']), $Config['channel_mappings'])); ?></textarea><br><br>
             </div>
         </div>
+
         <input id="updateConfig" type="submit" name="update" value="更新配置"><br><br>
         <div class="button-container">
             <a href="update.php" target="_blank">更新数据库</a>
             <a href="phpliteadmin.php" target="_blank">管理数据库</a>
-            <button type="button" onclick="showCronLog()">定时任务日志</button>
-            <button type="button" onclick="showLog()">数据库更新日志</button>
+            <button type="button" onclick="showLog('cron')">定时任务日志</button>
+            <button type="button" onclick="showLog('update')">数据库更新日志</button>
         </div>
     </form>
 </div>
@@ -594,24 +640,20 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['get_logs'])) {
     <div class="modal-content log-modal-content">
         <span class="close">&times;</span>
         <h2>数据库更新日志</h2>
-        <table id="logTable">
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>日期</th>
-                    <th>描述</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php foreach ($logData as $log) { ?>
+        <div class="table-container" id="log-table-container">
+            <table id="logTable">
+                <thead>
                     <tr>
-                        <td><?php echo $log['id']; ?></td>
-                        <td><?php echo strftime('%y-%m-%d %H:%M:%S', strtotime($log['timestamp'])); ?></td>
-                        <td><?php echo $log['log_message']; ?></td>
+                        <th>ID</th>
+                        <th>日期</th>
+                        <th>描述</th>
                     </tr>
-                <?php } ?>
-            </tbody>
-        </table>
+                </thead>
+                <tbody>
+                    <!-- 数据由 JavaScript 动态生成 -->
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 
@@ -620,7 +662,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['get_logs'])) {
     <div class="modal-content cron-log-modal-content">
         <span class="close">&times;</span>
         <h2>定时任务日志</h2>
-        <textarea id="logContent" readonly style="width: 100%; height: 400px;"></textarea>
+        <textarea id="cronLogContent" readonly style="width: 100%; height: 400px;"></textarea>
     </div>
 </div>
 
@@ -665,81 +707,66 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['get_logs'])) {
                 modal.style.display = "none";
             }
         }
+        $configUpdated = false;
     }
 
-    function showLog() {
-        var logModal = document.getElementById("logModal");
-        var logSpan = document.getElementsByClassName("close")[1];
+    function showLog(type) {
+        var modal, logSpan, logContent;
 
-        logModal.style.display = "block";
+        if (type === 'update') {
+            modal = document.getElementById("logModal");
+            logSpan = document.getElementsByClassName("close")[1];
+            fetchLogs('<?php echo $_SERVER['PHP_SELF']; ?>?get_update_logs=true', updateLogTable);
+        } else if (type === 'cron') {
+            modal = document.getElementById("cronlogModal");
+            logSpan = document.getElementsByClassName("close")[2];
+            fetchLogs('<?php echo $_SERVER['PHP_SELF']; ?>?get_cron_logs=true', updateCronLogContent);
+        }
+
+        modal.style.display = "block";
 
         logSpan.onclick = function() {
-            logModal.style.display = "none";
+            modal.style.display = "none";
         }
 
         window.onclick = function(event) {
-            if (event.target == logModal) {
-                logModal.style.display = "none";
+            if (event.target == modal) {
+                modal.style.display = "none";
             }
         }
-
-        // 使用 AJAX 异步请求更新日志数据
-        var xhr = new XMLHttpRequest();
-        xhr.onreadystatechange = function() {
-            if (xhr.readyState == 4 && xhr.status == 200) {
-                var logData = JSON.parse(xhr.responseText);
-                updateLogTable(logData);
-            }
-        };
-        xhr.open("GET", "<?php echo $_SERVER['PHP_SELF']; ?>?get_logs=true", true);
-        xhr.send();
     }
 
-    function showCronLog() {
-        var cronlogModal = document.getElementById("cronlogModal");
-        var logSpan = document.getElementsByClassName("close")[2];
-        var logContent = document.getElementById("logContent");
-
-        // 获取当前时间戳，避免缓存问题
-        var timestamp = new Date().getTime();
-
-        // 使用 fetch 请求获取 cron.log 文件内容，并附加时间戳参数
-        fetch('cron.log?' + timestamp)
-            .then(response => response.text())
-            .then(data => {
-                // 将日志文件内容显示在文本框中
-                logContent.value = data.trim();
-                // 设置文本框的滚动位置，显示最后一行
-                logContent.scrollTop = logContent.scrollHeight;
-            })
+    function fetchLogs(endpoint, callback) {
+        fetch(endpoint)
+            .then(response => response.json())
+            .then(data => callback(data))
             .catch(error => {
-                console.error('Error fetching log file:', error);
-                logContent.value = '无法读取日志文件';
+                console.error('Error fetching log:', error);
+                callback([]);
             });
-
-        cronlogModal.style.display = "block";
-
-        logSpan.onclick = function() {
-            cronlogModal.style.display = "none";
-        }
-
-        window.onclick = function(event) {
-            if (event.target == cronlogModal) {
-                cronlogModal.style.display = "none";
-            }
-        }
     }
 
     function updateLogTable(logData) {
-        var tableBody = document.getElementById("logTable").getElementsByTagName('tbody')[0];
-        tableBody.innerHTML = ''; // 清空表格内容
+        var logTableBody = document.querySelector("#logTable tbody");
+        logTableBody.innerHTML = '';
 
-        logData.forEach(function(log) {
-            var row = tableBody.insertRow();
-            row.innerHTML = '<td>' + log.id + '</td>' +
-                            '<td>' + log.timestamp.substring(2) + '</td>' +
-                            '<td>' + log.log_message + '</td>';
+        logData.forEach(log => {
+            var row = document.createElement("tr");
+            row.innerHTML = `
+                <td>${log.id}</td>
+                <td>${new Date(log.timestamp).toLocaleString()}</td>
+                <td>${log.log_message}</td>
+            `;
+            logTableBody.appendChild(row);
         });
+        var logTableContainer = document.getElementById("log-table-container");
+        logTableContainer.scrollTop = logTableContainer.scrollHeight;
+    }
+
+    function updateCronLogContent(logData) {
+        var logContent = document.getElementById("cronLogContent");
+        logContent.value = logData.map(log => `[${new Date(log.timestamp).toLocaleString()}] ${log.log_message}`).join('\n');
+        logContent.scrollTop = logContent.scrollHeight;
     }
 </script>
 </body>

@@ -1,10 +1,13 @@
 # PHP-EPG-Docker-Server 📺
 
-PHP-EPG-Docker-Server 是一个用 PHP 实现的 EPG（电子节目指南）服务端， `Docker` 部署，自带设置界面，支持 `xmltv` 和 `DIYP & 百川` 格式。
+PHP-EPG-Docker-Server 是一个用 PHP 实现的 EPG（电子节目指南）服务端， `Docker` 部署，自带设置界面，支持 `DIYP & 百川` 、 `超级直播` 以及 `xmltv` 格式。
 
 ## 主要功能 ℹ️
 - **使用 Docker🐳 部署，提供 `amd64` 跟 `arm64` 架构镜像**
-- 支持标准的 `xmltv` 和 `DIYP & 百川` 格式 📡
+- **基镜像采用 `alpine-apache-php` ，压缩后大小仅 `23M`**
+- **采用先构建再存数据库的策略，占用空间稍大，但是能实现秒读取**
+- 支持 `DIYP & 百川` 以及 `超级直播` 格式，支持缓存 `xmltv` 格式 📡
+- 兼容多种 `xmltv` 格式
 - 内置定时任务，支持设置定时拉取数据 ⏳
 - 使用 `SQLite` 数据库存储 🗃️
 - 包含网页设置页面 🌐
@@ -34,6 +37,24 @@ PHP-EPG-Docker-Server 是一个用 PHP 实现的 EPG（电子节目指南）服�
 
 ## 更新日志 📝
 
+### 2024-7-21更新：
+
+1. **支持 `超级直播` 格式**
+2. **重构代码，基镜像改为 `alpine-apache-php` ，镜像大小从 155M 下降到 23M**
+3. 支持解析 M3U4U 等非 .xml/.gz 结尾 EPG 地址
+4. 数据分批插入，降低内存占用
+5. 修复部分界面显示异常问题
+6. 修复设置页面刷新，提示“是否重新提交表单”问题
+
+- ⚠️ 该版本容器内端口从 `8080` 修正为 `80`，自行部署的小伙伴注意这一点。
+
+
+#### TODO：
+
+- 支持繁体频道匹配（ opencc4php 在 alpine 里面还没跑起来……）
+- 整合生成 xml 文件（现在只返回第一个）
+- 支持多对一频道映射
+
 ### 2024-7-18更新：
 
 1. 提供 Docker🐳 镜像（基于 php:7.4-apache ，支持 x86-64 跟 arm64 ）
@@ -44,12 +65,6 @@ PHP-EPG-Docker-Server 是一个用 PHP 实现的 EPG（电子节目指南）服�
 6. 支持查看数据库更新日志
 7. 配置页面支持 Ctrl+S 保存
 8. 更新部署流程
-
-#### TODO：
-
-- 整合更轻量的 alpine-apache-php 容器
-- 支持繁体字匹配
-- 支持返回超级直播格式
 
 
 ### 2024-7-14更新：
@@ -78,12 +93,18 @@ PHP-EPG-Docker-Server 是一个用 PHP 实现的 EPG（电子节目指南）服�
 
 1. 配置 `Docker` 环境
 
-2. 拉取镜像并运行：
+2. 若已安装过，先删除旧版本（注意备份数据）
+
+   ```bash
+   docker rm php-epg -f
+   ```
+
+3. 拉取镜像并运行：
 
    ```bash
    docker run -d \
      --name php-epg \
-     -p 5678:8080 \
+     -p 5678:80 \
      --restart always \
      taksss/php-epg:latest
    ```
@@ -105,7 +126,17 @@ PHP-EPG-Docker-Server 是一个用 PHP 实现的 EPG（电子节目指南）服�
 
 5. 设置 `定时任务` ，点击 `更新配置` 保存，点击 `定时任务日志` 查看定时任务时间表
 
-6. 将 **`http://{服务器IP地址}:5678/epg`** 填入 `DIYP`、`TiviMate` 等软件的 `EPG 地址栏`
+6. 用浏览器测试各个接口的返回结果是否正确：
+
+    - `xmltv` 接口： `http://{服务器IP地址}:5678/epg/index.php`
+  
+    - `DIYP&百川` 接口： `http://{服务器IP地址}:5678/epg/index.php?ch=CCTV1`
+  
+    - `超级直播` 接口： `http://{服务器IP地址}:5678/epg/index.php?channel=CCTV1`
+
+7. 将 **`http://{服务器IP地址}:5678/epg/index.php`** 填入 `DIYP`、`TiviMate` 等软件的 `EPG 地址栏`
+
+    - ⚠️ 直接使用 `docker run` 拉取镜像的话，可以将 `http://{服务器IP地址}:5678/epg/index.php` 替换为 `http://{服务器IP地址}:5678/epg`。
 
 ![设置定时任务](/pic/cronSet.png)
 
@@ -122,6 +153,9 @@ PHP-EPG-Docker-Server 是一个用 PHP 实现的 EPG（电子节目指南）服�
 **TiviMate**
 
 ![TiviMate](/pic/TiviMate.jpg)
+
+**超级直播**
+![超级直播](/pic/LoveTV.jpg)
 
 ## 特别鸣谢 🙏
 - [celetor/epg](https://github.com/celetor/epg)

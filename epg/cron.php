@@ -12,7 +12,7 @@
 // 取消时间限制
 set_time_limit(0);
 
-// 确保脚本只能通过CLI运行
+// 设置脚本只能通过CLI运行
 if (php_sapi_name() !== 'cli') {
     die("此脚本只能通过 CLI 运行");
 }
@@ -23,13 +23,37 @@ date_default_timezone_set("Asia/Shanghai");
 // 从config.php中读取配置
 include 'config.php';
 
-$logFile = 'cron.log'; // 日志文件路径
-$pidFile = 'cron.pid'; // PID文件路径
+// 数据库文件路径
+$db_file = __DIR__ . '/adata.db';
+
+try {
+    // 创建或打开数据库
+    $dsn = 'sqlite:' . $db_file;
+    $db = new PDO($dsn);
+    $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
+    // 初始化数据库表
+    $db->exec("CREATE TABLE IF NOT EXISTS cron_log (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
+        log_message TEXT NOT NULL
+    )");
+} catch (PDOException $e) {
+    die("无法连接到数据库: " . $e->getMessage());
+}
 
 // 日志记录函数
 function logMessage($message) {
-    global $logFile;
-    file_put_contents($logFile, date('Y-m-d H:i:s') . " - " . $message . "\n", FILE_APPEND);
+    global $db;
+    try {
+        $timestamp = date('Y-m-d H:i:s'); // 使用设定的时区时间
+        $stmt = $db->prepare("INSERT INTO cron_log (timestamp, log_message) VALUES (:timestamp, :message)");
+        $stmt->bindValue(':timestamp', $timestamp, PDO::PARAM_STR);
+        $stmt->bindParam(':message', $message);
+        $stmt->execute();
+    } catch (PDOException $e) {
+        die("日志记录失败: " . $e->getMessage());
+    }
 }
 
 // 获取当前进程的PID
@@ -38,7 +62,6 @@ $currentPid = getmypid();
 // 检查是否已有实例在运行
 $output = [];
 exec("ps aux | grep '[c]ron.php'", $output);
-
 foreach ($output as $line) {
     // 提取进程信息
     $parts = preg_split('/\s+/', $line);
@@ -117,9 +140,6 @@ if ($next_execution_time >= $end_time_today) {
 // 计算距离下一个执行时间的秒数
 $initial_sleep = $next_execution_time - $current_time;
 
-// 提示
-logMessage("【提示】 只保存当天定时任务日志");
-
 // 格式化并显示时间信息
 logMessage("------------------------------------");
 logMessage("【开始时间】 " . date('Y-m-d H:i:s', $first_run_today));
@@ -156,9 +176,6 @@ while (true) {
         $next_execution_time = $first_run_today + 24 * 3600; // 加一天
         // 更新明天的结束时间
         $end_time_today = strtotime(date('Y-m-d', strtotime('+1 day')) . " $end_hour:$end_minute:00");
-        // 清空当天日志文件
-        file_put_contents($logFile, "");
-        logMessage("【旧日志已清除】");
     }
 
     // 计算等待时间

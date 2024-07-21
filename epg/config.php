@@ -24,7 +24,6 @@ $Config = array (
   array (
     'regex:/^CCTV[-\\s]*(\\p{Han})/iu' => '$1',
     'regex:/^CCTV[-\\s]*(\\d+[K\\+]?)(?!美洲|欧洲).*/i' => 'CCTV$1',
-    'regex:/^(深圳.*?)频道$/i' => '$1',
     'CGTN英语' => 'CGTN',
     'CGTN Documentary' => 'CGTN纪录',
     'CGTN 记录' => 'CGTN纪录',

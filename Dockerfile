@@ -1,21 +1,49 @@
-# 使用 PHP 7.4 Apache 基础镜像
-FROM php:7.4-apache
+FROM alpine:3.20
+LABEL maintainer="erik.soderblom@gmail.com"
+LABEL description="Alpine based image with apache2 and php8.3."
 
-# 拷贝本地 epg 目录到容器的 /var/www/html/epg 目录
-COPY ./epg /var/www/html/epg
+# 使用中科大镜像
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.ustc.edu.cn/g' /etc/apk/repositories
 
-# 设置 /var/www/html/epg 目录的权限
-RUN chmod -R 777 /var/www/html/epg
+# 安装 Apache 和 PHP
+RUN apk --no-cache --update \
+    add apache2 \
+    apache2-ssl \
+    curl \
+    php83-apache2 \
+    php83-bcmath \
+    php83-bz2 \
+    php83-calendar \
+    php83-common \
+    php83-ctype \
+    php83-curl \
+    php83-dom \
+    php83-gd \
+    php83-iconv \
+    php83-mbstring \
+    php83-mysqli \
+    php83-mysqlnd \
+    php83-openssl \
+    php83-pdo_mysql \
+    php83-pdo_pgsql \
+    php83-pdo_sqlite \
+    php83-phar \
+    php83-session \
+    php83-xml \
+    php83-xmlreader \
+    php83-simplexml \
+    php83-json \
+    php83-posix \
+    && mkdir /htdocs
 
-# 设置 ServerName 以避免警告
-RUN echo "ServerName localhost" >> /etc/apache2/apache2.conf
+# 复制 ./epg 文件夹到 /htdocs 并设置权限
+COPY ./epg /htdocs/epg
+RUN chown -R apache:apache /htdocs/epg
 
-# 修改 Apache 配置以监听非特权端口 8080
-RUN sed -i 's/Listen 80/Listen 8080/' /etc/apache2/ports.conf
-RUN sed -i 's/:80/:8080/' /etc/apache2/sites-available/000-default.conf
+EXPOSE 80 443
 
-# 切换到 www-data 用户并运行 cron.php 脚本
-USER www-data
+ADD docker-entrypoint.sh /
 
-# 设置 ENTRYPOINT 以运行 PHP 脚本并启动 Apache 服务器
-ENTRYPOINT ["sh", "-c", "cd /var/www/html/epg && php cron.php & exec apache2-foreground"]
+HEALTHCHECK CMD wget -q --no-cache --spider localhost
+
+ENTRYPOINT ["/docker-entrypoint.sh"]
