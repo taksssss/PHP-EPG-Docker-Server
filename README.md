@@ -1,4 +1,5 @@
 # PHP-EPG-Docker-Server 📺
+![Docker Pulls](https://img.shields.io/docker/pulls/taksss/php-epg)
 
 PHP-EPG-Docker-Server 是一个用 PHP 实现的 EPG（电子节目指南）服务端， `Docker` 部署，自带设置界面，支持 `DIYP & 百川` 、 `超级直播` 以及 `xmltv` 格式。
 
@@ -45,6 +46,8 @@ PHP-EPG-Docker-Server 是一个用 PHP 实现的 EPG（电子节目指南）服�
 4. 数据分批插入，降低内存占用
 5. 修复部分界面显示异常问题
 6. 修复设置页面刷新，提示“是否重新提交表单”问题
+7. 增加接口测试说明
+8. 增加 EPG 地址填写提示
 
 - ⚠️ 该版本容器内端口从 `8080` 修正为 `80`，自行部署的小伙伴注意这一点。
 
