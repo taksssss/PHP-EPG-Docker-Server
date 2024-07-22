@@ -5,7 +5,7 @@ PHP-EPG-Docker-Server 是一个用 PHP 实现的 EPG（电子节目指南）服�
 
 ## 主要功能 ℹ️
 - **使用 Docker🐳 部署，提供 `amd64` 跟 `arm64` 架构镜像**
-- **基镜像采用 `[alpine-apache-php](https://github.com/eriksoderblom/alpine-apache-php/)` ，压缩后大小仅 `23M`** 📦
+- **基镜像采用 [alpine-apache-php](https://github.com/eriksoderblom/alpine-apache-php/) ，压缩后大小仅 `23M`** 📦
 - **采用先构建再存数据库的策略，占用空间稍大，但是能实现秒读取** 🚀
 - **支持 `DIYP & 百川` 以及 `超级直播` 格式，支持缓存 `xmltv` 格式** 📡
 - 兼容多种 `xmltv` 格式 📑
