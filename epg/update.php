@@ -55,7 +55,14 @@ try {
 // 删除过期数据和日志
 function deleteOldData($db, $keep_days, &$log_messages) {
     global $timeformat;
-    $threshold_date = date('Y-m-d', strtotime("-$keep_days days + 1 day"));
+
+    // 清除过期 xmltv 数据
+    $threshold_date = date('Y-m-d', strtotime("-$keep_days days + 1 day"));    
+    $stmt = $db->prepare("DELETE FROM epg_xml WHERE date < :threshold_date");
+    $stmt->bindValue(':threshold_date', $threshold_date, PDO::PARAM_STR);
+    $stmt->execute();
+
+    // 清除过期 DIYP、LoveTV 数据
     $stmt = $db->prepare("DELETE FROM epg_data WHERE date < :threshold_date");
     $stmt->bindValue(':threshold_date', $threshold_date, PDO::PARAM_STR);
     $stmt->execute();
@@ -72,25 +79,6 @@ function deleteOldData($db, $keep_days, &$log_messages) {
     $stmt->bindValue(':threshold_date', $threshold_date, PDO::PARAM_STR);
     $stmt->execute();
     $log_messages[] = date($timeformat) . " 【定时日志】 共 {$stmt->rowCount()} 条。";
-}
-
-// 全局变量，用于标记是否已经清除当天数据
-$cleared_today = false;
-
-// 清除当天数据，仅在第一次调用时执行
-function clearTodayData($date, $db) {
-    global $cleared_today;
-    if (!$cleared_today) {
-        $stmt = $db->prepare("DELETE FROM epg_data WHERE date = :date");
-        $stmt->bindValue(':date', $date, PDO::PARAM_STR);
-        $stmt->execute();
-
-        $stmt = $db->prepare("DELETE FROM epg_xml WHERE date = :date");
-        $stmt->bindValue(':date', $date, PDO::PARAM_STR);
-        $stmt->execute();
-
-        $cleared_today = true;
-    }
 }
 
 // 格式化时间函数
@@ -130,9 +118,6 @@ function downloadData($xml_url, $db, &$log_messages) {
             }
         }
 
-        // 清除当天数据
-        clearTodayData(date('Y-m-d'), $db);
-
         $db->beginTransaction();
         try {
             processXmlData($xml_data, date('Y-m-d'), $db);
@@ -149,8 +134,8 @@ function downloadData($xml_url, $db, &$log_messages) {
 
 // 处理 XML 数据并存入数据库
 function processXmlData($xml_data, $date, $db) {
-    // 插入数据到 epg_xml 表，如果有冲突则忽略
-    $stmt = $db->prepare('INSERT OR IGNORE INTO epg_xml (date, content) VALUES (:date, :content)');
+    // 插入数据到 epg_xml 表，如果有冲突则覆盖
+    $stmt = $db->prepare('INSERT OR REPLACE INTO epg_xml (date, content) VALUES (:date, :content)');
     $stmt->bindValue(':date', $date, PDO::PARAM_STR);
     $stmt->bindValue(':content', $xml_data, PDO::PARAM_STR);
     $stmt->execute();
@@ -224,7 +209,7 @@ function processXmlData($xml_data, $date, $db) {
         $channelId = (string)$programme['channel'];
         if (isset($channelsData[$channelId])) {
             if (!isset($channelsData[$channelId]['diyp_data'][$start['date']])) {
-                // 只有遍历到下一个新日期的时候才递增
+                // 只有遍历到下一个新节目或新日期时才递增
                 $programmeCount++;
                 if ($programmeCount % $batchSize == 0) {
                     insertDataToDatabase($channelsData, $db);
@@ -281,8 +266,16 @@ function insertDataToDatabase($channelsData, $db) {
                 ]
             ], JSON_UNESCAPED_UNICODE);
 
-            // 插入或更新 epg_data 表
-            $stmt = $db->prepare('INSERT OR IGNORE INTO epg_data (date, channel, epg_diyp, epg_lovetv) VALUES (:date, :channel, :epg_diyp, :epg_lovetv) ON CONFLICT(date, channel) DO UPDATE SET epg_diyp = :epg_diyp, epg_lovetv = :epg_lovetv');
+            if ($date == date('Y-m-d')) {
+                // 当天数据覆盖
+                $stmt = $db->prepare('INSERT OR REPLACE INTO epg_data (date, channel, epg_diyp, epg_lovetv)
+                                    VALUES (:date, :channel, :epg_diyp, :epg_lovetv)');
+            } else {
+                // 其他日期数据忽略
+                $stmt = $db->prepare('INSERT OR IGNORE INTO epg_data (date, channel, epg_diyp, epg_lovetv)
+                                    VALUES (:date, :channel, :epg_diyp, :epg_lovetv)');
+            }
+
             $stmt->bindValue(':date', $date, PDO::PARAM_STR);
             $stmt->bindValue(':channel', $channelName, PDO::PARAM_STR);
             $stmt->bindValue(':epg_diyp', $diypContent, PDO::PARAM_STR);

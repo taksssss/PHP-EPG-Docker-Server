@@ -1,30 +1,23 @@
-![php-epg](https://socialify.git.ci/TakcC/PHP-EPG-Docker-Server/image?description=1&descriptionEditable=Docker%F0%9F%90%B3%20%E9%83%A8%E7%BD%B2%EF%BC%8C%E5%B8%A6%E8%AE%BE%E7%BD%AE%E7%95%8C%E9%9D%A2%EF%BC%8C%E6%94%AF%E6%8C%81%20DIYP%20%26%20%E7%99%BE%E5%B7%9D%20%E3%80%81%20%E8%B6%85%E7%BA%A7%E7%9B%B4%E6%92%AD%20%E4%BB%A5%E5%8F%8A%20xmltv%20%E3%80%82&font=Inter&forks=1&issues=1&language=1&name=1&owner=1&pattern=Circuit%20Board&pulls=1&stargazers=1&theme=Auto)
-
 # PHP-EPG-Docker-Server 📺
-![Docker Pulls](https://img.shields.io/docker/pulls/taksss/php-epg)
 
 PHP-EPG-Docker-Server 是一个用 PHP 实现的 EPG（电子节目指南）服务端， `Docker` 部署，自带设置界面，支持 `DIYP & 百川` 、 `超级直播` 以及 `xmltv` 格式。
 
 ## 主要功能 ℹ️
 - **使用 Docker🐳 部署，提供 `amd64` 跟 `arm64` 架构镜像**
-- **基镜像采用 [alpine-apache-php](https://github.com/eriksoderblom/alpine-apache-php/) ，压缩后大小仅 `23M`** 📦
-- **采用先构建再存数据库的策略，占用空间稍大，但是能实现秒读取** 🚀
-- **支持 `DIYP & 百川` 以及 `超级直播` 格式，支持缓存 `xmltv` 格式** 📡
-- 兼容多种 `xmltv` 格式 📑
+- **基镜像采用 `alpine-apache-php` ，压缩后大小仅 `23M`**
+- **采用先构建再存数据库的策略，存在部分冗余数据，但能提高读取速度**
+- 支持 `DIYP & 百川` 、 `超级直播` 以及 `xmltv` 格式 📡
+- 兼容多种 `xmltv` 格式 🗂️
 - 内置定时任务，支持设置定时拉取数据 ⏳
 - 使用 `SQLite` 数据库存储 🗃️
 - 包含网页设置页面 🌐
 - 支持多个 EPG 源 📡
 - 可配置数据保存天数 📅
 - 支持设置频道忽略字符串 🔇
-- 支持频道映射，支持**正则表达式** 🔄
+- 支持**`多对一`**频道映射，支持**正则表达式** 🔄
 - 内置 `phpLiteAdmin` 方便管理数据库 🛠️
 
 ![设置页面](/pic/management.png)
-
-![定时任务日志](/pic/cronLog.png)
-
-![更新日志](/pic/updateLog.png)
 
 > **内置正则表达式说明：**
 > 
@@ -40,6 +33,24 @@ PHP-EPG-Docker-Server 是一个用 PHP 实现的 EPG（电子节目指南）服�
 
 ## 更新日志 📝
 
+### 2024-7-26更新：
+
+1. 自定义频道名支持**多对一映射**
+2. 支持**整合 xmltv**，并**生成 .xml.gz 文件**，降低硬盘占用
+3. 支持查看、搜索数据库频道列表，方便填写映射
+4. 修复 cron.php 在第三天失效的问题
+5. 删除 epg_lovetv 表，超级直播数据直接从对应 DIYP 中生成，减少数据冗余
+6. 优化更新当天数据的逻辑，避免更新时无法获取节目表
+
+#### TODO：
+
+- [x] 支持返回超级直播格式
+- [x] 整合更轻量的 alpine-apache-php 容器
+- [x] 整合生成 xml 文件（现在只返回第一个）
+- [x] 支持多对一频道映射
+- [ ] 支持繁体频道匹配（ opencc4php 在 alpine 里面还没跑起来……）
+
+
 ### 2024-7-21更新：
 
 1. **支持 `超级直播` 格式**
@@ -49,16 +60,7 @@ PHP-EPG-Docker-Server 是一个用 PHP 实现的 EPG（电子节目指南）服�
 5. 修复部分界面显示异常问题
 6. 修复设置页面刷新，提示“是否重新提交表单”问题
 7. 增加接口测试说明
-8. 增加 EPG 地址填写提示
 
-- ⚠️ 该版本容器内端口从 `8080` 修正为 `80`，自行部署的小伙伴注意这一点。
-
-
-#### TODO：
-
-- 支持繁体频道匹配（ opencc4php 在 alpine 里面还没跑起来……）
-- 整合生成 xml 文件（现在只返回第一个）
-- 支持多对一频道映射
 
 ### 2024-7-18更新：
 
@@ -145,7 +147,11 @@ PHP-EPG-Docker-Server 是一个用 PHP 实现的 EPG（电子节目指南）服�
 
 ![设置定时任务](/pic/cronSet.png)
 
-![更新数据库](/pic/update.png)
+![定时任务日志](/pic/cronLog.png)
+
+![更新日志](/pic/updateLog.png)
+
+![查看频道列表](/pic/channels.png)
 
 ![phpLiteAdmin](/pic/phpliteadmin.png)
 
@@ -163,9 +169,8 @@ PHP-EPG-Docker-Server 是一个用 PHP 实现的 EPG（电子节目指南）服�
 ![超级直播](/pic/LoveTV.jpg)
 
 ## 特别鸣谢 🙏
-- [alpine-apache-php](https://github.com/eriksoderblom/alpine-apache-php/)
 - [celetor/epg](https://github.com/celetor/epg)
 - [sparkssssssssss/epg](https://github.com/sparkssssssssss/epg)
 - [Black_crow/xmlgz](https://gitee.com/Black_crow/xmlgz)
-- [112114](https://diyp.112114.xyz/)
+- [DIYP](https://diyp.112114.xyz/)
 - [EPG 51zmt](http://epg.51zmt.top:8000/)
