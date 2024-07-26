@@ -5,6 +5,7 @@ $Config = array (
   array (
   ),
   'days_to_keep' => 7,
+  'gen_xml' => '1',
   'start_time' => '00:00',
   'end_time' => '23:59',
   'interval_time' => 0,
@@ -24,9 +25,8 @@ $Config = array (
   array (
     'regex:/^CCTV[-\\s]*(\\p{Han})/iu' => '$1',
     'regex:/^CCTV[-\\s]*(\\d+[K\\+]?)(?!美洲|欧洲).*/i' => 'CCTV$1',
+    '[CGTN Documentary, CGTN 档案]' => 'CGTN纪录',
     'CGTN英语' => 'CGTN',
-    'CGTN Documentary' => 'CGTN纪录',
-    'CGTN 记录' => 'CGTN纪录',
   ),
 );
 

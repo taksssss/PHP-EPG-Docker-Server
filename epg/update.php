@@ -27,26 +27,6 @@ try {
     $dsn = 'sqlite:' . $db_file;
     $db = new PDO($dsn);
     $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-
-    // 初始化数据库表
-    $db->exec("CREATE TABLE IF NOT EXISTS epg_data (
-        date TEXT NOT NULL,
-        channel TEXT NOT NULL,
-        epg_diyp TEXT,
-        epg_lovetv TEXT,
-        PRIMARY KEY (date, channel)
-    )");
-
-    $db->exec("CREATE TABLE IF NOT EXISTS epg_xml (
-        date TEXT PRIMARY KEY,
-        content TEXT NOT NULL
-    )");
-
-    $db->exec("CREATE TABLE IF NOT EXISTS update_log (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
-        log_message TEXT NOT NULL
-    )");
 } catch (PDOException $e) {
     echo '数据库连接失败: ' . $e->getMessage();
     exit();
@@ -55,26 +35,30 @@ try {
 // 删除过期数据和日志
 function deleteOldData($db, $keep_days, &$log_messages) {
     global $timeformat;
+    global $Config;
 
-    // 清除过期 xmltv 数据
-    $threshold_date = date('Y-m-d', strtotime("-$keep_days days + 1 day"));    
-    $stmt = $db->prepare("DELETE FROM epg_xml WHERE date < :threshold_date");
-    $stmt->bindValue(':threshold_date', $threshold_date, PDO::PARAM_STR);
-    $stmt->execute();
+    // 检查并删除 t.xml.gz 文件
+    if ($Config['gen_xml']) {
+        $file = './t.xml.gz';
+        if (file_exists($file)) {
+            unlink($file);
+        }
+    }
 
-    // 清除过期 DIYP、LoveTV 数据
+    // 清除过期 EPG 数据
+    $threshold_date = date('Y-m-d', strtotime("-$keep_days days + 1 day"));   
     $stmt = $db->prepare("DELETE FROM epg_data WHERE date < :threshold_date");
     $stmt->bindValue(':threshold_date', $threshold_date, PDO::PARAM_STR);
     $stmt->execute();
     $log_messages[] = date($timeformat) . " 【清理数据】 共 {$stmt->rowCount()} 条。";
 
-    // 清除过期更新日志，保留最近 $keep_days 天的日志
+    // 清除过期更新日志
     $stmt = $db->prepare("DELETE FROM update_log WHERE timestamp < :threshold_date");
     $stmt->bindValue(':threshold_date', $threshold_date, PDO::PARAM_STR);
     $stmt->execute();
     $log_messages[] = date($timeformat) . " 【更新日志】 共 {$stmt->rowCount()} 条。";
     
-    // 清除过期定时任务日志，保留最近 $keep_days 天的日志
+    // 清除过期定时任务日志
     $stmt = $db->prepare("DELETE FROM cron_log WHERE timestamp < :threshold_date");
     $stmt->bindValue(':threshold_date', $threshold_date, PDO::PARAM_STR);
     $stmt->execute();
@@ -105,15 +89,15 @@ function downloadData($xml_url, $db, &$log_messages) {
     global $timeformat;
 
     // 获取 URL 的扩展名
-    $extension = strtolower(substr($xml_url, -3));
+    $extension = strtoupper(substr($xml_url, -3));
 
     $xml_data = @file_get_contents($xml_url, false, $context);
     if ($xml_data !== false) {
-        if ($extension === '.gz') {
+        if ($extension === '.GZ') {
             // 解压缩文件内容
             $xml_data = gzdecode($xml_data);
             if ($xml_data === false) {
-                $log_messages[] = '解压缩失败：' . $xml_url;
+                $log_messages[] = date($timeformat) . ' 【解压缩失败！！！】';
                 return;
             }
         }
@@ -124,7 +108,7 @@ function downloadData($xml_url, $db, &$log_messages) {
             $db->commit();
         } catch (Exception $e) {
             $db->rollBack();
-            $log_messages[] = "处理数据时出错: " . $e->getMessage();
+            $log_messages[] = date($timeformat) . "  【处理数据出错！！！】 " . $e->getMessage();
         }
         $log_messages[] = date($timeformat) . " 【更新成功】";
     } else {
@@ -132,13 +116,66 @@ function downloadData($xml_url, $db, &$log_messages) {
     }
 }
 
+// 从 epg_data 表生成 XML 数据的函数
+function generateXmlFromEpgData($db) {
+    // 查询所有唯一的 channel
+    $stmt = $db->prepare("SELECT DISTINCT channel FROM epg_data ORDER BY channel ASC");
+    $stmt->execute();
+    $channels = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // 创建 XML 结构
+    $xml = new SimpleXMLElement('<?xml version="1.0" encoding="UTF-8"?><tv info-name="by Tak" info-url="https://github.com/TakcC/PHP-EPG-Docker-Server"></tv>');
+
+    // 添加所有频道信息
+    foreach ($channels as $channel) {
+        $channelElement = $xml->addChild('channel');
+        $channelElement->addAttribute('id', $channel['channel']);
+        $channelElement->addChild('display-name', $channel['channel'])->addAttribute('lang', 'zh');
+    }
+
+    // 查询所有节目数据
+    $stmt = $db->prepare("SELECT date, channel, epg_diyp FROM epg_data ORDER BY channel ASC");
+    $stmt->execute();
+    $epgData = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // 添加所有节目信息
+    foreach ($epgData as $program) {
+        $data = json_decode($program['epg_diyp'], true);
+        foreach ($data['epg_data'] as $item) {
+            $programme = $xml->addChild('programme');
+            $programme->addAttribute('channel', $data['channel_name']);
+            $programme->addAttribute('start', formatTime($program['date'], $item['start']));
+            $programme->addAttribute('stop', formatTime($program['date'], $item['end']));
+            $programme->addChild('title', htmlspecialchars($item['title']))->addAttribute('lang', 'zh');
+            if (!empty($item['desc'])) {
+                $programme->addChild('desc', htmlspecialchars($item['desc']))->addAttribute('lang', 'zh');
+            }
+        }
+    }
+
+    // 添加 XML 声明
+    $dom = new DOMDocument('1.0', 'UTF-8');
+    $dom->preserveWhiteSpace = false;
+    $dom->formatOutput = true;
+    $dom->loadXML($xml->asXML());
+
+    return $dom->saveXML();
+}
+
+// 辅助函数：将日期和时间格式化为 XMLTV 格式
+function formatTime($date, $time) {
+    // 假设 $date 格式为 "YYYY-MM-DD" 和 $time 格式为 "HH:MM"
+    return date('YmdHis O', strtotime("$date $time"));
+}
+
+// 压缩 XML 内容
+function compressXmlContent($xmlContent) {
+    $gzContent = gzencode($xmlContent);
+    return $gzContent;
+}
+
 // 处理 XML 数据并存入数据库
 function processXmlData($xml_data, $date, $db) {
-    // 插入数据到 epg_xml 表，如果有冲突则覆盖
-    $stmt = $db->prepare('INSERT OR REPLACE INTO epg_xml (date, content) VALUES (:date, :content)');
-    $stmt->bindValue(':date', $date, PDO::PARAM_STR);
-    $stmt->bindValue(':content', $xml_data, PDO::PARAM_STR);
-    $stmt->execute();
 
     $reader = new XMLReader();
     if (!$reader->XML($xml_data)) {
@@ -156,7 +193,6 @@ function processXmlData($xml_data, $date, $db) {
         $channelsData[$channelId] = [
             'channel_name' => (string)$channel->{'display-name'},
             'diyp_data' => [], // 初始化 diyp_data 数组
-            'lovetv_data' => [] // 初始化 lovetv_data 数组
         ];
         $reader->next('channel');
     }
@@ -169,7 +205,7 @@ function processXmlData($xml_data, $date, $db) {
     while ($reader->read() && $reader->name !== 'programme');
 
     // 遍历 programme 元素
-    $batchSize = 1000; // 分批处理，防止内存不足。
+    $batchSize = 500; // 分批处理，防止内存不足。
     $programmeCount = 0;
 
     while ($reader->name === 'programme') {
@@ -195,16 +231,6 @@ function processXmlData($xml_data, $date, $db) {
         // 格式化 showTime 为 HH:MM
         $showTime = formatDuration($duration);
 
-        $lovetvProgrammeArray = [
-            'st' => $startTimestamp,
-            'et' => $endTimestamp,
-            'eventType' => '', // 可以根据需要添加事件类型
-            'eventId' => '',   // 可以根据需要添加事件 ID
-            't' => $diypProgrammeArray['title'],
-            'showTime' => $showTime,
-            'duration' => $duration
-        ];
-
         // 将 programme 添加到对应的 channel 和日期
         $channelId = (string)$programme['channel'];
         if (isset($channelsData[$channelId])) {
@@ -216,17 +242,11 @@ function processXmlData($xml_data, $date, $db) {
                     // 清除数据需要保留 channel_name 内容
                     array_walk($channelsData, function(&$channelData) {
                         $channelData['diyp_data'] = [];  // 清除 diyp_data
-                        $channelData['lovetv_data'] = []; // 清除 lovetv_data
                     });                    
                 }
                 $channelsData[$channelId]['diyp_data'][$start['date']] = [];
             }
             $channelsData[$channelId]['diyp_data'][$start['date']][] = $diypProgrammeArray;
-
-            if (!isset($channelsData[$channelId]['lovetv_data'][$start['date']])) {
-                $channelsData[$channelId]['lovetv_data'][$start['date']] = [];
-            }
-            $channelsData[$channelId]['lovetv_data'][$start['date']][] = $lovetvProgrammeArray;
         }
 
         // 移动到下一个 programme 元素
@@ -245,7 +265,7 @@ function processXmlData($xml_data, $date, $db) {
 // 批量写入数据库的函数
 function insertDataToDatabase($channelsData, $db) {
     foreach ($channelsData as $channelId => $channelData) {
-        $channelName = $channelData['channel_name'];
+        $channelName = strtoupper($channelData['channel_name']);
         foreach ($channelData['diyp_data'] as $date => $diypProgrammes) {
             // 生成 epg_diyp 数据内容
             $diypContent = json_encode([
@@ -255,31 +275,19 @@ function insertDataToDatabase($channelsData, $db) {
                 'epg_data' => $diypProgrammes
             ], JSON_UNESCAPED_UNICODE);
 
-            // 生成 epg_lovetv 数据内容
-            $lovetvContent = json_encode([
-                $channelName => [
-                    'isLive' => '',
-                    'liveSt' => '',
-                    'channelName' => $channelName,
-                    'lvUrl' => 'https://github.com/TakcC/PHP-EPG-Docker-Server',
-                    'program' => $channelData['lovetv_data'][$date]
-                ]
-            ], JSON_UNESCAPED_UNICODE);
-
-            if ($date == date('Y-m-d')) {
-                // 当天数据覆盖
-                $stmt = $db->prepare('INSERT OR REPLACE INTO epg_data (date, channel, epg_diyp, epg_lovetv)
-                                    VALUES (:date, :channel, :epg_diyp, :epg_lovetv)');
+            if ($date >= date('Y-m-d')) {
+                // 当天及未来数据覆盖
+                $stmt = $db->prepare('INSERT OR REPLACE INTO epg_data (date, channel, epg_diyp)
+                                    VALUES (:date, :channel, :epg_diyp)');
             } else {
                 // 其他日期数据忽略
-                $stmt = $db->prepare('INSERT OR IGNORE INTO epg_data (date, channel, epg_diyp, epg_lovetv)
-                                    VALUES (:date, :channel, :epg_diyp, :epg_lovetv)');
+                $stmt = $db->prepare('INSERT OR IGNORE INTO epg_data (date, channel, epg_diyp)
+                                    VALUES (:date, :channel, :epg_diyp)');
             }
 
             $stmt->bindValue(':date', $date, PDO::PARAM_STR);
             $stmt->bindValue(':channel', $channelName, PDO::PARAM_STR);
             $stmt->bindValue(':epg_diyp', $diypContent, PDO::PARAM_STR);
-            $stmt->bindValue(':epg_lovetv', $lovetvContent, PDO::PARAM_STR);
             $stmt->execute();
         }
     }
@@ -305,9 +313,19 @@ foreach ($Config['xml_urls'] as $xml_url) {
     downloadData($cleaned_url, $db, $log_messages);
 }
 
+// 判断是否生成 .xml.gz 文件
+if ($Config['gen_xml']) {
+    $xml_content = generateXmlFromEpgData($db);
+    $gz_content = compressXmlContent($xml_content);
+    file_put_contents('./t.xml.gz', $gz_content);
+    $log_messages[] = date($timeformat) . " 【更新完成】 已保存 .xml.gz 文件。";
+}
+
 // 统计更新后数据条数
 $finalCount = $db->query("SELECT COUNT(*) FROM epg_data")->fetchColumn();
-$log_messages[] = date($timeformat) . " 【更新完成】 更新前：{$initialCount} 条，更新后：{$finalCount} 条。";
+$dif = $finalCount - $initialCount;
+$msg = $dif > 0 ? " 增加 {$dif} 条。" : ($dif < 0 ? " 减少 " . abs($dif) . " 条。" : "");
+$log_messages[] = date($timeformat) . " 【更新完成】 更新前：{$initialCount} 条，更新后：{$finalCount} 条。" . $msg;
 
 // 将日志信息写入数据库
 $log_message_str = implode("<br>", $log_messages);

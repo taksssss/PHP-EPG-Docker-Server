@@ -11,7 +11,7 @@
  */
 
 // 禁止输出错误提示
-// error_reporting(0);
+error_reporting(0);
 
 // 设置时区为亚洲/上海
 date_default_timezone_set("Asia/Shanghai");
@@ -53,10 +53,18 @@ function cleanChannelName($channel) {
                 return strtoupper($channel);
             }
         } else {
-            // 非正则表达式映射
-            if (strtoupper($channel) === strtoupper($search)) {
-                $channel = $replace;                
-                return strtoupper($channel);
+            // 检查是否为一对一映射或多对一映射
+            if (strtoupper($channel) === strtoupper($search) || (strpos($search, '[') === 0 && strpos($search, ']') === strlen($search) - 1)) {
+                // 如果是多对一映射，拆分为多个频道
+                $channels = strpos($search, '[') === 0 ? explode(',', trim($search, '[]')) : [$search];
+                foreach ($channels as $singleChannel) {
+                    // 检查频道是否匹配
+                    if (strtoupper($channel) === strtoupper(trim($singleChannel))) {
+                        // 替换频道名称并返回
+                        $channel = $replace;
+                        return strtoupper($channel);
+                    }
+                }
             }
         }
     }
@@ -94,24 +102,68 @@ function getFormatTime($time) {
     return ['date' => $date, 'time' => $time];
 }
 
-// 从数据库中获取 XML 内容
-function getXmlContent($date, $db) {
-    $stmt = $db->prepare("SELECT content FROM epg_xml WHERE date = :date");
-    $stmt->bindParam(':date', $date);
-    $stmt->execute();
-    $row = $stmt->fetch(PDO::FETCH_ASSOC);
-    return $row ? $row['content'] : null;
-}
-
 // 从数据库读取 diyp、lovetv 数据
 function readEPGData($date, $channel, $db, $type) {
-    $field = $type === 'diyp' ? 'epg_diyp' : 'epg_lovetv';
-    $stmt = $db->prepare("SELECT $field FROM epg_data WHERE date = :date AND channel = :channel");
+    $stmt = $db->prepare("SELECT epg_diyp FROM epg_data WHERE date = :date AND channel = :channel");
     $stmt->bindParam(':date', $date);
     $stmt->bindParam(':channel', $channel);
     $stmt->execute();
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
-    return $row ? $row[$field] : false;
+    
+    if (!$row) {
+        return false;
+    }
+
+    if ($type === 'diyp') {
+        return $row['epg_diyp'];
+    }
+
+    if ($type === 'lovetv') {
+        $diyp_data = json_decode($row['epg_diyp'], true);
+        $program = array_map(function($epg) {
+            $start_time = strtotime($epg['start']);
+            $end_time = strtotime($epg['end']);
+            return [
+                'st' => $start_time,
+                'et' => $end_time,
+                'eventType' => '',
+                'eventId' => '',
+                't' => $epg['title'],
+                'showTime' => date('H:i', $start_time),
+                'duration' => $end_time - $start_time
+            ];
+        }, $diyp_data['epg_data']);
+
+        // 查找当前节目
+        $current_programme = findCurrentProgramme($program);
+
+        // 生成 lovetv 数据
+        $lovetv_data = [
+            $channel => [
+                'isLive' => $current_programme ? $current_programme['t'] : '',
+                'liveSt' => $current_programme ? $current_programme['st'] : 0,
+                'channelName' => $diyp_data['channel_name'],
+                'lvUrl' => $diyp_data['url'],
+                'program' => array_map(function($epg) {
+                    $start_time = strtotime($epg['start']);
+                    $end_time = strtotime($epg['end']);
+                    return [
+                        'st' => $start_time,
+                        'et' => $end_time,
+                        'eventType' => '',
+                        'eventId' => '',
+                        't' => $epg['title'],
+                        'showTime' => date('H:i', $start_time),
+                        'duration' => $end_time - $start_time
+                    ];
+                }, $diyp_data['epg_data'])
+            ]
+        ];
+
+        return json_encode($lovetv_data, JSON_UNESCAPED_UNICODE);
+    }
+
+    return false;
 }
 
 // 获取当前时间戳
@@ -145,16 +197,10 @@ function fetchHandler() {
 
     $date = isset($query_params['date']) ? getFormatTime(preg_replace('/\D+/', '', $query_params['date']))['date'] : getNowDate();
 
-    // 频道参数为空时，直接返回xml文件
+    // 频道参数为空时，直接重定向到 t.xml.gz 文件
     if (empty($channel)) {
-        $xml_content = getXmlContent($date, $db);
-        if ($xml_content) {
-            $init['headers']['content-type'] = 'text/xml';
-            makeRes($xml_content, $init['status'], $init['headers']);
-        } else {
-            makeRes('', $init['status'], $init['headers']);
-        }
-        return;
+        header('Location: ./t.xml.gz');
+        exit;
     }
 
     // 返回 diyp、lovetv 数据
@@ -163,16 +209,6 @@ function fetchHandler() {
         $response = readEPGData($date, $channel, $db, $type);
     
         if ($response) {
-            if ($type === 'lovetv') {
-                $lovetv_data = json_decode($response, true);
-                $programmes = $lovetv_data[$channel]['program'];
-                $current_programme = findCurrentProgramme($programmes);
-                if ($current_programme) {
-                    $lovetv_data[$channel]['isLive'] = $current_programme['t'];
-                    $lovetv_data[$channel]['liveSt'] = $current_programme['st'];
-                }
-                $response = json_encode($lovetv_data, JSON_UNESCAPED_UNICODE);
-            }
             makeRes($response, $init['status'], $init['headers']);
         } else {
             if ($type === 'diyp') {

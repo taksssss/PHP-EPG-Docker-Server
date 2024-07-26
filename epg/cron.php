@@ -173,9 +173,9 @@ while (true) {
 
     // 如果跨越了结束时间，则设置为明天的首次执行时间
     if ($next_execution_time >= $end_time_today) {
-        $next_execution_time = $first_run_today + 24 * 3600; // 加一天
-        // 更新明天的结束时间
-        $end_time_today = strtotime(date('Y-m-d', strtotime('+1 day')) . " $end_hour:$end_minute:00");
+        $first_run_today += 24 * 3600; // 更新明天的开始时间
+        $end_time_today += 24 * 3600; // 更新明天的结束时间
+        $next_execution_time = $first_run_today; // 重置为明天首次执行时间
     }
 
     // 计算等待时间

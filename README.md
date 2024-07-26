@@ -4,7 +4,7 @@ PHP-EPG-Docker-Server 是一个用 PHP 实现的 EPG（电子节目指南）服�
 
 ## 主要功能 ℹ️
 - **使用 Docker🐳 部署，提供 `amd64` 跟 `arm64` 架构镜像**
-- **基镜像采用 `alpine-apache-php` ，压缩后大小仅 `23M`**
+- **基镜像采用 `alpine-apache-php` ，压缩后大小仅 `20M`**
 - **采用先构建再存数据库的策略，存在部分冗余数据，但能提高读取速度**
 - 支持 `DIYP & 百川` 、 `超级直播` 以及 `xmltv` 格式 📡
 - 兼容多种 `xmltv` 格式 🗂️
@@ -136,14 +136,15 @@ PHP-EPG-Docker-Server 是一个用 PHP 实现的 EPG（电子节目指南）服�
 6. 用浏览器测试各个接口的返回结果是否正确：
 
     - `xmltv` 接口： `http://{服务器IP地址}:5678/epg/index.php`
-  
+    
     - `DIYP&百川` 接口： `http://{服务器IP地址}:5678/epg/index.php?ch=CCTV1`
-  
+    
     - `超级直播` 接口： `http://{服务器IP地址}:5678/epg/index.php?channel=CCTV1`
 
 7. 将 **`http://{服务器IP地址}:5678/epg/index.php`** 填入 `DIYP`、`TiviMate` 等软件的 `EPG 地址栏`
 
     - ⚠️ 直接使用 `docker run` 拉取镜像的话，可以将 `http://{服务器IP地址}:5678/epg/index.php` 替换为 `http://{服务器IP地址}:5678/epg`。
+    - ⚠️ 部分软件不支持跳转解析 `xmltv` 文件，可直接使用 **`http://{服务器IP地址}:5678/epg/t.xml.gz`** 访问。
 
 ![设置定时任务](/pic/cronSet.png)
 
