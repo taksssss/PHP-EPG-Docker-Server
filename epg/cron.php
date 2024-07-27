@@ -27,9 +27,7 @@ include 'config.php';
 $db_file = __DIR__ . '/adata.db';
 
 try {
-    // 创建或打开数据库
-    $dsn = 'sqlite:' . $db_file;
-    $db = new PDO($dsn);
+    $db = new PDO('sqlite:' . $db_file);
     $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
     // 初始化数据库表

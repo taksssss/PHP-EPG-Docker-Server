@@ -38,7 +38,7 @@ function deleteOldData($db, $keep_days, &$log_messages) {
     global $Config;
 
     // 检查并删除 t.xml.gz 文件
-    if ($Config['gen_xml']) {
+    if (!$Config['gen_xml']) {
         $file = './t.xml.gz';
         if (file_exists($file)) {
             unlink($file);
