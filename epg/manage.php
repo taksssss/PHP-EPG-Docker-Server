@@ -9,8 +9,8 @@
  * GitHub: https://github.com/TakcC/PHP-EPG-Docker-Server
  */
 
-// 设置时区为亚洲/上海
-date_default_timezone_set("Asia/Shanghai");
+// 引入公共脚本
+require_once 'public.php';
 
 session_start();
 
@@ -22,9 +22,6 @@ $configUpdated = isset($_SESSION['configUpdated']) && $_SESSION['configUpdated']
 if ($configUpdated) {
     unset($_SESSION['configUpdated']);
 }
-
-// 引入配置文件
-require_once 'config.php';
 
 // 处理密码更新请求
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['change_password'])) {
@@ -72,108 +69,7 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
     <html>
     <head>
         <title>登录</title>
-        <style>
-            body {
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                height: 100vh;
-                margin: 0;
-                font-family: Arial, sans-serif;
-                background-color: #f0f0f0;
-            }
-            .container {
-                background: white;
-                padding: 30px;
-                box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-                border-radius: 5px;
-                width: 200px;
-            }
-            input[type="password"] {
-                width: calc(100%);
-                flex: 1;
-                padding: 7px;
-                font-size: 16px;
-                border: 1px solid #ccc;
-                border-radius: 5px;
-                box-sizing: border-box;
-            }
-            input[type="submit"] {
-                width: 100%;
-                padding: 8px;
-                background-color: #FF9800;
-                color: white;
-                border: none;
-                border-radius: 5px;
-                cursor: pointer;
-                box-sizing: border-box;
-                font-size: 16px;
-                font-weight: bold;
-                margin-bottom: 5px;
-            }
-            .button-container button {
-                width: 100%;
-                padding: 8px;
-                background-color: #2196F3;
-                color: white;
-                border: none;
-                border-radius: 5px;
-                cursor: pointer;
-                box-sizing: border-box;
-                font-size: 15px;
-                margin-top: 5px;
-            }
-            .form-group {
-                display: flex;
-                align-items: center;
-            }
-            .form-group label {
-                width: 48px;
-                margin-right: 10px;
-                margin-bottom: 10px;
-            }
-            .form-group input[type="password"] {
-                flex: 1;
-                padding: 5px;
-                font-size: 16px;
-                border: 1px solid #ccc;
-                border-radius: 5px;
-                box-sizing: border-box;
-                margin-bottom: 10px;
-            }
-            .modal {
-                display: none; /* 默认隐藏 */
-                position: fixed;
-                z-index: 1;
-                left: 0;
-                top: 0;
-                width: 100%;
-                height: 100%;
-                overflow: auto;
-                background-color: rgba(0, 0, 0, 0.4);
-                text-align: center;
-            }
-            .passwd-modal-content {
-                background-color: #fefefe;
-                display: inline-block;
-                padding: 20px;
-                border: 1px solid #888;
-                max-width: 200px;
-                width: auto;
-                text-align: left;
-                border-radius: 10px;
-                position: relative;
-                top: 50%;
-                transform: translateY(-50%);
-                box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2);
-            }
-            .footer {
-                position: fixed;
-                bottom: 10px;
-                width: 100%;
-                text-align: center;
-            }
-        </style>
+        <link rel="stylesheet" type="text/css" href="css/login.css">
     </head>
     <body>
         <div class="container">
@@ -245,9 +141,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update'])) {
     // 获取表单数据并去除每个 URL 末尾的换行符
     $xml_urls = array_map('trim', explode("\n", trim($_POST['xml_urls'])));
     $days_to_keep = intval($_POST['days_to_keep']);
-    $gen_xml = $_POST['gen_xml'];
+    $gen_xml = isset($_POST['gen_xml']) ? intval($_POST['gen_xml']) : $Config['gen_xml'];
+    $include_future_only = isset($_POST['include_future_only']) ? intval($_POST['include_future_only']) : $Config['include_future_only'];
     $start_time = $_POST['start_time'];
     $end_time = $_POST['end_time'];
+    
     // 处理间隔时间
     $interval_hour = intval($_POST['interval_hour']);
     $interval_minute = intval($_POST['interval_minute']);
@@ -272,6 +170,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update'])) {
         'xml_urls' => $xml_urls,
         'days_to_keep' => $days_to_keep,
         'gen_xml' => $gen_xml,
+        'include_future_only' => $include_future_only,
         'start_time' => $start_time,
         'end_time' => $end_time,
         'interval_time' => $interval_time,
@@ -296,12 +195,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update'])) {
     header('Location: manage.php');
     exit;
 } else {
-    // 首次进入界面，检查 cron.php 是否运行正常
-    // $output = [];
-    // exec("ps aux | grep '[c]ron.php'", $output);
-    // if(!$output) {
-    //     exec('php cron.php > /dev/null 2>/dev/null &');
-    // }
 }
 
 // 连接数据库并获取日志表中的数据
@@ -309,30 +202,7 @@ $logData = [];
 $cronLogData = [];
 $channels = [];
 try {
-    $db = new PDO('sqlite:adata.db');
-    $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-    
-    // 初始化数据库表
-    $db->exec("CREATE TABLE IF NOT EXISTS epg_data (
-        date TEXT NOT NULL,
-        channel TEXT NOT NULL,
-        epg_diyp TEXT,
-        PRIMARY KEY (date, channel)
-    )");
-
-    $db->exec("CREATE TABLE IF NOT EXISTS update_log (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
-        log_message TEXT NOT NULL
-    )");
-
-    $db->exec("CREATE TABLE IF NOT EXISTS cron_log (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
-        log_message TEXT NOT NULL
-    )");
-
-    // 处理 AJAX 请求，返回更新日志数据
+    // 返回更新日志数据
     if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['get_update_logs'])) {
         $stmt = $db->query("SELECT * FROM update_log");
         $logData = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -341,7 +211,7 @@ try {
         exit;
     }
 
-    // 处理 AJAX 请求，返回定时任务日志数据
+    // 返回定时任务日志数据
     if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['get_cron_logs'])) {
         $stmt = $db->query("SELECT * FROM cron_log");
         $cronLogData = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -350,13 +220,67 @@ try {
         exit;
     }
 
-    // 处理 AJAX 请求，返回频道数据
+    // 返回所有频道数据和频道数量
     if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['get_channel'])) {
         $stmt = $db->query("SELECT DISTINCT channel FROM epg_data ORDER BY channel ASC");
         $channels = $stmt->fetchAll(PDO::FETCH_COLUMN);
+        $channelCount = count($channels);
+        $response = [
+            'channels' => $channels,
+            'count' => $channelCount
+        ];
         header('Content-Type: application/json');
-        echo json_encode($channels);
+        echo json_encode($response);
         exit;
+    }
+
+    // 返回待保存频道列表数据
+    if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['get_gen_list'])) {        
+        $stmt = $db->query("SELECT channel FROM gen_list");
+        $genList = $stmt->fetchAll(PDO::FETCH_COLUMN);
+        header('Content-Type: application/json');
+        echo json_encode($genList);
+        exit;
+    }
+
+    // 将频道数据写入数据库
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['set_gen_list'])) {
+        $data = json_decode(file_get_contents("php://input"), true)['data'] ?? '';
+        try {
+            // 启动事务
+            $db->beginTransaction();
+            // 清空表中的数据
+            $db->exec("DELETE FROM gen_list");
+            // 插入新数据
+            $lines = array_filter(array_map('trim', explode("\n", $data)));
+            $stmt = $db->prepare("INSERT INTO gen_list (channel) VALUES (:channel)");
+            foreach ($lines as $line) {
+                $stmt->bindValue(':channel', $line, PDO::PARAM_STR);
+                $stmt->execute(); // 执行插入操作
+            }
+            // 提交事务
+            $db->commit();
+            echo 'success';
+        } catch (PDOException $e) {
+            // 回滚事务
+            $db->rollBack();
+            echo "数据库操作失败: " . $e->getMessage();
+        }
+        exit;
+    }
+
+    // 返回处理后的频道列表
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['get_clean_list'])) {
+        header('Content-Type: application/json');
+        $data = json_decode(file_get_contents('php://input'), true);
+    
+        if (isset($data['channels'])) {
+            $convertedChannels = explode("\n", implode("\n", $data['channels']));
+            $cleanedChannels = array_map('cleanChannelName', $convertedChannels);
+            $uniqueChannels = array_unique($cleanedChannels);
+            echo json_encode(array_values($uniqueChannels)); // 确保返回的是数组
+            exit;
+        }
     }
 
 } catch (Exception $e) {
@@ -372,249 +296,18 @@ try {
 <html>
 <head>
     <title>管理配置</title>
-    <style>
-        body {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-            font-family: Arial, sans-serif;
-            background-color: #f0f0f0;
-        }
-        .container {
-            background: white;
-            padding: 30px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-            border-radius: 5px;
-            width: 850px;
-            margin: auto;
-        }
-        textarea {
-            width: 100%;
-            padding: 5px;
-            line-height: 1.5;
-            font-size: 15px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            box-sizing: border-box;
-            resize: none;
-            white-space: nowrap;
-        }
-        textarea[id="cronLogContent"], textarea[id="channelList"] {
-            white-space: pre-wrap; // 自动换行
-        }
-        .form-row {
-            display: flex;
-            align-items: center;
-            margin-bottom: 10px;
-        }
-        .label-days-to-keep {
-            width: 98px;
-        }
-        .custom-margin0 {
-            margin-left: 20px;
-        }
-        .custom-margin1 {
-            margin-left: 20px;
-        }
-        .custom-margin2 {
-            margin-left: 60px;
-        }
-        .custom-margin3 {
-            margin-left: 65px;
-        }
-        .form-row select {
-            padding: 6px;
-            font-size: 16px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            box-sizing: border-box;
-            width: 98px;
-            text-align: center;
-        }
-        .form-row select[id="gen_xml"] {
-            width: 90px;
-            margin-left: 54px;
-        }
-        .form-row input[type="time"] {
-            padding: 5px;
-            font-size: 16px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            box-sizing: border-box;
-            width: 97px;
-        }
-        .form-row input[id="start_time"] {
-            margin-left: 133px;
-        }
-        .form-row input[id="end_time"] {
-            margin-left: 27px;
-        }
-        .form-row select[id="interval_hour"], select[id="interval_minute"] {
-            width: 55px;
-            margin-right: 0px;
-            text-align: center;
-        }
-        .form-row select[id="interval_hour"] {
-            margin-left: 33px;
-        }
-        input[type="submit"] {
-            width: 100%;
-            padding: 10px;
-            background-color: #FF9800;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            box-sizing: border-box;
-            font-size: 16px;
-            font-weight: bold;
-        }
-        input[type="submit"]:hover {
-            background-color: #e68900;
-        }
-        input[type="text"] {
-            width: calc(100% - 22px);
-            padding: 10px;
-            margin-bottom: 10px;
-        }
-        .button-container {
-            display: flex;
-            gap: 15px;
-            align-items: center;
-            justify-content: space-between;
-        }
-        .button-container a, .button-container button {
-            padding: 10px;
-            background-color: #2196F3;
-            color: white;
-            text-decoration: none;
-            border: none;
-            border-radius: 10px;
-            text-align: center;
-            cursor: pointer;
-            box-sizing: border-box;
-            width: 32%;
-            font-size: 16px;
-        }
-        .button-container a:hover, .button-container button:hover {
-            background-color: #0b7dda;
-        }
-        .flex-container {
-            display: flex;
-            justify-content: space-between;
-            gap: 20px;
-        }
-        .flex-item {
-            width: 48%;
-        }
-        .footer {
-            position: fixed;
-            bottom: 10px;
-            width: 100%;
-            text-align: center;
-        }
-        .modal {
-            display: none; /* 默认隐藏 */
-            position: fixed;
-            z-index: 1;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            overflow: auto;
-            background-color: rgba(0, 0, 0, 0.4);
-            text-align: center;
-        }
-        .modal-content {
-            background-color: #fefefe;
-            display: inline-block;
-            padding: 20px;
-            border: 1px solid #888;
-            text-align: left;
-            border-radius: 10px;
-            position: relative;
-            box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2);
-            top: 50%;
-            transform: translateY(-50%);
-        }
-        .update-log-modal-content {
-            max-width: 830px;
-            width: auto;
-        }
-        .cron-log-modal-content,
-        .config-modal-content {
-            max-width: 65%;
-            width: 500px;
-        }
-        .config-modal-content {
-            width: 200px;
-        }
-        .channel-modal-content {
-            width: 300px;
-        }
-        .close {
-            color: #aaa;
-            float: right;
-            font-size: 28px;
-            font-weight: bold;
-        }
-        .close:hover,
-        .close:focus {
-            color: black;
-            text-decoration: none;
-            cursor: pointer;
-        }
-        .table-container {
-            height: 425px; /* 固定高度 */
-            overflow-y: scroll; /* 启用垂直滚动条 */
-        }
-        #logTable {
-            width: 100%;
-            border-collapse: separate;
-            border-spacing: 0 5px; /* 调整行之间的垂直间距 */
-            table-layout: fixed; /* 固定表格布局，防止内容超出 */
-        }
-        #logTable th, #logTable td {
-            border: 1px solid black;
-            padding: 5px;
-            text-align: left;
-        }
-        #logTable th:nth-child(1), 
-        #logTable td:nth-child(1) {
-            width: 4%; /* 第一列宽度 */
-            text-align: center;
-        }
-
-        #logTable th:nth-child(2), 
-        #logTable td:nth-child(2) {
-            width: 9%; /* 第二列宽度 */
-            text-align: center;
-        }
-
-        #logTable th:nth-child(3), 
-        #logTable td:nth-child(3) {
-            width: 88%; /* 第三列宽度 */
-            word-wrap: break-word; /* 自动换行 */
-            overflow-wrap: break-word; /* 自动换行 */
-        }
-        #logTable th:nth-child(3) {
-            text-align: center; /* 第三列表头居中 */
-        }
-    </style>
+    <link rel="stylesheet" type="text/css" href="css/manage.css">
 </head>
 <body>
 <div class="container">
     <h2>管理配置</h2>
-    <form method="POST">
+    <form method="POST" id="settingsForm">
 
-        <label for="xml_urls">EPG源地址 (支持 xml 跟 .xml.gz 格式， # 为注释)</label><br><br>
-        <textarea placeholder="一行一个，地址前面加 # 可以临时停用，后面加 # 可以备注。" id="xml_urls" name="xml_urls" rows="5" required><?php echo implode("\n", array_map('trim', $Config['xml_urls'])); ?></textarea><br><br>
+        <label for="xml_urls">EPG源地址（支持 xml 跟 .xml.gz 格式， # 为注释）</label><br><br>
+        <textarea placeholder="一行一个，地址前面加 # 可以临时停用，后面加 # 可以备注。快捷键： Ctrl+/  。" id="xml_urls" name="xml_urls" rows="5" required><?php echo implode("\n", array_map('trim', $Config['xml_urls'])); ?></textarea><br><br>
 
         <div class="form-row">
             <label for="days_to_keep" class="label-days-to-keep">数据保存天数</label>
-            <label for="gen_xml" class="label-gen-xml custom-margin0" >生成 .xml.gz 文件</label>
             <label for="start_time" class="label-time custom-margin1">【定时任务】： 开始时间</label>
             <label for="end_time" class="label-time2 custom-margin2">结束时间</label>
             <label for="interval_time" class="label-time3 custom-margin3">间隔周期 (选0小时0分钟取消)</label>
@@ -627,10 +320,6 @@ try {
                         <?php echo $i; ?>
                     </option>
                 <?php endfor; ?>
-            </select>
-            <select id="gen_xml" name="gen_xml" required>
-                <option value="1" <?php if ($Config['gen_xml'] == 1) echo 'selected'; ?>>是</option>
-                <option value="0" <?php if ($Config['gen_xml'] == 0) echo 'selected'; ?>>否</option>
             </select>
             <input type="time" id="start_time" name="start_time" value="<?php echo $Config['start_time']; ?>" required>
             <input type="time" id="end_time" name="end_time" value="<?php echo $Config['end_time']; ?>" required>
@@ -654,7 +343,7 @@ try {
         
         <div class="flex-container">
             <div class="flex-item">
-                <label for="channel_replacements">频道忽略字符串<br>(匹配时按先后顺序清除)</label><br><br>
+                <label for="channel_replacements">频道忽略字符串<br>（匹配时按先后顺序清除， \s 表示空格）</label><br><br>
                 <textarea id="channel_replacements" name="channel_replacements" rows="5" required><?php echo implode("\n", array_map('trim', $Config['channel_replacements'])); ?></textarea><br><br>
             </div>
             <div class="flex-item">
@@ -667,12 +356,16 @@ try {
             </div>
         </div>
 
-        <input id="updateConfig" type="submit" name="update" value="更新配置"><br><br>
+        <div class="tooltip">
+            <input id="updateConfig" type="submit" name="update" value="更新配置">
+            <span class="tooltiptext">快捷键：Ctrl+S</span>
+        </div><br><br>
         <div class="button-container">
             <a href="update.php" target="_blank">更新数据库</a>
             <a href="phpliteadmin.php" target="_blank">管理数据库</a>
             <button type="button" onclick="showModal('cron')">定时任务日志</button>
             <button type="button" onclick="showModal('update')">数据库更新日志</button>
+            <button type="button" onclick="showModal('moresetting')">更多设置</button>
         </div>
     </form>
 </div>
@@ -725,17 +418,93 @@ try {
 <div id="channelModal" class="modal">
     <div class="modal-content channel-modal-content">
         <span class="close">&times;</span>
-        <h2>数据库频道列表</h2>
+        <h2 id="channelModalTitle">频道列表</h2>
         <input type="text" id="searchInput" placeholder="搜索频道名..." onkeyup="filterChannels()">
         <textarea id="channelList" readonly style="width: 100%; height: 370px;"></textarea>
     </div>
 </div>
 
+<!-- 更多设置模态框 -->
+<div id="moreSettingModal" class="modal">
+    <div class="modal-content more-setting-modal-content">
+        <span class="close">&times;</span>
+        <h2>更多设置</h2>
+        <label for="gen_xml">生成 .xml.gz 文件：</label>
+        <select id="gen_xml" name="gen_xml" required>
+            <option value="1" <?php if ($Config['gen_xml'] == 1) echo 'selected'; ?>>是</option>
+            <option value="0" <?php if ($Config['gen_xml'] == 0) echo 'selected'; ?>>否</option>
+        </select>
+        <label for="include_future_only">生成方式：</label>
+        <select id="include_future_only" name="include_future_only" required>
+            <option value="1" <?php if ($Config['include_future_only'] == 1) echo 'selected'; ?>>仅含预告数据</option>
+            <option value="0" <?php if ($Config['include_future_only'] == 0) echo 'selected'; ?>>生成所有数据</option>
+        </select>
+        <br><br>
+        <label for="gen_list_text"">仅生成以下频道的节目单：</label>
+        <span id="dbChannelName" onclick="parseSource()">
+            （可粘贴 txt、m3u 直播源并<span style="color: blue; text-decoration: underline; cursor: pointer;">点击解析</span>）
+        </span><br><br>
+        <textarea id="gen_list_text" style="width: 100%; height: 316px;"></textarea><br><br>
+        <button id="saveConfig" type="button" onclick="saveAndUpdateConfig();">保存配置</button>
+    </div>
+</div>
+
 <script>
+    // Ctrl+S 保存设置
     document.addEventListener("keydown", function(event) {
         if (event.ctrlKey && event.key === "s") {
             event.preventDefault(); // 阻止默认行为，如保存页面
-            document.getElementById("updateConfig").click();
+            saveAndUpdateConfig();
+        }
+    });
+
+    // Ctrl+/ 设置（取消）注释
+    document.getElementById('xml_urls').addEventListener('keydown', function(event) {
+    if (event.ctrlKey && event.key === '/') {
+            event.preventDefault();
+
+            const textarea = this;
+            const { selectionStart, selectionEnd, value } = textarea;
+            const lines = value.split('\n');
+
+            // 计算当前选中的行
+            const startLine = value.slice(0, selectionStart).split('\n').length - 1;
+            const endLine = value.slice(0, selectionEnd).split('\n').length - 1;
+
+            // 判断选中的行是否都已注释
+            const allCommented = lines.slice(startLine, endLine + 1).every(line => line.trim().startsWith('#'));
+            const newLines = lines.map((line, index) => {
+                if (index >= startLine && index <= endLine) {
+                    return allCommented ? line.replace(/^#\s*/, '') : '# ' + line;
+                }
+                return line;
+            });
+
+            // 更新 textarea 的内容
+            textarea.value = newLines.join('\n');
+
+            // 检查光标开始位置是否在行首
+            const startLineStartIndex = value.lastIndexOf('\n', selectionStart - 1) + 1;
+            const isStartInLineStart = (selectionStart - startLineStartIndex < 2);
+
+            // 检查光标结束位置是否在行首
+            const endLineStartIndex = value.lastIndexOf('\n', selectionEnd - 1) + 1;
+            const isEndInLineStart = (selectionEnd - endLineStartIndex < 2);
+
+            // 计算光标新的开始位置
+            const newSelectionStart = isStartInLineStart 
+                ? startLineStartIndex
+                : selectionStart + newLines[startLine].length - lines[startLine].length;
+
+            // 计算光标新的结束位置
+            const lengthDiff = newLines.join('').length - lines.join('').length;
+            const endLineDiff = newLines[endLine].length - lines[endLine].length;
+            const newSelectionEnd = isEndInLineStart
+                ? (endLineDiff > 0 ? endLineStartIndex + lengthDiff : endLineStartIndex + lengthDiff - endLineDiff)
+                : selectionEnd + lengthDiff;
+
+            // 恢复光标位置
+            textarea.setSelectionRange(newSelectionStart, newSelectionEnd);
         }
     });
 
@@ -778,19 +547,31 @@ try {
     function showModal(type) {
         var modal, logSpan, logContent;
 
-        if (type === 'update') {
+        switch (type) {
+        case 'update':
             modal = document.getElementById("updatelogModal");
             logSpan = document.getElementsByClassName("close")[1];
             fetchLogs('<?php echo $_SERVER['PHP_SELF']; ?>?get_update_logs=true', updateLogTable);
-        } else if (type === 'cron') {
+            break;
+        case 'cron':
             modal = document.getElementById("cronlogModal");
             logSpan = document.getElementsByClassName("close")[2];
             fetchLogs('<?php echo $_SERVER['PHP_SELF']; ?>?get_cron_logs=true', updateCronLogContent);
-        } else if (type === 'channel') {
+            break;
+        case 'channel':
             modal = document.getElementById("channelModal");
             logSpan = document.getElementsByClassName("close")[3];
             fetchLogs('<?php echo $_SERVER['PHP_SELF']; ?>?get_channel=true', updateChannelList);
-            document.getElementById('searchInput').value = "";
+            document.getElementById('searchInput').value = ""; // 清空搜索框
+            break;
+        case 'moresetting':
+            modal = document.getElementById("moreSettingModal");
+            logSpan = document.getElementsByClassName("close")[4];            
+            fetchLogs('<?php echo $_SERVER['PHP_SELF']; ?>?get_gen_list=true', updateGenList);
+            break;
+        default:
+            console.error('Unknown type:', type);
+            break;
         }
 
         modal.style.display = "block";
@@ -835,15 +616,22 @@ try {
 
     function updateCronLogContent(logData) {
         var logContent = document.getElementById("cronLogContent");
-        logContent.value = logData.map(log => `[${new Date(log.timestamp).toLocaleString()}] ${log.log_message}`).join('\n');
+        logContent.value = logData.map(log => `[${new Date(log.timestamp).toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' })} ${new Date(log.timestamp).toLocaleTimeString()}] ${log.log_message}`).join('\n');
         logContent.scrollTop = logContent.scrollHeight;
     }
 
-    function updateChannelList(channels) {
-        var channelList = document.getElementById('channelList');
-        channelList.dataset.allChannels = channels.join('\n'); // 保存所有频道数据
+    function updateChannelList(data) {
+        const channelList = document.getElementById('channelList');
+        const channelTitle = document.getElementById('channelModalTitle');
+        channelList.dataset.allChannels = data.channels.join('\n'); // 保存所有频道数据
         channelList.value = channelList.dataset.allChannels;
+        channelTitle.innerHTML = `频道列表<span style="font-size: 18px;">（总数：${data.count}）</span>`; // 更新频道总数
     }
+
+    function updateGenList(genData) {
+        const gen_list_text = document.getElementById('gen_list_text');
+        gen_list_text.value = genData.join('\n');
+    }    
 
     function filterChannels() {
         var input = document.getElementById('searchInput').value.toLowerCase();
@@ -852,6 +640,79 @@ try {
         var filteredChannels = allChannels.filter(channel => channel.toLowerCase().includes(input));
         channelList.value = filteredChannels.join('\n');
     }
+
+    // 解析 txt、m3u 直播源，并生成频道列表
+    function parseSource() {
+        const textarea = document.getElementById('gen_list_text');
+        const text = textarea.value;
+        const channels = new Set();
+
+        if (text.includes('#EXTM3U')) {
+            if (text.includes('tvg-name')) {
+                text.replace(/tvg-name="([^"]+)"/g, (_, name) => channels.add(name.trim()));
+            } else {
+                text.replace(/#EXTINF:[^,]*,([^,\n]+)/g, (_, name) => channels.add(name.trim()));
+            }
+        } else {
+            text.split('\n').forEach(line => {
+                if (line && !line.includes('#genre#')) {
+                    channels.add(line.split(',')[0].trim());
+                }
+            });
+        }
+
+        // 发送解析后的频道数据到服务器
+        fetch('<?php echo $_SERVER['PHP_SELF']; ?>?get_clean_list=true', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ channels: Array.from(channels) })
+        })
+        .then(response => response.json())
+        .then(data => {
+            // 更新 textarea 显示处理后的频道数据
+            textarea.value = data.join('\n');
+        })
+        .catch(error => console.error('Error:', error));
+    }
+
+    // 保存数据并更新配置
+    function saveAndUpdateConfig() {
+        const textAreaContent = document.getElementById('gen_list_text').value;
+
+        fetch('<?php echo $_SERVER['PHP_SELF']; ?>?set_gen_list=true', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ data: textAreaContent })
+        })
+        .then(response => response.text())
+        .then(responseText => {
+            if (responseText.trim() === 'success') {
+                document.getElementById('updateConfig').click();
+            } else {
+                console.error('服务器响应错误:', responseText);
+            }
+        })
+        .catch(error => {
+            console.error('请求失败:', error);
+        });
+    }
+
+    // 在提交表单时，将更多设置中的数据包括在表单数据中
+    document.getElementById('settingsForm').addEventListener('submit', function() {
+        const fields = ['gen_xml', 'include_future_only'];
+        fields.forEach(function(field) {
+            const hiddenInput = document.createElement('input');
+            hiddenInput.type = 'hidden';
+            hiddenInput.name = field;
+            hiddenInput.value = document.getElementById(field).value;
+            this.appendChild(hiddenInput);
+        }, this);
+    });
+    
 </script>
 </body>
 </html>

@@ -1,0 +1,269 @@
+body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background-color: #f0f0f0;
+}
+.container {
+    background: white;
+    padding: 30px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    border-radius: 5px;
+    width: 850px;
+    margin: auto;
+}
+textarea {
+    width: 100%;
+    padding: 5px;
+    line-height: 1.5;
+    font-size: 15px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    box-sizing: border-box;
+    resize: none;
+    white-space: pre-wrap; /* 保持空白字符和换行符，同时在内容超出容器宽度时换行 */
+    word-break: break-all; /* 允许单词内断行 */
+}
+textarea[id="cronLogContent"], textarea[id="channelList"] {
+    white-space: pre-wrap; // 自动换行
+}
+.form-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+}
+.label-days-to-keep {
+    width: 98px;
+}
+.custom-margin1 {
+    margin-left: 98px;
+}
+.custom-margin2 {
+    margin-left: 68px;
+}
+.custom-margin3 {
+    margin-left: 68px;
+}
+.form-row select, 
+.modal-content select {
+    padding: 6px;
+    font-size: 16px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    box-sizing: border-box;
+    width: 98px;
+    margin-right: 88px;
+    text-align: center;
+}
+.form-row input[type="time"] {
+    padding: 5px;
+    font-size: 16px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    box-sizing: border-box;
+    width: 97px;
+}
+.form-row input[id="start_time"] {
+    margin-left: 125px;
+}
+.form-row input[id="end_time"] {
+    margin-left: 34px;
+}
+.form-row select[id="interval_hour"], select[id="interval_minute"] {
+    width: 75px;
+    margin-right: 0px;
+    text-align: center;
+}
+.form-row select[id="interval_hour"] {
+    margin-left: 37px;
+}
+input[type="submit"],
+.modal-content button {
+    width: 100%;
+    padding: 10px;
+    background-color: #FF9800;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    box-sizing: border-box;
+    font-size: 16px;
+    font-weight: bold;
+}
+input[type="submit"]:hover {
+    background-color: #e68900;
+}
+input[type="text"] {
+    width: calc(100% - 22px);
+    padding: 10px;
+    margin-bottom: 10px;
+}
+.button-container {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+    justify-content: space-between;
+}
+.button-container a, .button-container button {
+    padding: 10px;
+    background-color: #2196F3;
+    color: white;
+    text-decoration: none;
+    border: none;
+    border-radius: 10px;
+    text-align: center;
+    cursor: pointer;
+    box-sizing: border-box;
+    width: 32%;
+    font-size: 16px;
+}
+.button-container a:hover, .button-container button:hover {
+    background-color: #0b7dda;
+}
+.flex-container {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+}
+.flex-item {
+    width: 48%;
+}
+.footer {
+    position: fixed;
+    bottom: 10px;
+    width: 100%;
+    text-align: center;
+}
+.modal {
+    display: none; /* 默认隐藏 */
+    position: fixed;
+    z-index: 1;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0, 0, 0, 0.4);
+    text-align: center;
+}
+.modal-content {
+    background-color: #fefefe;
+    display: inline-block;
+    padding: 20px;
+    border: 1px solid #888;
+    text-align: left;
+    border-radius: 10px;
+    position: relative;
+    box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2);
+    top: 50%;
+    transform: translateY(-50%);
+}
+.update-log-modal-content {
+    max-width: 830px;
+    width: auto;
+}
+.cron-log-modal-content,
+.config-modal-content {
+    max-width: 65%;
+    width: 500px;
+}
+.config-modal-content {
+    width: 200px;
+}
+.channel-modal-content {
+    width: 300px;
+}
+.more-setting-modal-content {
+    width: 500px;
+}
+.close {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+}
+.close:hover,
+.close:focus {
+    color: black;
+    text-decoration: none;
+    cursor: pointer;
+}
+.table-container {
+    height: 425px; /* 固定高度 */
+    overflow-y: scroll; /* 启用垂直滚动条 */
+}
+#logTable {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0 5px; /* 调整行之间的垂直间距 */
+    table-layout: fixed; /* 固定表格布局，防止内容超出 */
+}
+#logTable th, #logTable td {
+    border: 1px solid black;
+    padding: 5px;
+    text-align: left;
+}
+#logTable th:nth-child(1), 
+#logTable td:nth-child(1) {
+    width: 4%; /* 第一列宽度 */
+    text-align: center;
+}
+
+#logTable th:nth-child(2), 
+#logTable td:nth-child(2) {
+    width: 9%; /* 第二列宽度 */
+    text-align: center;
+}
+
+#logTable th:nth-child(3), 
+#logTable td:nth-child(3) {
+    width: 88%; /* 第三列宽度 */
+    word-break: break-all; /* 允许单词内断行 */
+}
+#logTable th:nth-child(3) {
+    text-align: center; /* 第三列表头居中 */
+}
+.modal-content select[id="gen_xml"], select[id="include_future_only"] {
+    width: 160px;
+    text-align: center;
+    margin-right: 0px;
+}
+.modal-content select[id="gen_xml"] {
+    width: 77px;
+    margin-right: 30px;
+}
+
+/* 工具提示容器 */
+.tooltip {
+    position: relative;
+    display: inline-block;
+    width: 100%;
+}
+
+/* 工具提示文本 */
+.tooltip .tooltiptext {
+    visibility: hidden;
+    width: 120px;
+    background-color: #555;
+    color: #fff;
+    text-align: center;
+    border-radius: 5px;
+    padding: 5px;
+    position: absolute;
+    z-index: 1;
+    bottom: 125%; /* 上方显示 */
+    left: 50%;
+    margin-left: -60px;
+    opacity: 0;
+    transition: opacity 0.3s;
+    font-size: 14px; /* 设置字体大小 */
+}
+
+/* 显示工具提示 */
+.tooltip:hover .tooltiptext {
+    visibility: visible;
+    opacity: 1;
+}

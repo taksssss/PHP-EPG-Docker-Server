@@ -9,35 +9,15 @@
  * GitHub: https://github.com/TakcC/PHP-EPG-Docker-Server
  */
 
+// 引入公共脚本
+require_once 'public.php';
+
 // 取消时间限制
 set_time_limit(0);
 
 // 设置脚本只能通过CLI运行
 if (php_sapi_name() !== 'cli') {
     die("此脚本只能通过 CLI 运行");
-}
-
-// 设置时区为亚洲/上海
-date_default_timezone_set("Asia/Shanghai");
-
-// 从config.php中读取配置
-include 'config.php';
-
-// 数据库文件路径
-$db_file = __DIR__ . '/adata.db';
-
-try {
-    $db = new PDO('sqlite:' . $db_file);
-    $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-
-    // 初始化数据库表
-    $db->exec("CREATE TABLE IF NOT EXISTS cron_log (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
-        log_message TEXT NOT NULL
-    )");
-} catch (PDOException $e) {
-    die("无法连接到数据库: " . $e->getMessage());
 }
 
 // 日志记录函数
@@ -76,7 +56,7 @@ foreach ($output as $line) {
 
 // 检查配置中是否存在 interval_time
 if (!isset($Config['interval_time'])) {
-    logMessage("配置中不存在间隔时间(interval_time)。退出...");
+    logMessage("不存在间隔时间。退出...");
     exit;
 }
 
@@ -85,20 +65,23 @@ $interval_time = $Config['interval_time'];
 
 // 如果间隔时间为0，则不执行
 if ($interval_time == 0) {
-    logMessage("间隔时间(interval_time)设置为0。退出...");
+    logMessage("间隔时间设置为0。退出...");
     exit;
 }
 
 // 检查配置中是否存在首次执行时间和结束时间
 if (!isset($Config['start_time'])) {
-    logMessage("配置中不存在首次执行时间(start_time)。退出...");
+    logMessage("不存在start_time。退出...");
     exit;
 }
 
 if (!isset($Config['end_time'])) {
-    logMessage("配置中不存在结束时间(end_time)。退出...");
+    logMessage("不存在end_time。退出...");
     exit;
 }
+
+// 启动事务
+$db->beginTransaction();
 
 // 从配置中获取首次执行时间和结束时间
 $start_time = $Config['start_time'];
@@ -132,29 +115,35 @@ if ($current_time >= $end_time_today) {
 
 // 如果跨越了结束时间，则设置为明天的首次执行时间
 if ($next_execution_time >= $end_time_today) {
-    $next_execution_time = $first_run_today + 24 * 3600; // 加一天
+    $first_run_today += 24 * 3600; // 更新明天的开始时间
+    $end_time_today += 24 * 3600; // 更新明天的结束时间
+    $next_execution_time = $first_run_today; // 重置为明天首次执行时间
 }
 
 // 计算距离下一个执行时间的秒数
 $initial_sleep = $next_execution_time - $current_time;
 
-// 格式化并显示时间信息
-logMessage("------------------------------------");
-logMessage("【开始时间】 " . date('Y-m-d H:i:s', $first_run_today));
-logMessage("【结束时间】 " . date('Y-m-d H:i:s', $end_time_today));
-logMessage("【间隔时间】 " . gmdate('H:i:s', $interval_time));
-logMessage("------------------------------------");
-logMessage("【下次执行时间】 " . date('Y-m-d H:i:s', $next_execution_time));
-logMessage("【初始等待时间】 " . gmdate('H:i:s', $initial_sleep));
-logMessage("-------------运行时间表-------------");
+// 汇总所有日志信息
+$logContent .= "【开始时间】 " . date('H:i', $first_run_today) . "\n";
+$logContent .= "                 【结束时间】 " . date('H:i', $end_time_today) . "\n";
+$logContent .= "                 【间隔时间】 " . gmdate('H小时i分钟', $interval_time) . "\n";
+$logContent .= "                 ----------运行时间表----------\n";
 
 // 循环输出每次执行的时间
 $current_execution_time = $first_run_today;
 while ($current_execution_time < $end_time_today) {
-    logMessage("         " . date('Y-m-d H:i:s', $current_execution_time));
+    $logContent .= "                             " . date('H:i', $current_execution_time) . "\n";
     $current_execution_time += $interval_time;
 }
-logMessage("------------------------------------");
+$logContent .= "                 ------------------------------";
+// 记录日志信息
+logMessage($logContent);
+
+logMessage("【下次执行】 " . date('m/d H:i', $next_execution_time));
+logMessage("【等待时间】 " . gmdate('H小时i分钟', $initial_sleep));
+
+// 提交事务
+$db->commit();
 
 // 首先等待到下一个执行时间
 sleep($initial_sleep);
@@ -180,7 +169,7 @@ while (true) {
     $sleep_time = $next_execution_time - $current_time;
 
     // 记录下次执行时间
-    logMessage("【下次执行时间】 " . date('Y-m-d H:i:s', $next_execution_time));
+    logMessage("【下次执行】 " . date('Y-m-d H:i:s', $next_execution_time));
 
     // 等待到下一个执行时间
     sleep($sleep_time);

@@ -10,26 +10,11 @@
  * GitHub: https://github.com/TakcC/PHP-EPG-Docker-Server
  */
 
+// 引入公共脚本
+require_once 'public.php';
+
 // 禁止输出错误提示
 error_reporting(0);
-
-// 设置时区为亚洲/上海
-date_default_timezone_set("Asia/Shanghai");
-
-// 引入配置文件
-include 'config.php';
-
-// 创建或打开数据库
-$db_file = __DIR__ . '/adata.db';
-
-// 使用 PDO 连接 SQLite 数据库
-try {
-    $db = new PDO('sqlite:' . $db_file);
-    // 设置 PDO 错误模式为异常
-    $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-} catch (PDOException $e) {
-    die("数据库连接失败: " . $e->getMessage());
-}
 
 // 初始化响应头信息
 $init = [
@@ -38,42 +23,6 @@ $init = [
         'content-type' => 'application/json'
     ]
 ];
-
-// 添加频道处理函数
-function cleanChannelName($channel) {
-    global $Config;
-
-    // 频道映射，优先级最高，匹配后直接返回，支持正则表达式映射，以 regex: 开头
-    foreach ($Config['channel_mappings'] as $search => $replace) {
-        // 检查是否为正则表达式映射
-        if (strpos($search, 'regex:') === 0) {
-            $pattern = substr($search, 6);
-            if (preg_match($pattern, $channel)) {
-                $channel = preg_replace($pattern, $replace, $channel);
-                return strtoupper($channel);
-            }
-        } else {
-            // 检查是否为一对一映射或多对一映射
-            if (strtoupper($channel) === strtoupper($search) || (strpos($search, '[') === 0 && strpos($search, ']') === strlen($search) - 1)) {
-                // 如果是多对一映射，拆分为多个频道
-                $channels = strpos($search, '[') === 0 ? explode(',', trim($search, '[]')) : [$search];
-                foreach ($channels as $singleChannel) {
-                    // 检查频道是否匹配
-                    if (strtoupper($channel) === strtoupper(trim($singleChannel))) {
-                        // 替换频道名称并返回
-                        $channel = $replace;
-                        return strtoupper($channel);
-                    }
-                }
-            }
-        }
-    }
-
-    // 清理特定字符串
-    $channel = strtoupper(str_replace(' ', '', str_ireplace($Config['channel_replacements'], '', $channel)));
-
-    return $channel;
-}
 
 // 生成响应
 function makeRes($body, $status = 200, $headers = []) {
@@ -192,8 +141,8 @@ function fetchHandler() {
         parse_str($uri['query'], $query_params);
     }
 
-    // 获取并清理频道名称
-    $channel = cleanChannelName($query_params['ch'] ?? $query_params['channel'] ?? '');
+    // 获取并清理频道名称，繁体转换成简体
+    $channel = cleanChannelName($query_params['ch'] ?? $query_params['channel'] ?? '', $t2s = true);
 
     $date = isset($query_params['date']) ? getFormatTime(preg_replace('/\D+/', '', $query_params['date']))['date'] : getNowDate();
 

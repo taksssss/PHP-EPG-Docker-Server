@@ -1,0 +1,14 @@
+#!/usr/bin/env php
+<?php
+
+include $_composer_autoload_path ?? __DIR__ . '/../vendor/autoload.php';
+
+use Overtrue\PHPOpenCC\Console\BuildCommand;
+use Overtrue\PHPOpenCC\Console\ConvertCommand;
+use Symfony\Component\Console\Application;
+
+$application = new Application("PHP OpenCC by @overtrue" );
+
+$application->add(new ConvertCommand());
+$application->setDefaultCommand(ConvertCommand::getDefaultName(), true);
+$application->run();

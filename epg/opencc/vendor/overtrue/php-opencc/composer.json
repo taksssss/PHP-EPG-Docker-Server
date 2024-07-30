@@ -1,0 +1,70 @@
+{
+    "name": "overtrue/php-opencc",
+    "description": "中文简繁转换，支持词汇级别的转换、异体字转换和地区习惯用词转换（中国大陆、台湾、香港、日本新字体）。基于 [BYVoid/OpenCC](https://github.com/BYVoid/OpenCC) 数据实现。",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "overtrue",
+            "email": "i@overtrue.me"
+        }
+    ],
+    "require": {
+        "php": ">=8.0",
+        "ext-zip": "*",
+        "symfony/console": "^5.4|^6.3",
+        "symfony/process": "^5.4|^6.3"
+    },
+    "require-dev": {
+        "brainmaestro/composer-git-hooks": "dev-master",
+        "mockery/mockery": "^1.2",
+        "phpunit/phpunit": "^9.0",
+        "vimeo/psalm": "^4.10",
+        "jetbrains/phpstorm-attributes": "^1.0",
+        "laravel/pint": "^0.1|^1.10"
+    },
+    "bin": [
+        "bin/opencc"
+    ],
+    "autoload": {
+        "psr-4": {
+            "Overtrue\\PHPOpenCC\\": "src"
+        }
+    },
+    "extra": {
+        "hooks": {
+            "pre-commit": [
+                "composer pint",
+                "composer test"
+            ],
+            "pre-push": [
+                "composer pint",
+                "composer test"
+            ]
+        }
+    },
+    "scripts": {
+        "post-update-cmd": [
+            "cghooks remove",
+            "cghooks add --ignore-lock",
+            "cghooks update"
+        ],
+        "post-merge": "composer install",
+        "post-install-cmd": [
+            "cghooks remove",
+            "cghooks add --ignore-lock",
+            "cghooks update"
+        ],
+        "cghooks": "vendor/bin/cghooks",
+        "check-style": "vendor/bin/pint ./src ./tests --test",
+        "pint": "vendor/bin/pint ./src ./tests",
+        "fix-style": "vendor/bin/pint ./src ./tests",
+        "test": "phpunit --colors",
+        "psalm": "psalm --show-info=true --no-cache",
+        "psalm-fix": "psalm --no-cache --alter --issues=MissingReturnType,MissingParamType"
+    },
+    "scripts-descriptions": {
+        "test": "Run all tests.",
+        "check-style": "Run style checks (only dry run - no fixing!).",
+        "fix-style": "Run style checks and fix violations."
+    }
+}
