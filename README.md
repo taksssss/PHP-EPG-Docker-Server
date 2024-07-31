@@ -39,11 +39,12 @@ PHP 实现的 EPG（电子节目指南）服务端， `Docker` 部署，自带�
 
 ## 更新日志 📝
 
-### 2024-7-30二次更新：
+### 2024-7-31更新：
 
 1. 部分用户反馈 `phpLiteAdmin-ng` 在 `php7.x` 上打开较慢，已换回之前的 `phpLiteAdmin 1.9.71`
 2. 修复 `phpLiteAdmin 1.9.71` 部分节目不显示的问题：
    - 将部分 `substr` 、 `strlen` 替换为 `mb_substr` 、 `mb_strlen`
+3. 修复未进入“更多设置”页面，`Ctrl+S` 会清空限定频道列表的问题
 
 >
 > 推荐更新为该版本

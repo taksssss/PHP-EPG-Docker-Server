@@ -436,8 +436,8 @@ try {
         </select>
         <label for="include_future_only">生成方式：</label>
         <select id="include_future_only" name="include_future_only" required>
-            <option value="1" <?php if ($Config['include_future_only'] == 1) echo 'selected'; ?>>仅含预告数据</option>
-            <option value="0" <?php if ($Config['include_future_only'] == 0) echo 'selected'; ?>>生成所有数据</option>
+            <option value="1" <?php if ($Config['include_future_only'] == 1) echo 'selected'; ?>>仅预告数据</option>
+            <option value="0" <?php if ($Config['include_future_only'] == 0) echo 'selected'; ?>>所有数据</option>
         </select>
         <br><br>
         <label for="gen_list_text"">仅生成以下频道的节目单：</label>
@@ -450,6 +450,8 @@ try {
 </div>
 
 <script>
+    let genListLoaded = false; // 用于跟踪数据是否已加载
+
     // Ctrl+S 保存设置
     document.addEventListener("keydown", function(event) {
         if (event.ctrlKey && event.key === "s") {
@@ -568,6 +570,7 @@ try {
             modal = document.getElementById("moreSettingModal");
             logSpan = document.getElementsByClassName("close")[4];            
             fetchLogs('<?php echo $_SERVER['PHP_SELF']; ?>?get_gen_list=true', updateGenList);
+            genListLoaded = true; // 数据已加载
             break;
         default:
             console.error('Unknown type:', type);
@@ -679,6 +682,11 @@ try {
 
     // 保存数据并更新配置
     function saveAndUpdateConfig() {
+        if (!genListLoaded) {
+            document.getElementById('updateConfig').click();
+            return;
+        }
+
         const textAreaContent = document.getElementById('gen_list_text').value;
 
         fetch('<?php echo $_SERVER['PHP_SELF']; ?>?set_gen_list=true', {
