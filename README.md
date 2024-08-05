@@ -47,7 +47,7 @@ PHP 实现的 EPG（电子节目指南）服务端， `Docker` 部署，自带�
 4. 优化正则表达式，增加 `CCTV 5PLUS` 频道匹配
 5. 新增 `docker-compose.yml` ，可持久化 `adata.db` 跟 `config.php` 文件
 
-- 亦可使用以下命令，需确保 `当前目录` 包含上述0文件
+- 亦可使用以下命令，需确保 `当前目录` 包含上述文件
   ```bash
   docker run -d \
    --name php-epg \
