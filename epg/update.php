@@ -39,7 +39,8 @@ function deleteOldData($db, $keep_days, &$log_messages) {
         'update_log' => ['timestamp', '清理更新日志'],
         'cron_log' => ['timestamp', '清理定时日志']
     ];
-    foreach ($tables as $table => [$column, $logMessage]) {
+    foreach ($tables as $table => $values) {
+        list($column, $logMessage) = $values;
         $stmt = $db->prepare("DELETE FROM $table WHERE $column < :threshold_date");
         $stmt->bindValue(':threshold_date', $threshold_date, PDO::PARAM_STR);
         $stmt->execute();
@@ -56,7 +57,7 @@ function getFormatTime($time) {
 }
 
 // 下载数据并存入数据库
-function downloadData($xml_url, $db, &$log_messages) {
+function downloadData($xml_url, $db, &$log_messages, $gen_list) {
     $xml_data = downloadXmlData($xml_url);
     if ($xml_data !== false) {        
         logMessage($log_messages, "【下载】 成功");
@@ -69,7 +70,6 @@ function downloadData($xml_url, $db, &$log_messages) {
         }
         $db->beginTransaction();
         try {
-            $gen_list = getGenList($db);
             processXmlData($xml_data, date('Y-m-d'), $db, $gen_list);
             $db->commit();
             logMessage($log_messages, "【更新】 成功");
@@ -105,7 +105,7 @@ function getGenList($db) {
     }
     $channelsString = implode("\n", $channels);
     $channelsSimplified = t2s($channelsString);
-    return array_map('trim', explode("\n", $channelsSimplified));
+    return array_unique(array_map('cleanChannelName', explode("\n", $channelsSimplified)));
 }
 
 // 从 epg_data 表生成 XML 数据
@@ -164,6 +164,7 @@ function compressXmlContent($xmlContent) {
 
 // 处理 XML 数据并存入数据库
 function processXmlData($xml_data, $date, $db, $gen_list) {
+    global $Config;
     $reader = new XMLReader();
     if (!$reader->XML($xml_data)) {
         throw new Exception("无法解析 XML 数据");
@@ -171,30 +172,35 @@ function processXmlData($xml_data, $date, $db, $gen_list) {
 
     // 初始化存储转换后 channel 的数组
     $channelsData = [];
-    $channelNames = [];
+    $oriChannelNames = [];
+    $cleanChannelNames = [];
 
     // 读取 channel 元素到数组中
     while ($reader->read() && $reader->name !== 'channel');
     while ($reader->name === 'channel') {
         $channel = new SimpleXMLElement($reader->readOuterXML());
         $channelId = (string)$channel['id'];
-        $channelName = cleanChannelName((string)$channel->{'display-name'});
-        $channelNames[$channelId] = $channelName; // 收集所有频道名称
+        $oriChannelName = (string)$channel->{'display-name'};
+        $oriChannelNames[$channelId] = $oriChannelName; // 收集所有原频道名称
+        $cleanChannelName = cleanChannelName($oriChannelName);
+        $cleanChannelNames[$channelId] = $cleanChannelName; // 收集所有处理后的频道名称
         $reader->next('channel');
     }
 
     // 统一处理繁简转换
-    $allChannelNames = implode("\n", $channelNames);
+    $allChannelNames = implode("\n", $cleanChannelNames);
     $allChannelNamesSimplified = t2s($allChannelNames);
     $simplifiedChannelNames = explode("\n", $allChannelNamesSimplified);
     
     // 根据转换后的频道名称更新 channelsData
-    foreach ($channelNames as $channelId => $channelName) {
+    foreach ($cleanChannelNames as $channelId => $channelName) {
         $channelNameSimplified = array_shift($simplifiedChannelNames);
         // 当 gen_list 为空时，插入所有数据
         if (empty($gen_list) || in_array($channelNameSimplified, $gen_list, true)) {
+            $channel_name = !isset($Config['proc_chname']) || $Config['proc_chname'] ?
+                            $channelNameSimplified : $oriChannelNames[$channelId];
             $channelsData[$channelId] = [
-                'channel_name' => $channelNameSimplified,
+                'channel_name' => $channel_name,
                 'diyp_data' => []
             ];
         }
@@ -243,7 +249,7 @@ function processXmlData($xml_data, $date, $db, $gen_list) {
 // 插入数据到数据库
 function insertDataToDatabase($channelsData, $db) {
     foreach ($channelsData as $channelId => $channelData) {
-        $channelName = strtoupper($channelData['channel_name']);
+        $channelName = $channelData['channel_name'];
         foreach ($channelData['diyp_data'] as $date => $diypProgrammes) {
             // 生成 epg_diyp 数据内容
             $diypContent = json_encode([
@@ -272,6 +278,7 @@ $initialCount = $db->query("SELECT COUNT(*) FROM epg_data")->fetchColumn();
 deleteOldData($db, $Config['days_to_keep'], $log_messages);
 
 // 更新数据
+$gen_list = getGenList($db); // 获取限定频道列表
 foreach ($Config['xml_urls'] as $xml_url) {
     // 忽略以 # 开头的 URL
     if (strpos($xml_url, '#') === 0) {
@@ -282,7 +289,7 @@ foreach ($Config['xml_urls'] as $xml_url) {
     $cleaned_url = trim($url_parts[0]);
 
     logMessage($log_messages, "【更新地址】 $cleaned_url");
-    downloadData($cleaned_url, $db, $log_messages);
+    downloadData($cleaned_url, $db, $log_messages, $gen_list);
 }
 
 // 判断是否生成 .xml.gz 文件

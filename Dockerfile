@@ -2,6 +2,8 @@ FROM alpine:3.20
 LABEL maintainer="erik.soderblom@gmail.com"
 LABEL description="Alpine based image with apache2 and php8.3."
 
+# MOD: Tak
+
 # 使用中科大镜像
 RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.ustc.edu.cn/g' /etc/apk/repositories
 
@@ -36,13 +38,13 @@ RUN apk --no-cache --update \
     php83-posix \
     && mkdir /htdocs
 
-# 复制 ./epg 文件夹到 /htdocs 并设置权限
+# 复制 ./epg 文件夹到 /htdocs
 COPY ./epg /htdocs/epg
-RUN chown -R apache:apache /htdocs/epg
 
 EXPOSE 80 443
 
 ADD docker-entrypoint.sh /
+RUN chmod +x /docker-entrypoint.sh
 
 HEALTHCHECK CMD wget -q --no-cache --spider localhost
 

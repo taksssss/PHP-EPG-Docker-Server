@@ -1,0 +1,13 @@
+services:
+  php-epg:
+    image: taksss/php-epg:latest
+    container_name: php-epg
+    # 持久化adata.db和config.php
+    volumes:
+      - ./epg/adata.db:/htdocs/epg/adata.db
+      - ./epg/config.php:/htdocs/epg/config.php
+    # 默认端口5678
+    ports:
+      - "5678:80"
+    restart: always
+    entrypoint: ["/bin/sh", "./docker-entrypoint.sh"]

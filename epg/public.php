@@ -57,22 +57,21 @@ try {
 // 获取处理后的频道名：$t2s参数表示繁简转换，默认false
 function cleanChannelName($channel, $t2s = false) {
     global $Config;
-    $channel = strtoupper($channel); // 转换为大写
     // 频道映射，优先级最高，匹配后直接返回，支持正则表达式映射，以 regex: 开头
     foreach ($Config['channel_mappings'] as $search => $replace) {
         if (strpos($search, 'regex:') === 0) {
             $pattern = substr($search, 6);
             if (preg_match($pattern, $channel)) {
-                return strtoupper(preg_replace($pattern, $replace, $channel));
+                return preg_replace($pattern, $replace, $channel);
             }
         } else {
             // 检查是否为一对一映射或多对一映射
-            $search = strtoupper(trim($search));
+            $search = trim($search);
             if ($channel === $search || (strpos($search, '[') === 0 && strpos($search, ']') === strlen($search) - 1)) {
                 $channels = strpos($search, '[') === 0 ? explode(',', trim($search, '[]')) : [$search];
                 foreach ($channels as $singleChannel) {
-                    if ($channel === strtoupper(trim($singleChannel))) {
-                        return strtoupper($replace);
+                    if ($channel === trim($singleChannel)) {
+                        return $replace;
     }}}}}
     // 默认不进行繁简转换
     if ($t2s) {
@@ -83,7 +82,7 @@ function cleanChannelName($channel, $t2s = false) {
     if (in_array('\\s', $Config['channel_replacements'])) {
         $channel = str_replace(' ', '', $channel);
     }
-    return strtoupper($channel);
+    return $channel;
 }
 
 // 繁体转简体

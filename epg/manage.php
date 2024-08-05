@@ -143,6 +143,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update'])) {
     $days_to_keep = intval($_POST['days_to_keep']);
     $gen_xml = isset($_POST['gen_xml']) ? intval($_POST['gen_xml']) : $Config['gen_xml'];
     $include_future_only = isset($_POST['include_future_only']) ? intval($_POST['include_future_only']) : $Config['include_future_only'];
+    $proc_chname = isset($_POST['proc_chname']) ? intval($_POST['proc_chname']) : $Config['proc_chname'];
     $start_time = $_POST['start_time'];
     $end_time = $_POST['end_time'];
     
@@ -171,6 +172,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update'])) {
         'days_to_keep' => $days_to_keep,
         'gen_xml' => $gen_xml,
         'include_future_only' => $include_future_only,
+        'proc_chname' => $proc_chname,
         'start_time' => $start_time,
         'end_time' => $end_time,
         'interval_time' => $interval_time,
@@ -195,56 +197,59 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update'])) {
     header('Location: manage.php');
     exit;
 } else {
+    // 首次进入界面，检查 cron.php 是否运行正常
+    if($Config['interval_time']!=0) {
+        $output = [];
+        exec("ps aux | grep '[c]ron.php'", $output);
+        if(!$output) {
+            exec('php cron.php > /dev/null 2>/dev/null &');
+        }
+    }
 }
 
 // 连接数据库并获取日志表中的数据
 $logData = [];
 $cronLogData = [];
 $channels = [];
+
 try {
-    // 返回更新日志数据
-    if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['get_update_logs'])) {
-        $stmt = $db->query("SELECT * FROM update_log");
-        $logData = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        header('Content-Type: application/json');
-        echo json_encode($logData);
-        exit;
-    }
+    $requestMethod = $_SERVER['REQUEST_METHOD'];
+    $dbResponse = null;
 
-    // 返回定时任务日志数据
-    if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['get_cron_logs'])) {
-        $stmt = $db->query("SELECT * FROM cron_log");
-        $cronLogData = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        header('Content-Type: application/json');
-        echo json_encode($cronLogData);
-        exit;
-    }
+    if ($requestMethod == 'GET') {
+        // 返回更新日志数据
+        if (isset($_GET['get_update_logs'])) {
+            $dbResponse = $db->query("SELECT * FROM update_log")->fetchAll(PDO::FETCH_ASSOC);
+        }
 
-    // 返回所有频道数据和频道数量
-    if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['get_channel'])) {
-        $stmt = $db->query("SELECT DISTINCT channel FROM epg_data ORDER BY channel ASC");
-        $channels = $stmt->fetchAll(PDO::FETCH_COLUMN);
-        $channelCount = count($channels);
-        $response = [
-            'channels' => $channels,
-            'count' => $channelCount
-        ];
-        header('Content-Type: application/json');
-        echo json_encode($response);
-        exit;
-    }
+        // 返回定时任务日志数据
+        elseif (isset($_GET['get_cron_logs'])) {
+            $dbResponse = $db->query("SELECT * FROM cron_log")->fetchAll(PDO::FETCH_ASSOC);
+        }
 
-    // 返回待保存频道列表数据
-    if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['get_gen_list'])) {        
-        $stmt = $db->query("SELECT channel FROM gen_list");
-        $genList = $stmt->fetchAll(PDO::FETCH_COLUMN);
-        header('Content-Type: application/json');
-        echo json_encode($genList);
-        exit;
+        // 返回所有频道数据和频道数量
+        elseif (isset($_GET['get_channel'])) {
+            $channels = $db->query("SELECT DISTINCT channel FROM epg_data ORDER BY channel ASC")->fetchAll(PDO::FETCH_COLUMN);
+            $dbResponse = [
+                'channels' => $channels,
+                'count' => count($channels)
+            ];
+        }
+
+        // 返回待保存频道列表数据
+        elseif (isset($_GET['get_gen_list'])) {
+            $dbResponse = $db->query("SELECT channel FROM gen_list")->fetchAll(PDO::FETCH_COLUMN);
+        }
+
+        if ($dbResponse !== null) {
+            header('Content-Type: application/json');
+            echo json_encode($dbResponse);
+            exit;
+        }
     }
 
     // 将频道数据写入数据库
-    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['set_gen_list'])) {
+    elseif ($requestMethod === 'POST' && isset($_GET['set_gen_list'])) {
         $data = json_decode(file_get_contents("php://input"), true)['data'] ?? '';
         try {
             // 启动事务
@@ -268,21 +273,6 @@ try {
         }
         exit;
     }
-
-    // 返回处理后的频道列表
-    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['get_clean_list'])) {
-        header('Content-Type: application/json');
-        $data = json_decode(file_get_contents('php://input'), true);
-    
-        if (isset($data['channels'])) {
-            $convertedChannels = explode("\n", implode("\n", $data['channels']));
-            $cleanedChannels = array_map('cleanChannelName', $convertedChannels);
-            $uniqueChannels = array_unique($cleanedChannels);
-            echo json_encode(array_values($uniqueChannels)); // 确保返回的是数组
-            exit;
-        }
-    }
-
 } catch (Exception $e) {
     // 处理数据库连接错误
     $logData = [];
@@ -440,11 +430,17 @@ try {
             <option value="0" <?php if ($Config['include_future_only'] == 0) echo 'selected'; ?>>所有数据</option>
         </select>
         <br><br>
+        <label for="proc_chname">入库前处理频道名：</label>
+        <select id="proc_chname" name="proc_chname" required>
+            <option value="1" <?php if (!isset($Config['proc_chname']) || $Config['proc_chname'] == 1) echo 'selected'; ?>>是</option>
+            <option value="0" <?php if ($Config['proc_chname'] == 0) echo 'selected'; ?>>否</option>
+        </select>
+        <br><br>
         <label for="gen_list_text"">仅生成以下频道的节目单：</label>
-        <span id="dbChannelName" onclick="parseSource()">
+        <span onclick="parseSource()">
             （可粘贴 txt、m3u 直播源并<span style="color: blue; text-decoration: underline; cursor: pointer;">点击解析</span>）
         </span><br><br>
-        <textarea id="gen_list_text" style="width: 100%; height: 316px;"></textarea><br><br>
+        <textarea id="gen_list_text" style="width: 100%; height: 261px;"></textarea><br><br>
         <button id="saveConfig" type="button" onclick="saveAndUpdateConfig();">保存配置</button>
     </div>
 </div>
@@ -634,7 +630,7 @@ try {
     function updateGenList(genData) {
         const gen_list_text = document.getElementById('gen_list_text');
         gen_list_text.value = genData.join('\n');
-    }    
+    }
 
     function filterChannels() {
         var input = document.getElementById('searchInput').value.toLowerCase();
@@ -664,20 +660,7 @@ try {
             });
         }
 
-        // 发送解析后的频道数据到服务器
-        fetch('<?php echo $_SERVER['PHP_SELF']; ?>?get_clean_list=true', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ channels: Array.from(channels) })
-        })
-        .then(response => response.json())
-        .then(data => {
-            // 更新 textarea 显示处理后的频道数据
-            textarea.value = data.join('\n');
-        })
-        .catch(error => console.error('Error:', error));
+        textarea.value = Array.from(channels).join('\n');
     }
 
     // 保存数据并更新配置
@@ -711,7 +694,7 @@ try {
 
     // 在提交表单时，将更多设置中的数据包括在表单数据中
     document.getElementById('settingsForm').addEventListener('submit', function() {
-        const fields = ['gen_xml', 'include_future_only'];
+        const fields = ['gen_xml', 'include_future_only', 'proc_chname'];
         fields.forEach(function(field) {
             const hiddenInput = document.createElement('input');
             hiddenInput.type = 'hidden';

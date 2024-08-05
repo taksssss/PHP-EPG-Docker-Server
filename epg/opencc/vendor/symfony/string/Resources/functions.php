@@ -11,16 +11,14 @@
 
 namespace Symfony\Component\String;
 
-if (!\function_exists(u::class)) {
-    function u(?string $string = ''): UnicodeString
-    {
+if (!\function_exists('u')) {
+    function u($string = '') {
         return new UnicodeString($string ?? '');
     }
 }
 
-if (!\function_exists(b::class)) {
-    function b(?string $string = ''): ByteString
-    {
+if (!\function_exists('b')) {
+    function b($string = '') {
         return new ByteString($string ?? '');
     }
 }
@@ -29,10 +27,10 @@ if (!\function_exists(s::class)) {
     /**
      * @return UnicodeString|ByteString
      */
-    function s(?string $string = ''): AbstractString
-    {
-        $string ??= '';
-
+    function s($string = '') {
+        if (!isset($string)) {
+            $string = '';
+        }
         return preg_match('//u', $string) ? new UnicodeString($string) : new ByteString($string);
     }
 }

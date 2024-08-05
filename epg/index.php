@@ -53,9 +53,10 @@ function getFormatTime($time) {
 
 // 从数据库读取 diyp、lovetv 数据
 function readEPGData($date, $channel, $db, $type) {
-    $stmt = $db->prepare("SELECT epg_diyp FROM epg_data WHERE date = :date AND channel = :channel");
+    $stmt = $db->prepare("SELECT epg_diyp FROM epg_data WHERE date = :date AND channel LIKE :channel COLLATE NOCASE");
     $stmt->bindParam(':date', $date);
-    $stmt->bindParam(':channel', $channel);
+    $channelPattern = '%' . $channel . '%';
+    $stmt->bindParam(':channel', $channelPattern);
     $stmt->execute();
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
     

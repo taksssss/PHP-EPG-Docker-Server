@@ -226,7 +226,9 @@ input[type="text"] {
 #logTable th:nth-child(3) {
     text-align: center; /* 第三列表头居中 */
 }
-.modal-content select[id="gen_xml"], select[id="include_future_only"] {
+.modal-content select[id="gen_xml"],
+select[id="include_future_only"],
+select[id="proc_chname"] {
     width: 160px;
     text-align: center;
     margin-right: 0px;
@@ -234,6 +236,9 @@ input[type="text"] {
 .modal-content select[id="gen_xml"] {
     width: 77px;
     margin-right: 30px;
+}
+.modal-content select[id="proc_chname"] {
+    width: 73px;
 }
 
 /* 工具提示容器 */

@@ -44,6 +44,9 @@ sed -i "s#^;date.timezone =\$#date.timezone = \"${TZ}\"#" /etc/php83/php.ini
 
 echo 'Running cron.php and Apache'
 
+# Change ownership of /htdocs/epg
+chown -R apache:apache /htdocs/epg
+
 # Start cron.php
 cd /htdocs/epg
 su -s /bin/sh -c "php cron.php &" "apache"

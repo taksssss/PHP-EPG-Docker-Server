@@ -8,7 +8,7 @@ PHP 实现的 EPG（电子节目指南）服务端， `Docker` 部署，自带�
 
 ## 主要功能 ℹ️
 - 支持返回 **`DIYP & 百川`** 、 **`超级直播`** 以及 **`xmltv`** 格式 📡
-- 使用 **`Docker`** 部署，提供 **`amd64`** 跟 **`arm64`** 架构镜像 🐳
+- 提供 **`amd64`** 跟 **`arm64`** 架构 `Docker` 镜像，支持电视盒子等设备 🐳
 - 基镜像采用 `alpine-apache-php`，**压缩后大小仅 `20M`** 📦
 - 采用**先构建再存数据库**的策略，存在部分冗余数据，但能**提高读取速度** 🚀
 - 支持**繁体中文频道匹配** 🌐
@@ -33,11 +33,30 @@ PHP 实现的 EPG（电子节目指南）服务端， `Docker` 部署，自带�
 > 
 >   - `regex:/^CCTV[-\s]*(\p{Han})/iu, $1` ：将 `CCTV风云足球`、`cctv-风云音乐` 等替换成 `风云足球`、`风云音乐`
 > 
->   - `regex:/^CCTV[-\s]*(\d+[K\+]?)(?!美洲|欧洲).*/i, CCTV$1` ：将 `CCTV 1综合`、`CCTV-4K频道`、`CCTV - 5+频道` 等替换成 `CCTV1`、`CCTV4K`、`CCTV5+`（排除 `CCTV4美洲` 和 `CCTV4欧洲`）
+>   - `regex:/^CCTV[-\s]*(\d+(\s*PLUS|[K\+])?)(?!美洲|欧洲).*/i => CCTV$1` ：将 `CCTV 1综合`、`CCTV-4K频道`、`CCTV - 5+频道`、`CCTV - 5PLUS频道` 等替换成 `CCTV1`、`CCTV4K`、`CCTV5+`、`CCTV5PLUS`（排除 `CCTV4美洲` 和 `CCTV4欧洲`）
 > 
 >   - `regex:/^(深圳.*?)频道$/i, $1` ：将 `深圳xx频道` 替换成 `深圳xx`
 
 ## 更新日志 📝
+
+### 2024-8-5更新：
+
+1. 修改部分 `opencc` 及 `update.php` 代码，兼容 `PHP 7.0` 以上版本
+2. 新增 `入库前处理频道名` 选项（ `DIYP` 跟 `超级直播` 用户保持默认 `是` 即可）
+3. 更新 `manage.php` ，打开设置页面时检查定时任务运行情况
+4. 优化正则表达式，增加 `CCTV 5PLUS` 频道匹配
+5. 新增 `docker-compose.yml` ，可持久化 `adata.db` 跟 `config.php` 文件
+
+- 亦可使用以下命令，需确保 `当前目录` 包含上述0文件
+  ```bash
+  docker run -d \
+   --name php-epg \
+   -v ./adata.db:/htdocs/epg/adata.db \
+   -v ./config.php:/htdocs/epg/config.php \
+   -p 5678:80 \
+   --restart always \
+   taksss/php-epg:latest
+  ```
 
 ### 2024-7-31更新：
 
@@ -45,10 +64,6 @@ PHP 实现的 EPG（电子节目指南）服务端， `Docker` 部署，自带�
 2. 修复 `phpLiteAdmin 1.9.71` 部分节目不显示的问题：
    - 将部分 `substr` 、 `strlen` 替换为 `mb_substr` 、 `mb_strlen`
 3. 修复未进入“更多设置”页面，`Ctrl+S` 会清空限定频道列表的问题
-
->
-> 推荐更新为该版本
-> 
 
 ### 2024-7-30更新：
 
@@ -147,9 +162,22 @@ PHP 实现的 EPG（电子节目指南）服务端， `Docker` 部署，自带�
      taksss/php-epg:latest
    ```
 
-      >
-      > 默认端口为 `5678` ，根据需要自行修改。
-      > 
+   >
+   > 默认端口为 `5678` ，根据需要自行修改。
+   > 
+
+- `adata.db` 跟 `config.php` 文件持久化：
+  - 下载 `源代码` 后，在 `根目录` 执行 `docker-compose up -d` 部署（后续升级无需重新下载源代码）
+  - 或执行以下命令 ，需确保 `当前目录` 存在文件
+    ```bash
+    docker run -d \
+      --name php-epg \
+      -v ./adata.db:/htdocs/epg/adata.db \
+      -v ./config.php:/htdocs/epg/config.php \
+      -p 5678:80 \
+      --restart always \
+      taksss/php-epg:latest
+     ```
 
 
 ## 使用步骤 🛠️
@@ -164,7 +192,9 @@ PHP 实现的 EPG（电子节目指南）服务端， `Docker` 部署，自带�
 
 5. 设置 `定时任务` ，点击 `更新配置` 保存，点击 `定时任务日志` 查看定时任务时间表
 
-6. 用浏览器测试各个接口的返回结果是否正确：
+6. 点击 `更多设置` ，选择是否 `生成xml文件` 、`生成方式` ，设置 `限定频道节目单`
+
+7. 用浏览器测试各个接口的返回结果是否正确：
 
     - `xmltv` 接口： `http://{服务器IP地址}:5678/epg/index.php`
     
@@ -172,10 +202,10 @@ PHP 实现的 EPG（电子节目指南）服务端， `Docker` 部署，自带�
     
     - `超级直播` 接口： `http://{服务器IP地址}:5678/epg/index.php?channel=CCTV1`
 
-7. 将 **`http://{服务器IP地址}:5678/epg/index.php`** 填入 `DIYP`、`TiviMate` 等软件的 `EPG 地址栏`
+8. 将 **`http://{服务器IP地址}:5678/epg/index.php`** 填入 `DIYP`、`TiviMate` 等软件的 `EPG 地址栏`
 
-    - ⚠️ 直接使用 `docker run` 拉取镜像的话，可以将 `http://{服务器IP地址}:5678/epg/index.php` 替换为 `http://{服务器IP地址}:5678/epg`。
-    - ⚠️ 部分软件不支持跳转解析 `xmltv` 文件，可直接使用 **`http://{服务器IP地址}:5678/epg/t.xml.gz`** 访问。
+    - ⚠️ 直接使用 `docker run` 运行的话，可以将 `:5678/epg/index.php` 替换为 `:5678/epg`。
+    - ⚠️ 部分软件不支持跳转解析 `xmltv` 文件，可直接使用 **`:5678/epg/t.xml.gz`** 访问。
 
 >
 > **快捷键：**
@@ -218,10 +248,6 @@ PHP 实现的 EPG（电子节目指南）服务端， `Docker` 部署，自带�
 **TiviMate**
 
 ![TiviMate](/pic/TiviMate.jpg)
-
-**超级直播**
-
-![超级直播](/pic/LoveTV.jpg)
 
 
 ## 特别鸣谢 🙏
