@@ -134,7 +134,7 @@ function findCurrentProgramme($programmes) {
 
 // 处理请求
 function fetchHandler() {
-    global $init, $db;
+    global $init, $db, $Config;
 
     $uri = parse_url($_SERVER['REQUEST_URI']);
     $query_params = [];
@@ -147,9 +147,17 @@ function fetchHandler() {
 
     $date = isset($query_params['date']) ? getFormatTime(preg_replace('/\D+/', '', $query_params['date']))['date'] : getNowDate();
 
-    // 频道参数为空时，直接重定向到 t.xml.gz 文件
+    // 频道参数为空时，直接重定向到 t.xml 或 t.xml.gz 文件
     if (empty($channel)) {
-        header('Location: ./t.xml.gz');
+        if ($Config['gen_xml'] == 1) {
+            header('Location: ./t.xml.gz');
+        } else if ($Config['gen_xml'] == 2) {
+            header('Location: ./t.xml');
+        } else {
+            // 输出消息并设置404状态码
+            echo "404 Not Found. <br>未生成 xmltv 文件";
+            http_response_code(404);
+        }
         exit;
     }
 
@@ -170,11 +178,11 @@ function fetchHandler() {
                     'epg_data' => array_map(function($hour) {
                         return [
                             'start' => sprintf('%02d:00', $hour),
-                            'end' => sprintf('%02d:00', ($hour + 2) % 24),
+                            'end' => sprintf('%02d:00', ($hour + 1) % 24),
                             'title' => '精彩节目',
                             'desc' => ''
                         ];
-                    }, range(0, 22, 2))
+                    }, range(0, 23, 1))
                 ];
                 $response = json_encode($default_diyp_program_info, JSON_UNESCAPED_UNICODE);
             } else {
@@ -188,11 +196,11 @@ function fetchHandler() {
                         'program' => array_map(function($hour) {
                             return [
                                 'st' => strtotime(sprintf('%02d:00', $hour)),
-                                'et' => strtotime(sprintf('%02d:00', ($hour + 2) % 24)),
+                                'et' => strtotime(sprintf('%02d:00', ($hour + 1) % 24)),
                                 't' => '精彩节目',
                                 'd' => ''
                             ];
-                        }, range(0, 22, 2))
+                        }, range(0, 23, 1))
                     ]
                 ];
                 $response = json_encode($default_lovetv_program_info, JSON_UNESCAPED_UNICODE);

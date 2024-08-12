@@ -419,10 +419,11 @@ try {
     <div class="modal-content more-setting-modal-content">
         <span class="close">&times;</span>
         <h2>更多设置</h2>
-        <label for="gen_xml">生成 .xml.gz 文件：</label>
+        <label for="gen_xml">生成 xmltv 文件：</label>
         <select id="gen_xml" name="gen_xml" required>
-            <option value="1" <?php if ($Config['gen_xml'] == 1) echo 'selected'; ?>>是</option>
-            <option value="0" <?php if ($Config['gen_xml'] == 0) echo 'selected'; ?>>否</option>
+            <option value="1" <?php if ($Config['gen_xml'] == 1) echo 'selected'; ?>>t.xml.gz</option>
+            <option value="2" <?php if ($Config['gen_xml'] == 2) echo 'selected'; ?>>t.xml</option>
+            <option value="0" <?php if ($Config['gen_xml'] == 0) echo 'selected'; ?>>不生成</option>
         </select>
         <label for="include_future_only">生成方式：</label>
         <select id="include_future_only" name="include_future_only" required>

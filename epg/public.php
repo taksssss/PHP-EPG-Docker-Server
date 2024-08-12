@@ -65,12 +65,13 @@ function cleanChannelName($channel, $t2s = false) {
                 return preg_replace($pattern, $replace, $channel);
             }
         } else {
-            // 检查是否为一对一映射或多对一映射
-            $search = trim($search);
-            if ($channel === $search || (strpos($search, '[') === 0 && strpos($search, ']') === strlen($search) - 1)) {
+            // 检查是否为一对一映射或多对一映射，忽略所有空格
+            $search = str_replace(' ', '', $search);
+            $channelNoSpaces = str_replace(' ', '', $channel);
+            if ($channelNoSpaces === $search || (strpos($search, '[') === 0 && strpos($search, ']') === strlen($search) - 1)) {
                 $channels = strpos($search, '[') === 0 ? explode(',', trim($search, '[]')) : [$search];
                 foreach ($channels as $singleChannel) {
-                    if ($channel === trim($singleChannel)) {
+                    if ($channelNoSpaces === str_replace(' ', '', $singleChannel)) {
                         return $replace;
     }}}}}
     // 默认不进行繁简转换

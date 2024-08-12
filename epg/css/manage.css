@@ -28,7 +28,7 @@ textarea {
     word-break: break-all; /* 允许单词内断行 */
 }
 textarea[id="cronLogContent"], textarea[id="channelList"] {
-    white-space: pre-wrap; // 自动换行
+    white-space: pre-wrap; /* 自动换行 */
 }
 .form-row {
     display: flex;
@@ -229,16 +229,16 @@ input[type="text"] {
 .modal-content select[id="gen_xml"],
 select[id="include_future_only"],
 select[id="proc_chname"] {
-    width: 160px;
+    width: 155px;
     text-align: center;
     margin-right: 0px;
 }
 .modal-content select[id="gen_xml"] {
-    width: 77px;
-    margin-right: 30px;
+    width: 100px;
+    margin-right: 25px;
 }
 .modal-content select[id="proc_chname"] {
-    width: 73px;
+    width: 82px;
 }
 
 /* 工具提示容器 */

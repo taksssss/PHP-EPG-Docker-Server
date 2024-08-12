@@ -27,8 +27,11 @@ function logMessage(&$log_messages, $message) {
 function deleteOldData($db, $keep_days, &$log_messages) {
     global $Config;
 
-    // 检查并删除 t.xml.gz 文件
-    if (!$Config['gen_xml'] && file_exists('./t.xml.gz')) {
+    // 删除 t.xml 和 t.xml.gz 文件
+    if (($Config['gen_xml'] == 0 || $Config['gen_xml'] == 1) && file_exists('./t.xml')) {
+        unlink('./t.xml');
+    }
+    if (($Config['gen_xml'] == 0 || $Config['gen_xml'] == 2) && file_exists('./t.xml.gz')) {
         unlink('./t.xml.gz');
     }
 
@@ -59,7 +62,7 @@ function getFormatTime($time) {
 // 下载数据并存入数据库
 function downloadData($xml_url, $db, &$log_messages, $gen_list) {
     $xml_data = downloadXmlData($xml_url);
-    if ($xml_data !== false) {        
+    if ($xml_data !== false && stripos($xml_data, 'not found') === false) {
         logMessage($log_messages, "【下载】 成功");
         if (strtoupper(substr($xml_url, -3)) === '.GZ') {
             $xml_data = gzdecode($xml_data);
@@ -271,6 +274,9 @@ function insertDataToDatabase($channelsData, $db) {
     }
 }
 
+// 记录开始时间
+$startTime = microtime(true);
+
 // 统计更新前数据条数
 $initialCount = $db->query("SELECT COUNT(*) FROM epg_data")->fetchColumn();
 
@@ -292,19 +298,29 @@ foreach ($Config['xml_urls'] as $xml_url) {
     downloadData($cleaned_url, $db, $log_messages, $gen_list);
 }
 
-// 判断是否生成 .xml.gz 文件
+// 判断是否生成 xmltv 文件
 if ($Config['gen_xml']) {
     $xml_content = generateXmlFromEpgData($db, $Config['include_future_only']);
-    $gz_content = compressXmlContent($xml_content);
-    file_put_contents('./t.xml.gz', $gz_content);
-    logMessage($log_messages, "【.xml.gz文件】 已生成");
+    if ($Config['gen_xml'] == 1) {
+        $gz_content = compressXmlContent($xml_content);
+        file_put_contents('./t.xml.gz', $gz_content);
+        logMessage($log_messages, "【t.xml.gz文件】 已生成");
+    }
+    else {
+        file_put_contents('./t.xml', $xml_content);
+        logMessage($log_messages, "【t.xml文件】 已生成");
+    }
 }
 
 // 统计更新后数据条数
 $finalCount = $db->query("SELECT COUNT(*) FROM epg_data")->fetchColumn();
 $dif = $finalCount - $initialCount;
 $msg = $dif > 0 ? " 增加 {$dif} 条。" : ($dif < 0 ? " 减少 " . abs($dif) . " 条。" : "");
-logMessage($log_messages, "【更新完成】 更新前：{$initialCount} 条，更新后：{$finalCount} 条。" . $msg);
+// 记录结束时间
+$endTime = microtime(true);
+// 计算运行时间（以秒为单位）
+$executionTime = round($endTime - $startTime, 1);
+logMessage($log_messages, "【更新完成】 {$executionTime} 秒。 更新前：{$initialCount} 条，更新后：{$finalCount} 条。" . $msg);
 
 // 将日志信息写入数据库
 $log_message_str = implode("<br>", $log_messages);

@@ -33,11 +33,17 @@ PHP 实现的 EPG（电子节目指南）服务端， `Docker` 部署，自带�
 > 
 >   - `regex:/^CCTV[-\s]*(\p{Han})/iu, $1` ：将 `CCTV风云足球`、`cctv-风云音乐` 等替换成 `风云足球`、`风云音乐`
 > 
->   - `regex:/^CCTV[-\s]*(\d+(\s*PLUS|[K\+])?)(?!美洲|欧洲).*/i => CCTV$1` ：将 `CCTV 1综合`、`CCTV-4K频道`、`CCTV - 5+频道`、`CCTV - 5PLUS频道` 等替换成 `CCTV1`、`CCTV4K`、`CCTV5+`、`CCTV5PLUS`（排除 `CCTV4美洲` 和 `CCTV4欧洲`）
+>   - `regex:/^CCTV[-\s]*(\d+(\s*P(LUS)?|[K\+])?)(?!美洲|欧洲).*/i => CCTV$1` ：将 `CCTV 1综合`、`CCTV-4K频道`、`CCTV - 5+频道`、`CCTV - 5PLUS频道` 等替换成 `CCTV1`、`CCTV4K`、`CCTV5+`、`CCTV5PLUS`（排除 `CCTV4美洲` 和 `CCTV4欧洲`）
 > 
 >   - `regex:/^(深圳.*?)频道$/i, $1` ：将 `深圳xx频道` 替换成 `深圳xx`
 
 ## 更新日志 📝
+
+### 2024-8-12更新：
+
+1. 新增：`xmltv` 文件格式选项（ `.xml.gz` 或 `.xml`）
+2. 优化：频道映射忽略空格（如 `CGTN英语 => CGTN` 可对 `CGTN 英语` 进行映射）
+3. 优化：正则表达式，增加 `CCTV 5P` 频道匹配
 
 ### 2024-8-5更新：
 
@@ -167,8 +173,8 @@ PHP 实现的 EPG（电子节目指南）服务端， `Docker` 部署，自带�
    > 
 
 - `adata.db` 跟 `config.php` 文件持久化：
-  - 下载 `源代码` 后，在 `根目录` 执行 `docker-compose up -d` 部署（后续升级无需重新下载源代码）
-  - 或执行以下命令 ，需确保 `当前目录` 存在文件
+  - 下载 `源代码` 后，在 `项目根目录` 执行 `docker-compose up -d` 部署（后续升级无需重新下载源代码）
+  - 或执行以下命令 ，需确保 `当前目录` 存在 `adata.db` 及 `config.php` 文件
     ```bash
     docker run -d \
       --name php-epg \
@@ -205,7 +211,7 @@ PHP 实现的 EPG（电子节目指南）服务端， `Docker` 部署，自带�
 8. 将 **`http://{服务器IP地址}:5678/epg/index.php`** 填入 `DIYP`、`TiviMate` 等软件的 `EPG 地址栏`
 
     - ⚠️ 直接使用 `docker run` 运行的话，可以将 `:5678/epg/index.php` 替换为 `:5678/epg`。
-    - ⚠️ 部分软件不支持跳转解析 `xmltv` 文件，可直接使用 **`:5678/epg/t.xml.gz`** 访问。
+    - ⚠️ 部分软件不支持跳转解析 `xmltv` 文件，可直接使用 **`:5678/epg/t.xml.gz`** 或 **`:5678/epg/t.xml`** 访问。
 
 >
 > **快捷键：**
