@@ -126,16 +126,16 @@ $initial_sleep = $next_execution_time - $current_time;
 // 汇总所有日志信息
 logMessage("【开始时间】 " . date('H:i', $first_run_today));
 logMessage("【结束时间】 " . date('H:i', $end_time_today));
-logMessage("【间隔时间】 " . gmdate('H小时i分钟', $interval_time));
-$logContent = "-------运行时间表-------\n";
+$logContent = "【间隔时间】 " . gmdate('H小时i分钟', $interval_time) . "\n";
+$logContent .= "\t\t  -------运行时间表-------\n";
 
 // 循环输出每次执行的时间
 $current_execution_time = $first_run_today;
 while ($current_execution_time < $end_time_today) {
-    $logContent .= "\t\t\t  " . date('H:i', $current_execution_time) . "\n";
+    $logContent .= "\t\t\t   " . date('H:i', $current_execution_time) . "\n";
     $current_execution_time += $interval_time;
 }
-$logContent .= "\t\t ------------------------";
+$logContent .= "\t\t  ------------------------";
 logMessage($logContent);
 
 logMessage("【下次执行】 " . date('m/d H:i', $next_execution_time));
