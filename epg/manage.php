@@ -156,11 +156,22 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update'])) {
     $channel_replacements = array_map('trim', explode("\n", trim($_POST['channel_replacements'])));
 
     // 处理频道映射
-    $channel_mappings_lines = array_map('trim', explode("\n", trim($_POST['channel_mappings'])));
     $channel_mappings = [];
-    foreach ($channel_mappings_lines as $line) {
-        list($search, $replace) = explode('=>', $line);
-        $channel_mappings[trim(str_replace("，", ",", $search))] = trim($replace);
+    $current_search = '';
+    foreach ($_POST['channel_mappings'] as $mapping) {
+        // 如果当前项是 search，则存储为当前搜索模式
+        if (isset($mapping['search'])) {
+            $current_search = trim(str_replace("，", ",", $mapping['search']));
+        }
+        // 如果当前项是 replace，则将其与当前 search 组合，并存入频道映射数组
+        elseif (isset($mapping['replace'])) {
+            $replace = trim($mapping['replace']);
+            if ($current_search !== '' && $replace !== '') {
+                $channel_mappings[$current_search] = $replace;
+            }
+            // 重置 current_search 以准备处理下一对 search-replace
+            $current_search = '';
+        }
     }
 
     // 获取旧的配置
@@ -332,17 +343,43 @@ try {
         </div><br>
         
         <div class="flex-container">
-            <div class="flex-item">
-                <label for="channel_replacements">频道忽略字符串<br>（匹配时按先后顺序清除， \s 表示空格）</label><br><br>
-                <textarea id="channel_replacements" name="channel_replacements" rows="5" required><?php echo implode("\n", array_map('trim', $Config['channel_replacements'])); ?></textarea><br><br>
+            <div class="flex-item" style="width: 33%;">
+                <label for="channel_replacements">频道忽略字符串（按顺序， \s 空格）</label><br><br>
+                <textarea id="channel_replacements" name="channel_replacements" style="height: 138px;" required><?php echo implode("\n", array_map('trim', $Config['channel_replacements'])); ?></textarea><br><br>
             </div>
-            <div class="flex-item">
-                <label for="channel_mappings">
-                    频道映射<br>[自定1, 自定2, ...] => 
-                    <span id="dbChannelName" onclick="showModal('channel')" style="color: blue; text-decoration: underline; cursor: pointer;">数据库频道名</span>
-                    (正则表达式regex:)
-                </label><br><br>
-                <textarea id="channel_mappings" name="channel_mappings" rows="5" required><?php echo implode("\n", array_map(function($search, $replace) { return $search . ' => ' . $replace; }, array_keys($Config['channel_mappings']), $Config['channel_mappings'])); ?></textarea><br><br>
+            <div class="flex-item" style="width: 67%;">
+                <label for="channel_mappings">频道映射（正则表达式 regex: ）</label><br><br>
+                <div class="table-wrapper">
+                    <table id="channelMappingsTable">
+                        <thead style="position: sticky; top: 0; background-color: #ffffff;"><tr>                                
+                            <th>自定义频道名（可用 , 分隔）</th>
+                            <th><span onclick="showModal('channel')" style="color: blue; cursor: pointer;">数据库频道名</span></th>
+                        </tr></thead>
+                        <tbody>
+                            <?php foreach ($Config['channel_mappings'] as $search => $replace): ?>
+                            <tr>
+                                <td contenteditable="true" oninput="updateHiddenInput(this); addRowIfNeeded(this)">
+                                    <?php echo htmlspecialchars(trim($search, '[]'), ENT_QUOTES); ?>
+                                    <input type="hidden" name="channel_mappings[][search]" value="<?php echo htmlspecialchars(trim($search, '[]'), ENT_QUOTES); ?>">
+                                </td>
+                                <td contenteditable="true" oninput="updateHiddenInput(this); addRowIfNeeded(this)">
+                                    <?php echo htmlspecialchars($replace, ENT_QUOTES); ?>
+                                    <input type="hidden" name="channel_mappings[][replace]" value="<?php echo htmlspecialchars($replace, ENT_QUOTES); ?>">
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                            <!-- 初始空行 -->
+                            <tr>
+                                <td contenteditable="true" oninput="updateHiddenInput(this); addRowIfNeeded(this)">
+                                    <input type="hidden" name="channel_mappings[][search]" value="">
+                                </td>
+                                <td contenteditable="true" oninput="updateHiddenInput(this); addRowIfNeeded(this)">
+                                    <input type="hidden" name="channel_mappings[][replace]" value="">
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div><br>
             </div>
         </div>
 
@@ -380,10 +417,9 @@ try {
         <h2>数据库更新日志</h2>
         <div class="table-container" id="log-table-container">
             <table id="logTable">
-                <thead>
+                <thead style="position: sticky; top: 0; background-color: white;">
                     <tr>
-                        <th>ID</th>
-                        <th>日期</th>
+                        <th>时间</th>
                         <th>描述</th>
                     </tr>
                 </thead>
@@ -400,7 +436,7 @@ try {
     <div class="modal-content cron-log-modal-content">
         <span class="close">&times;</span>
         <h2>定时任务日志</h2>
-        <textarea id="cronLogContent" readonly style="width: 100%; height: 420px;"></textarea>
+        <textarea id="cronLogContent" readonly style="width: 100%; height: 440px;"></textarea>
     </div>
 </div>
 
@@ -410,7 +446,7 @@ try {
         <span class="close">&times;</span>
         <h2 id="channelModalTitle">频道列表</h2>
         <input type="text" id="searchInput" placeholder="搜索频道名..." onkeyup="filterChannels()">
-        <textarea id="channelList" readonly style="width: 100%; height: 370px;"></textarea>
+        <textarea id="channelList" readonly style="width: 100%; height: 390px;"></textarea>
     </div>
 </div>
 
@@ -423,6 +459,7 @@ try {
         <select id="gen_xml" name="gen_xml" required>
             <option value="1" <?php if ($Config['gen_xml'] == 1) echo 'selected'; ?>>t.xml.gz</option>
             <option value="2" <?php if ($Config['gen_xml'] == 2) echo 'selected'; ?>>t.xml</option>
+            <option value="3" <?php if ($Config['gen_xml'] == 3) echo 'selected'; ?>>同时生成</option>
             <option value="0" <?php if ($Config['gen_xml'] == 0) echo 'selected'; ?>>不生成</option>
         </select>
         <label for="include_future_only">生成方式：</label>
@@ -439,14 +476,30 @@ try {
         <br><br>
         <label for="gen_list_text"">仅生成以下频道的节目单：</label>
         <span onclick="parseSource()">
-            （可粘贴 txt、m3u 直播源并<span style="color: blue; text-decoration: underline; cursor: pointer;">点击解析</span>）
+            （可粘贴 txt、m3u 直播源并<span style="color: blue; cursor: pointer;">点击解析</span>）
         </span><br><br>
-        <textarea id="gen_list_text" style="width: 100%; height: 261px;"></textarea><br><br>
+        <textarea id="gen_list_text" style="width: 100%; height: 260px;"></textarea><br><br>
         <button id="saveConfig" type="button" onclick="saveAndUpdateConfig();">保存配置</button>
     </div>
 </div>
 
 <script>
+    // 频道映射自动添加空行
+    function addRowIfNeeded(cell) {
+        var row = cell.parentElement;
+        var table = row.parentElement;
+        var isLastRow = row === table.lastElementChild;
+        if (isLastRow && cell.innerText.trim() !== "") {
+            var newRow = table.insertRow();
+            newRow.innerHTML = '<td contenteditable="true" oninput="addRowIfNeeded(this)"></td><td contenteditable="true" oninput="addRowIfNeeded(this)"></td>';
+            newRow.scrollIntoView({ behavior: 'smooth', block: 'end' });// 自动滚动到新添加的行
+        }
+    }
+    function updateHiddenInput(cell) {
+        var hiddenInput = cell.querySelector('input[type="hidden"]');
+        hiddenInput.value = cell.textContent.trim();
+    }
+
     let genListLoaded = false; // 用于跟踪数据是否已加载
 
     // Ctrl+S 保存设置
@@ -461,15 +514,12 @@ try {
     document.getElementById('xml_urls').addEventListener('keydown', function(event) {
     if (event.ctrlKey && event.key === '/') {
             event.preventDefault();
-
             const textarea = this;
             const { selectionStart, selectionEnd, value } = textarea;
             const lines = value.split('\n');
-
             // 计算当前选中的行
             const startLine = value.slice(0, selectionStart).split('\n').length - 1;
             const endLine = value.slice(0, selectionEnd).split('\n').length - 1;
-
             // 判断选中的行是否都已注释
             const allCommented = lines.slice(startLine, endLine + 1).every(line => line.trim().startsWith('#'));
             const newLines = lines.map((line, index) => {
@@ -478,30 +528,24 @@ try {
                 }
                 return line;
             });
-
             // 更新 textarea 的内容
             textarea.value = newLines.join('\n');
-
             // 检查光标开始位置是否在行首
             const startLineStartIndex = value.lastIndexOf('\n', selectionStart - 1) + 1;
             const isStartInLineStart = (selectionStart - startLineStartIndex < 2);
-
             // 检查光标结束位置是否在行首
             const endLineStartIndex = value.lastIndexOf('\n', selectionEnd - 1) + 1;
             const isEndInLineStart = (selectionEnd - endLineStartIndex < 2);
-
             // 计算光标新的开始位置
             const newSelectionStart = isStartInLineStart 
                 ? startLineStartIndex
                 : selectionStart + newLines[startLine].length - lines[startLine].length;
-
             // 计算光标新的结束位置
             const lengthDiff = newLines.join('').length - lines.join('').length;
             const endLineDiff = newLines[endLine].length - lines[endLine].length;
             const newSelectionEnd = isEndInLineStart
                 ? (endLineDiff > 0 ? endLineStartIndex + lengthDiff : endLineStartIndex + lengthDiff - endLineDiff)
                 : selectionEnd + lengthDiff;
-
             // 恢复光标位置
             textarea.setSelectionRange(newSelectionStart, newSelectionEnd);
         }
@@ -522,19 +566,15 @@ try {
         var modal = document.getElementById("myModal");
         var span = document.getElementsByClassName("close")[0];
         var modalMessage = document.getElementById("modalMessage");
-
         if (intervalTime === "0") {
             modalMessage.innerHTML = "配置已更新<br><br>已取消定时任务";
         } else {
             modalMessage.innerHTML = `配置已更新<br><br>已设置定时任务<br>开始时间：${startTime}<br>结束时间：${endTime}<br>间隔周期：${formatTime(intervalTime)}`;
         }
-
         modal.style.display = "block";
-
         span.onclick = function() {
             modal.style.display = "none";
         }
-
         window.onclick = function(event) {
             if (event.target == modal) {
                 modal.style.display = "none";
@@ -545,7 +585,6 @@ try {
 
     function showModal(type) {
         var modal, logSpan, logContent;
-
         switch (type) {
         case 'update':
             modal = document.getElementById("updatelogModal");
@@ -573,13 +612,10 @@ try {
             console.error('Unknown type:', type);
             break;
         }
-
         modal.style.display = "block";
-
         logSpan.onclick = function() {
             modal.style.display = "none";
         }
-
         window.onclick = function(event) {
             if (event.target == modal) {
                 modal.style.display = "none";
@@ -604,7 +640,6 @@ try {
         logData.forEach(log => {
             var row = document.createElement("tr");
             row.innerHTML = `
-                <td>${log.id}</td>
                 <td>${new Date(log.timestamp).toLocaleString()}</td>
                 <td>${log.log_message}</td>
             `;
@@ -646,7 +681,6 @@ try {
         const textarea = document.getElementById('gen_list_text');
         const text = textarea.value;
         const channels = new Set();
-
         if (text.includes('#EXTM3U')) {
             if (text.includes('tvg-name')) {
                 text.replace(/tvg-name="([^"]+)"/g, (_, name) => channels.add(name.trim()));
@@ -660,7 +694,6 @@ try {
                 }
             });
         }
-
         textarea.value = Array.from(channels).join('\n');
     }
 
@@ -670,9 +703,7 @@ try {
             document.getElementById('updateConfig').click();
             return;
         }
-
         const textAreaContent = document.getElementById('gen_list_text').value;
-
         fetch('<?php echo $_SERVER['PHP_SELF']; ?>?set_gen_list=true', {
             method: 'POST',
             headers: {

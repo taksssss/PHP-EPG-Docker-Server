@@ -151,7 +151,7 @@ function fetchHandler() {
     if (empty($channel)) {
         if ($Config['gen_xml'] == 1) {
             header('Location: ./t.xml.gz');
-        } else if ($Config['gen_xml'] == 2) {
+        } else if ($Config['gen_xml'] == 2 || $Config['gen_xml'] == 3) {
             header('Location: ./t.xml');
         } else {
             // 输出消息并设置404状态码

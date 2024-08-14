@@ -68,12 +68,11 @@ function cleanChannelName($channel, $t2s = false) {
             // 检查是否为一对一映射或多对一映射，忽略所有空格
             $search = str_replace(' ', '', $search);
             $channelNoSpaces = str_replace(' ', '', $channel);
-            if ($channelNoSpaces === $search || (strpos($search, '[') === 0 && strpos($search, ']') === strlen($search) - 1)) {
-                $channels = strpos($search, '[') === 0 ? explode(',', trim($search, '[]')) : [$search];
-                foreach ($channels as $singleChannel) {
-                    if ($channelNoSpaces === str_replace(' ', '', $singleChannel)) {
-                        return $replace;
-    }}}}}
+            $channels = strpos($search, ',') !== false ? explode(',', trim($search, '[]')) : [$search];
+            foreach ($channels as $singleChannel) {
+                if ($channelNoSpaces === str_replace(' ', '', trim($singleChannel))) {
+                    return $replace;
+    }}}}
     // 默认不进行繁简转换
     if ($t2s) {
         $channel = t2s($channel);

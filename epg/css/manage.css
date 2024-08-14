@@ -24,6 +24,7 @@ textarea {
     border-radius: 5px;
     box-sizing: border-box;
     resize: none;
+    font-family: SimSun;
     white-space: pre-wrap; /* 保持空白字符和换行符，同时在内容超出容器宽度时换行 */
     word-break: break-all; /* 允许单词内断行 */
 }
@@ -39,16 +40,17 @@ textarea[id="cronLogContent"], textarea[id="channelList"] {
     width: 98px;
 }
 .custom-margin1 {
-    margin-left: 98px;
+    margin-left: 190px;
 }
 .custom-margin2 {
-    margin-left: 68px;
+    margin-left: 50px;
 }
 .custom-margin3 {
-    margin-left: 68px;
+    margin-left: 50px;
 }
 .form-row select, 
 .modal-content select {
+    font-family: SimSun;
     padding: 6px;
     font-size: 16px;
     border: 1px solid #ccc;
@@ -64,21 +66,21 @@ textarea[id="cronLogContent"], textarea[id="channelList"] {
     border: 1px solid #ccc;
     border-radius: 5px;
     box-sizing: border-box;
-    width: 97px;
+    width: 90px;
 }
 .form-row input[id="start_time"] {
-    margin-left: 125px;
+    margin-left: 217px;
 }
 .form-row input[id="end_time"] {
-    margin-left: 34px;
+    margin-left: 24px;
 }
 .form-row select[id="interval_hour"], select[id="interval_minute"] {
-    width: 75px;
+    width: 60px;
     margin-right: 0px;
     text-align: center;
 }
 .form-row select[id="interval_hour"] {
-    margin-left: 37px;
+    margin-left: 25px;
 }
 input[type="submit"],
 .modal-content button {
@@ -191,8 +193,39 @@ input[type="text"] {
     text-decoration: none;
     cursor: pointer;
 }
+/* 频道映射的 CSS 规则 */
+.table-wrapper {
+    height: 138px; /* 固定高度 */
+    overflow-y: scroll; /* 启用垂直滚动条 */
+    border: 1px solid #ccc; /* 外边框 */
+    font-size: 15px; /* 字体大小 */
+    line-height: 1.5;
+    border-radius: 5px; /* 圆角边框 */
+    word-break: break-all; /* 单词换行 */
+}
+#channelMappingsTable {
+    border-collapse: separate;
+    border-spacing: 0;
+    font-family: SimSun; /* 设置字体 */
+    width: 100%; /* 表格宽度 */
+}
+#channelMappingsTable th {
+    width: 75%; /* 第一列宽度 */
+    padding: 0 5px; /* 左右内边距 */
+    border-bottom: 1.5px solid #ccc; /* 表头下边框 */
+    border-right: 1px solid #ccc; /* 表头右边框 */
+}
+#channelMappingsTable td {
+    padding: 0 5px; /* 左右内边距 */
+    border-bottom: 1px solid #ccc; /* 行间隔 */
+    border-right: 1px solid #ccc; /* 竖的内边框 */
+}
+#channelMappingsTable tr:last-child td {
+    /* 移除最后一行的底部边框 */
+    border-bottom: none;
+}
 .table-container {
-    height: 425px; /* 固定高度 */
+    height: 440px; /* 固定高度 */
     overflow-y: scroll; /* 启用垂直滚动条 */
 }
 #logTable {
@@ -208,23 +241,15 @@ input[type="text"] {
 }
 #logTable th:nth-child(1), 
 #logTable td:nth-child(1) {
-    width: 4%; /* 第一列宽度 */
+    width: 10%; /* 第一列宽度 */
     text-align: center;
 }
-
 #logTable th:nth-child(2), 
 #logTable td:nth-child(2) {
-    width: 9%; /* 第二列宽度 */
-    text-align: center;
-}
-
-#logTable th:nth-child(3), 
-#logTable td:nth-child(3) {
-    width: 88%; /* 第三列宽度 */
     word-break: break-all; /* 允许单词内断行 */
 }
-#logTable th:nth-child(3) {
-    text-align: center; /* 第三列表头居中 */
+#logTable th:nth-child(2) {
+    text-align: center; /* 第二列表头居中 */
 }
 .modal-content select[id="gen_xml"],
 select[id="include_future_only"],
@@ -240,14 +265,12 @@ select[id="proc_chname"] {
 .modal-content select[id="proc_chname"] {
     width: 82px;
 }
-
 /* 工具提示容器 */
 .tooltip {
     position: relative;
     display: inline-block;
     width: 100%;
 }
-
 /* 工具提示文本 */
 .tooltip .tooltiptext {
     visibility: hidden;
@@ -266,7 +289,6 @@ select[id="proc_chname"] {
     transition: opacity 0.3s;
     font-size: 14px; /* 设置字体大小 */
 }
-
 /* 显示工具提示 */
 .tooltip:hover .tooltiptext {
     visibility: visible;

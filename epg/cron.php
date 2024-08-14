@@ -47,7 +47,7 @@ foreach ($output as $line) {
     // 排除当前进程的PID
     if (isset($pid) && $pid != $currentPid && posix_kill($pid, 0)) {
         if (posix_kill($pid, 9)) {
-            logMessage("成功终止旧的进程 {$pid}");
+            logMessage("【终止旧进程】 {$pid}");
         } else {
             logMessage("无法终止旧的进程 {$pid}");
         }
@@ -124,19 +124,18 @@ if ($next_execution_time >= $end_time_today) {
 $initial_sleep = $next_execution_time - $current_time;
 
 // 汇总所有日志信息
-$logContent .= "【开始时间】 " . date('H:i', $first_run_today) . "\n";
-$logContent .= "                 【结束时间】 " . date('H:i', $end_time_today) . "\n";
-$logContent .= "                 【间隔时间】 " . gmdate('H小时i分钟', $interval_time) . "\n";
-$logContent .= "                 ----------运行时间表----------\n";
+logMessage("【开始时间】 " . date('H:i', $first_run_today));
+logMessage("【结束时间】 " . date('H:i', $end_time_today));
+logMessage("【间隔时间】 " . gmdate('H小时i分钟', $interval_time));
+$logContent = "-------运行时间表-------\n";
 
 // 循环输出每次执行的时间
 $current_execution_time = $first_run_today;
 while ($current_execution_time < $end_time_today) {
-    $logContent .= "                             " . date('H:i', $current_execution_time) . "\n";
+    $logContent .= "\t\t\t  " . date('H:i', $current_execution_time) . "\n";
     $current_execution_time += $interval_time;
 }
-$logContent .= "                 ------------------------------";
-// 记录日志信息
+$logContent .= "\t\t ------------------------";
 logMessage($logContent);
 
 logMessage("【下次执行】 " . date('m/d H:i', $next_execution_time));
@@ -152,7 +151,7 @@ sleep($initial_sleep);
 while (true) {
     // 执行update.php
     exec('php update.php');
-    logMessage("执行了 update.php");
+    logMessage("【成功执行】 update.php");
 
     // 计算下一个执行时间
     $current_time = time();
@@ -169,7 +168,7 @@ while (true) {
     $sleep_time = $next_execution_time - $current_time;
 
     // 记录下次执行时间
-    logMessage("【下次执行】 " . date('Y-m-d H:i:s', $next_execution_time));
+    logMessage("【下次执行】 " . date('m/d H:i', $next_execution_time));
 
     // 等待到下一个执行时间
     sleep($sleep_time);

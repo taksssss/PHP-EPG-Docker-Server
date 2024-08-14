@@ -301,12 +301,12 @@ foreach ($Config['xml_urls'] as $xml_url) {
 // 判断是否生成 xmltv 文件
 if ($Config['gen_xml']) {
     $xml_content = generateXmlFromEpgData($db, $Config['include_future_only']);
-    if ($Config['gen_xml'] == 1) {
+    if ($Config['gen_xml'] == 1 || $Config['gen_xml'] == 3) {
         $gz_content = compressXmlContent($xml_content);
         file_put_contents('./t.xml.gz', $gz_content);
         logMessage($log_messages, "【t.xml.gz文件】 已生成");
     }
-    else {
+    if ($Config['gen_xml'] == 2 || $Config['gen_xml'] == 3) {
         file_put_contents('./t.xml', $xml_content);
         logMessage($log_messages, "【t.xml文件】 已生成");
     }
