@@ -343,11 +343,11 @@ try {
         </div><br>
         
         <div class="flex-container">
-            <div class="flex-item" style="width: 33%;">
+            <div class="flex-item" style="width: 40%;">
                 <label for="channel_replacements">频道忽略字符串（按顺序， \s 空格）</label><br><br>
                 <textarea id="channel_replacements" name="channel_replacements" style="height: 138px;" required><?php echo implode("\n", array_map('trim', $Config['channel_replacements'])); ?></textarea><br><br>
             </div>
-            <div class="flex-item" style="width: 67%;">
+            <div class="flex-item" style="width: 60%;">
                 <label for="channel_mappings">频道映射（正则表达式 regex: ）</label><br><br>
                 <div class="table-wrapper">
                     <table id="channelMappingsTable">

@@ -40,13 +40,11 @@ textarea[id="cronLogContent"], textarea[id="channelList"] {
     width: 98px;
 }
 .custom-margin1 {
-    margin-left: 190px;
+    margin-left: 137px;
 }
-.custom-margin2 {
-    margin-left: 50px;
-}
+.custom-margin2,
 .custom-margin3 {
-    margin-left: 50px;
+    margin-left: 70px;
 }
 .form-row select, 
 .modal-content select {
@@ -69,18 +67,16 @@ textarea[id="cronLogContent"], textarea[id="channelList"] {
     width: 90px;
 }
 .form-row input[id="start_time"] {
-    margin-left: 217px;
+    margin-left: 164px;
 }
-.form-row input[id="end_time"] {
-    margin-left: 24px;
+.form-row input[id="end_time"],
+select[id="interval_hour"]{
+    margin-left: 44px;
 }
 .form-row select[id="interval_hour"], select[id="interval_minute"] {
-    width: 60px;
+    width: 70px;
     margin-right: 0px;
     text-align: center;
-}
-.form-row select[id="interval_hour"] {
-    margin-left: 25px;
 }
 input[type="submit"],
 .modal-content button {
