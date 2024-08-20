@@ -61,9 +61,19 @@ function getFormatTime($time) {
 
 // 下载数据并存入数据库
 function downloadData($xml_url, $db, &$log_messages, $gen_list) {
+    $json_file = 'arecord.json';
+    $hashes = loadHashesFromJson($json_file);
+
     $xml_data = downloadXmlData($xml_url);
     if ($xml_data !== false && stripos($xml_data, 'not found') === false) {
         logMessage($log_messages, "【下载】 成功");
+
+        $new_hash = hash('sha256', $xml_data);
+        if (isset($hashes[$xml_url]) && $hashes[$xml_url] === $new_hash) {
+            logMessage($log_messages, "【跳过】 文件未改变");
+            return;
+        }
+
         if (strtoupper(substr($xml_url, -3)) === '.GZ') {
             $xml_data = gzdecode($xml_data);
             if ($xml_data === false) {
@@ -76,6 +86,9 @@ function downloadData($xml_url, $db, &$log_messages, $gen_list) {
             processXmlData($xml_data, date('Y-m-d'), $db, $gen_list);
             $db->commit();
             logMessage($log_messages, "【更新】 成功");
+
+            $hashes[$xml_url] = $new_hash; // 更新哈希值
+            saveHashesToJson($json_file, $hashes); // 保存到JSON文件
         } catch (Exception $e) {
             $db->rollBack();
             logMessage($log_messages, "【处理数据出错！！！】 " . $e->getMessage());
@@ -83,6 +96,19 @@ function downloadData($xml_url, $db, &$log_messages, $gen_list) {
     } else {
         logMessage($log_messages, "【下载】 失败！！！");
     }
+}
+
+function loadHashesFromJson($json_file) {
+    if (file_exists($json_file)) {
+        $json_data = file_get_contents($json_file);
+        return json_decode($json_data, true);
+    }
+    return [];
+}
+
+function saveHashesToJson($json_file, $hashes) {
+    $json_data = json_encode($hashes, JSON_PRETTY_PRINT);
+    file_put_contents($json_file, $json_data);
 }
 
 function downloadXmlData($url) {
@@ -161,11 +187,10 @@ function formatTime($date, $time) {
 
 // 压缩 XML 内容
 function compressXmlContent($xmlContent) {
-    $gzContent = gzencode($xmlContent);
-    return $gzContent;
+    return gzencode($xmlContent);
 }
 
-// 处理 XML 数据并存入数据库
+// 处理 XML 数据并逐步存入数据库
 function processXmlData($xml_data, $date, $db, $gen_list) {
     global $Config;
     $reader = new XMLReader();
@@ -173,77 +198,71 @@ function processXmlData($xml_data, $date, $db, $gen_list) {
         throw new Exception("无法解析 XML 数据");
     }
 
-    // 初始化存储转换后 channel 的数组
-    $channelsData = [];
     $oriChannelNames = [];
     $cleanChannelNames = [];
 
-    // 读取 channel 元素到数组中
+    // 读取频道数据
     while ($reader->read() && $reader->name !== 'channel');
     while ($reader->name === 'channel') {
         $channel = new SimpleXMLElement($reader->readOuterXML());
         $channelId = (string)$channel['id'];
-        $oriChannelName = (string)$channel->{'display-name'};
-        $oriChannelNames[$channelId] = $oriChannelName; // 收集所有原频道名称
-        $cleanChannelName = cleanChannelName($oriChannelName);
-        $cleanChannelNames[$channelId] = $cleanChannelName; // 收集所有处理后的频道名称
+        $cleanChannelNames[$channelId] = cleanChannelName((string)$channel->{'display-name'});
+        $oriChannelNames[$channelId] = (string)$channel->{'display-name'};
         $reader->next('channel');
     }
 
-    // 统一处理繁简转换
-    $allChannelNames = implode("\n", $cleanChannelNames);
-    $allChannelNamesSimplified = t2s($allChannelNames);
-    $simplifiedChannelNames = explode("\n", $allChannelNamesSimplified);
-    
-    // 根据转换后的频道名称更新 channelsData
+    // 繁简转换和频道筛选
+    $simplifiedChannelNames = explode("\n", t2s(implode("\n", $cleanChannelNames)));
+    $channelNamesMap = [];
     foreach ($cleanChannelNames as $channelId => $channelName) {
         $channelNameSimplified = array_shift($simplifiedChannelNames);
         // 当 gen_list 为空时，插入所有数据
         if (empty($gen_list) || in_array($channelNameSimplified, $gen_list, true)) {
             $channel_name = !isset($Config['proc_chname']) || $Config['proc_chname'] ?
                             $channelNameSimplified : $oriChannelNames[$channelId];
-            $channelsData[$channelId] = [
-                'channel_name' => $channel_name,
-                'diyp_data' => []
-            ];
+            $channelNamesMap[$channelId] = $channel_name;
         }
     }
 
-    // 重置 XMLReader 到 programme 元素
     $reader->close();
-    if (!$reader->XML($xml_data)) {
-        throw new Exception("无法重新解析 XML 数据");
-    }
+    $reader->XML($xml_data); // 重置 XMLReader
     while ($reader->read() && $reader->name !== 'programme');
 
-    // 遍历 programme 元素
+    $currentChannelProgrammes = [];
+
+    // 遍历节目并按批插入数据库
     while ($reader->name === 'programme') {
         $programme = new SimpleXMLElement($reader->readOuterXML());
-
-        // 获取时间和日期
         $start = getFormatTime((string)$programme['start']);
-        $stop = getFormatTime((string)$programme['stop']);
-
-        // 构建 diypProgramme 数组表示
-        $diypProgrammeArray = [
-            'start' => $start['time'],
-            'end' => $stop['time'],
-            'title' => (string)$programme->title,
-            'desc' => '' // 可以根据需要添加描述信息
-        ];
-
-        // 将 programme 添加到对应的 channel 和日期
         $channelId = (string)$programme['channel'];
-        if (isset($channelsData[$channelId])) {
-            $channelsData[$channelId]['diyp_data'][$start['date']][] = $diypProgrammeArray;
+
+        if (isset($channelNamesMap[$channelId])) {
+            $diypProgrammeArray = [
+                'start' => $start['time'],
+                'end' => getFormatTime((string)$programme['stop'])['time'],
+                'title' => (string)$programme->title,
+                'desc' => isset($programme->desc) ? (string)$programme->desc : ''
+            ];
+
+            // 将 programme 添加到对应的 channel 和日期
+            $currentChannelProgrammes[$channelId]['channel_name'] = $channelNamesMap[$channelId];
+            $currentChannelProgrammes[$channelId]['diyp_data'][$start['date']][] = $diypProgrammeArray;
+
+            // 每次达到 50 条时，插入数据并保留最后一条
+            if (count($currentChannelProgrammes) >= 50) {
+                $lastProgramme = array_pop($currentChannelProgrammes); // 取出最后一条
+                insertDataToDatabase($currentChannelProgrammes, $db); // 插入前 49 条
+                $currentChannelProgrammes = [$channelId => $lastProgramme]; // 清空并重新赋值最后一条
+            }
         }
 
-        // 移动到下一个 programme 元素
         $reader->next('programme');
     }
 
-    // 写入数据
-    insertDataToDatabase($channelsData, $db);
+    // 插入剩余的节目数据
+    if (!empty($currentChannelProgrammes)) {
+        insertDataToDatabase($currentChannelProgrammes, $db);
+    }
 
     // 关闭 XMLReader
     $reader->close();
@@ -286,8 +305,9 @@ deleteOldData($db, $Config['days_to_keep'], $log_messages);
 // 更新数据
 $gen_list = getGenList($db); // 获取限定频道列表
 foreach ($Config['xml_urls'] as $xml_url) {
-    // 忽略以 # 开头的 URL
-    if (strpos($xml_url, '#') === 0) {
+    // 去掉空白字符，忽略空行和以 # 开头的 URL
+    $xml_url = trim($xml_url);
+    if (empty($xml_url) || strpos($xml_url, '#') === 0) {
         continue;
     }
     // 去除 URL 后的注释部分

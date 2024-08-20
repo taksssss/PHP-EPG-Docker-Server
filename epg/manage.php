@@ -31,11 +31,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['change_password'])) {
     // 验证原密码是否正确
     if ($oldPassword === $Config['manage_password']) {
         // 原密码正确，更新配置中的密码
-        $newConfig = $Config;
-        $newConfig['manage_password'] = $newPassword;
+        $Config['manage_password'] = $newPassword;
 
-        // 将新配置写回 config.php
-        file_put_contents('config.php', '<?php' . "\n\n" . '$Config = ' . var_export($newConfig, true) . ';' . "\n\n" . '?>');
+        // 将新配置写回 config.json
+        file_put_contents('config.json', json_encode($Config, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
 
         // 设置密码更改成功的标志变量
         $passwordChanged = true;
@@ -144,6 +143,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update'])) {
     $gen_xml = isset($_POST['gen_xml']) ? intval($_POST['gen_xml']) : $Config['gen_xml'];
     $include_future_only = isset($_POST['include_future_only']) ? intval($_POST['include_future_only']) : $Config['include_future_only'];
     $proc_chname = isset($_POST['proc_chname']) ? intval($_POST['proc_chname']) : $Config['proc_chname'];
+    $ret_default = isset($_POST['ret_default']) ? intval($_POST['ret_default']) : $Config['ret_default'];
     $start_time = $_POST['start_time'];
     $end_time = $_POST['end_time'];
     
@@ -184,6 +184,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update'])) {
         'gen_xml' => $gen_xml,
         'include_future_only' => $include_future_only,
         'proc_chname' => $proc_chname,
+        'ret_default' => $ret_default,
         'start_time' => $start_time,
         'end_time' => $end_time,
         'interval_time' => $interval_time,
@@ -192,14 +193,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update'])) {
         'channel_mappings' => $channel_mappings
     ];
 
-    // 将新配置写回config.php
-    file_put_contents('config.php', '<?php' . "\n\n" . '$Config = ' . var_export($newConfig, true) . ';' . "\n\n" . '?>');
+    // 将新配置写回 config.json
+    file_put_contents('config.json', json_encode($newConfig, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
 
     // 设置标志变量以显示弹窗
     $_SESSION['configUpdated'] = true;
 
     // 重新加载配置以确保页面显示更新的数据
-    require 'config.php';
+    $Config = json_decode(file_get_contents('config.json'), true);
 
     // 重新启动 cron.php ，设置新的定时任务
     if ($oldConfig['start_time'] !== $start_time || $oldConfig['end_time'] !== $end_time || $oldConfig['interval_time'] !== $interval_time) {
@@ -305,7 +306,7 @@ try {
     <form method="POST" id="settingsForm">
 
         <label for="xml_urls">EPG源地址（支持 xml 跟 .xml.gz 格式， # 为注释）</label><br><br>
-        <textarea placeholder="一行一个，地址前面加 # 可以临时停用，后面加 # 可以备注。快捷键： Ctrl+/  。" id="xml_urls" name="xml_urls" rows="5" required><?php echo implode("\n", array_map('trim', $Config['xml_urls'])); ?></textarea><br><br>
+        <textarea placeholder="一行一个，地址前面加 # 可以临时停用，后面加 # 可以备注。快捷键： Ctrl+/  。" id="xml_urls" name="xml_urls" rows="5"><?php echo implode("\n", array_map('trim', $Config['xml_urls'])); ?></textarea><br><br>
 
         <div class="form-row">
             <label for="days_to_keep" class="label-days-to-keep">数据保存天数</label>
@@ -345,7 +346,7 @@ try {
         <div class="flex-container">
             <div class="flex-item" style="width: 40%;">
                 <label for="channel_replacements">频道忽略字符串（按顺序， \s 空格）</label><br><br>
-                <textarea id="channel_replacements" name="channel_replacements" style="height: 138px;" required><?php echo implode("\n", array_map('trim', $Config['channel_replacements'])); ?></textarea><br><br>
+                <textarea id="channel_replacements" name="channel_replacements" style="height: 138px;"><?php echo implode("\n", array_map('trim', $Config['channel_replacements'])); ?></textarea><br><br>
             </div>
             <div class="flex-item" style="width: 60%;">
                 <label for="channel_mappings">频道映射（正则表达式 regex: ）</label><br><br>
@@ -471,7 +472,12 @@ try {
         <label for="proc_chname">入库前处理频道名：</label>
         <select id="proc_chname" name="proc_chname" required>
             <option value="1" <?php if (!isset($Config['proc_chname']) || $Config['proc_chname'] == 1) echo 'selected'; ?>>是</option>
-            <option value="0" <?php if ($Config['proc_chname'] == 0) echo 'selected'; ?>>否</option>
+            <option value="0" <?php if (isset($Config['proc_chname']) && $Config['proc_chname'] == 0) echo 'selected'; ?>>否</option>
+        </select>
+        <label for="ret_default">默认返回“精彩节目”：</label>
+        <select id="ret_default" name="ret_default" required>
+            <option value="1" <?php if (!isset($Config['ret_default']) || $Config['ret_default'] == 1) echo 'selected'; ?>>是</option>
+            <option value="0" <?php if (isset($Config['ret_default']) && $Config['ret_default'] == 0) echo 'selected'; ?>>否</option>
         </select>
         <br><br>
         <label for="gen_list_text"">仅生成以下频道的节目单：</label>
@@ -491,7 +497,13 @@ try {
         var isLastRow = row === table.lastElementChild;
         if (isLastRow && cell.innerText.trim() !== "") {
             var newRow = table.insertRow();
-            newRow.innerHTML = '<td contenteditable="true" oninput="addRowIfNeeded(this)"></td><td contenteditable="true" oninput="addRowIfNeeded(this)"></td>';
+            newRow.innerHTML = `
+                <td contenteditable="true" oninput="updateHiddenInput(this); addRowIfNeeded(this)">
+                    <input type="hidden" name="channel_mappings[][search]" value="">
+                </td>
+                <td contenteditable="true" oninput="updateHiddenInput(this); addRowIfNeeded(this)">
+                    <input type="hidden" name="channel_mappings[][replace]" value="">
+                </td>`;
             newRow.scrollIntoView({ behavior: 'smooth', block: 'end' });// 自动滚动到新添加的行
         }
     }
@@ -726,7 +738,7 @@ try {
 
     // 在提交表单时，将更多设置中的数据包括在表单数据中
     document.getElementById('settingsForm').addEventListener('submit', function() {
-        const fields = ['gen_xml', 'include_future_only', 'proc_chname'];
+        const fields = ['gen_xml', 'include_future_only', 'proc_chname', 'ret_default'];
         fields.forEach(function(field) {
             const hiddenInput = document.createElement('input');
             hiddenInput.type = 'hidden';

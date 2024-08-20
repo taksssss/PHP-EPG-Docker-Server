@@ -10,7 +10,7 @@ PHP 实现的 EPG（电子节目指南）服务端， `Docker` 部署，自带�
 - 支持返回 **`DIYP & 百川`** 、 **`超级直播`** 以及 **`xmltv`** 格式 📡
 - 提供 **`amd64`** 跟 **`arm64`** 架构 `Docker` 镜像，支持电视盒子等设备 🐳
 - 基镜像采用 `alpine-apache-php`，**压缩后大小仅 `20M`** 📦
-- 采用**先构建再存数据库**的策略，存在部分冗余数据，但能**提高读取速度** 🚀
+- 采用**先构建再存数据库**的策略，**提高读取速度** 🚀
 - 支持**繁体中文频道匹配** 🌐
 - 支持 **多对一频道映射**，支持**正则表达式** 🔄
 - 支持设置**频道忽略字符表** 🔇
@@ -39,6 +39,15 @@ PHP 实现的 EPG（电子节目指南）服务端， `Docker` 部署，自带�
 
 ## 更新日志 📝
 
+### 2024-8-20更新：
+
+1. 新增：同步提供 `腾讯云容器镜像` ，无法正常拉取镜像的用户可使用
+2. 新增：默认返回“精彩节目”选项
+3. 新增：更新前检查 EPG 文件，无变化则跳过
+4. 优化：分批插入数据，降低内存占用
+5. 优化：配置文件从 `config.php` 改为 `config.json`（⚠️ 数据持久化的用户注意）
+6. 修复：频道映射每次只能更新一条的问题
+
 ### 2024-8-14更新：
 
 1. 优化：频道映射显示方式
@@ -56,18 +65,7 @@ PHP 实现的 EPG（电子节目指南）服务端， `Docker` 部署，自带�
 2. 新增 `入库前处理频道名` 选项（ `DIYP` 跟 `超级直播` 用户保持默认 `是` 即可）
 3. 更新 `manage.php` ，打开设置页面时检查定时任务运行情况
 4. 优化正则表达式，增加 `CCTV 5PLUS` 频道匹配
-5. 新增 `docker-compose.yml` ，可持久化 `adata.db` 跟 `config.php` 文件
-
-- 亦可使用以下命令，需确保 `当前目录` 包含上述文件
-  ```bash
-  docker run -d \
-   --name php-epg \
-   -v ./adata.db:/htdocs/epg/adata.db \
-   -v ./config.php:/htdocs/epg/config.php \
-   -p 5678:80 \
-   --restart always \
-   taksss/php-epg:latest
-  ```
+5. 新增 `docker-compose.yml` ，可持久化 `adata.db` 跟 `config.json` 文件
 
 ### 2024-7-31更新：
 
@@ -177,19 +175,22 @@ PHP 实现的 EPG（电子节目指南）服务端， `Docker` 部署，自带�
    > 默认端口为 `5678` ，根据需要自行修改。
    > 
 
-- `adata.db` 跟 `config.php` 文件持久化：
+- `adata.db` 跟 `config.json` 文件持久化：
   - 下载 `源代码` 后，在 `项目根目录` 执行 `docker-compose up -d` 部署（后续升级无需重新下载源代码）
-  - 或执行以下命令 ，需确保 `当前目录` 存在 `adata.db` 及 `config.php` 文件
+  - 或执行以下命令 ，需确保 `当前目录` 存在 `adata.db` 及 `config.json` 文件
     ```bash
     docker run -d \
       --name php-epg \
       -v ./adata.db:/htdocs/epg/adata.db \
-      -v ./config.php:/htdocs/epg/config.php \
+      -v ./config.json:/htdocs/epg/config.json \
       -p 5678:80 \
       --restart always \
       taksss/php-epg:latest
      ```
 
+>
+> 无法正常拉取镜像的，可使用 `腾讯云容器镜像`（`ccr.ccs.tencentyun.com/taksss/php-epg:latest`）
+> 
 
 ## 使用步骤 🛠️
 
@@ -202,6 +203,11 @@ PHP 实现的 EPG（电子节目指南）服务端， `Docker` 部署，自带�
 4. 点击 `更新数据库` 拉取数据，点击 `数据库更新日志` 查看日志，点击 `查看数据库` 查看具体条目
 
 5. 设置 `定时任务` ，点击 `更新配置` 保存，点击 `定时任务日志` 查看定时任务时间表
+
+    >
+    > 建议从 `凌晨1点` 左右开始抓，很多源 `00:00 ~ 00:30` 都是无数据。
+    > 隔 `6 ~ 12` 小时抓一次即可。
+    > 
 
 6. 点击 `更多设置` ，选择是否 `生成xml文件` 、`生成方式` ，设置 `限定频道节目单`
 

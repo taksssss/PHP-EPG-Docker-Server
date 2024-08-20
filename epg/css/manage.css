@@ -40,7 +40,7 @@ textarea[id="cronLogContent"], textarea[id="channelList"] {
     width: 98px;
 }
 .custom-margin1 {
-    margin-left: 137px;
+    margin-left: 139px;
 }
 .custom-margin2,
 .custom-margin3 {
@@ -67,7 +67,7 @@ textarea[id="cronLogContent"], textarea[id="channelList"] {
     width: 90px;
 }
 .form-row input[id="start_time"] {
-    margin-left: 164px;
+    margin-left: 166px;
 }
 .form-row input[id="end_time"],
 select[id="interval_hour"]{
@@ -261,6 +261,11 @@ select[id="proc_chname"] {
 }
 .modal-content select[id="proc_chname"] {
     width: 82px;
+    margin-right: 25px;
+}
+.modal-content select[id="ret_default"] {
+    width: 81px;
+    margin-right: 0px;
 }
 /* 工具提示容器 */
 .tooltip {

@@ -12,8 +12,8 @@
 require 'opencc/vendor/autoload.php'; // 引入 Composer 自动加载器
 use Overtrue\PHPOpenCC\OpenCC; // 使用 OpenCC 库
 
-// 引入配置文件
-require_once 'config.php';
+// 引入并解析 JSON 配置文件
+$Config = json_decode(file_get_contents('config.json'), true);
 
 // 设置时区为亚洲/上海
 date_default_timezone_set("Asia/Shanghai");

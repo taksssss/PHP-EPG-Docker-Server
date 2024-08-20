@@ -149,9 +149,9 @@ function fetchHandler() {
 
     // 频道参数为空时，直接重定向到 t.xml 或 t.xml.gz 文件
     if (empty($channel)) {
-        if ($Config['gen_xml'] == 1) {
+        if ($Config['gen_xml'] == 1 || $Config['gen_xml'] == 3) {
             header('Location: ./t.xml.gz');
-        } else if ($Config['gen_xml'] == 2 || $Config['gen_xml'] == 3) {
+        } else if ($Config['gen_xml'] == 2) {
             header('Location: ./t.xml');
         } else {
             // 输出消息并设置404状态码
@@ -168,7 +168,7 @@ function fetchHandler() {
     
         if ($response) {
             makeRes($response, $init['status'], $init['headers']);
-        } else {
+        } else if(!isset($Config['ret_default']) || $Config['ret_default']) {
             if ($type === 'diyp') {
                 // 无法获取到数据时返回默认 diyp 数据
                 $default_diyp_program_info = [

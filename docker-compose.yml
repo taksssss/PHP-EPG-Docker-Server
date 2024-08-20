@@ -2,10 +2,10 @@ services:
   php-epg:
     image: taksss/php-epg:latest
     container_name: php-epg
-    # 持久化adata.db和config.php
+    # 持久化adata.db和config.json
     volumes:
       - ./epg/adata.db:/htdocs/epg/adata.db
-      - ./epg/config.php:/htdocs/epg/config.php
+      - ./epg/config.json:/htdocs/epg/config.json
     # 默认端口5678
     ports:
       - "5678:80"

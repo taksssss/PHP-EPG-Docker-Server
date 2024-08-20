@@ -6,7 +6,7 @@ set -eu
 SERVER_ADMIN="${SERVER_ADMIN:-you@example.com}"
 HTTP_SERVER_NAME="${HTTP_SERVER_NAME:-www.example.com}"
 HTTPS_SERVER_NAME="${HTTPS_SERVER_NAME:-www.example.com}"
-LOG_LEVEL="${LOG_LEVEL:-info}"
+LOG_LEVEL="${LOG_LEVEL:-error}"
 TZ="${TZ:-Asia/Shanghai}"
 PHP_MEMORY_LIMIT="${PHP_MEMORY_LIMIT:-512M}"
 
@@ -49,7 +49,7 @@ chown -R apache:apache /htdocs/epg
 
 # Start cron.php
 cd /htdocs/epg
-su -s /bin/sh -c "php cron.php &" "apache"
+php cron.php &
 
 # Start Apache
 httpd -D FOREGROUND
