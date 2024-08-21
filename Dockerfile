@@ -4,8 +4,8 @@ LABEL description="Alpine based image with apache2 and php8.3."
 
 # MOD: Tak
 
-# 使用中科大镜像
-RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.ustc.edu.cn/g' /etc/apk/repositories
+# 使用中科大镜像（改用GitHub Actions，无需镜像）
+# RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.ustc.edu.cn/g' /etc/apk/repositories
 
 # 安装 Apache 和 PHP
 RUN apk --no-cache --update \
@@ -46,6 +46,6 @@ EXPOSE 80 443
 ADD docker-entrypoint.sh /
 RUN chmod +x /docker-entrypoint.sh
 
-HEALTHCHECK CMD wget -q --no-cache --spider localhost
+HEALTHCHECK --interval=20m CMD wget -q --no-cache --spider localhost
 
 ENTRYPOINT ["/docker-entrypoint.sh"]

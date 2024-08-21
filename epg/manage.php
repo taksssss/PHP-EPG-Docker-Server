@@ -17,23 +17,6 @@ require_once 'public.php';
 
 session_start();
 
-if (isset($_GET['logout'])) {
-    // 销毁所有cookies
-    if (isset($_COOKIE[session_name()])) {
-        setcookie(session_name(), '', time() - 42000);
-    }
-    foreach ($_COOKIE as $key => $value) {
-        setcookie($key, '', time() - 42000);
-    }
-    // 销毁session
-    $_SESSION = array();
-    if (ini_get("session.use_cookies")) {
-        $params = session_get_cookie_params();
-        setcookie(session_name(), '', time() - 42000, $params["path"], $params["domain"], $params["secure"], $params["httponly"]);
-    }
-    session_destroy();
-}
-
 // 设置会话变量，表明用户可以访问 phpliteadmin.php
 $_SESSION['can_access_phpliteadmin'] = true;
 
@@ -407,14 +390,15 @@ try {
         <div class="tooltip">
             <input id="updateConfig" type="submit" name="update" value="更新配置">
             <span class="tooltiptext">快捷键：Ctrl+S</span>
-        </div><br><br>
+        </div>
+        <br><br>
         <div class="button-container">
             <a href="update.php" target="_blank">更新数据库</a>
             <a href="phpliteadmin.php" target="_blank">管理数据库</a>
             <button type="button" onclick="showModal('cron')">定时任务日志</button>
-            <button type="button" onclick="showModal('update')">更新日志</button>
+            <button type="button" onclick="showModal('update')">数据库更新日志</button>
             <button type="button" onclick="showModal('moresetting')">更多设置</button>
-            <button type="button" onclick="location.href='manage.php?logout=true';">退出</button>
+            <button type="button" name="logoutbtn" onclick="logout()">退出</button>
         </div>
     </form>
 </div>
@@ -511,6 +495,19 @@ try {
 </div>
 
 <script>
+    // 退出登录
+    function logout() {
+        // 清除所有cookies
+        document.cookie.split(";").forEach(function(cookie) {
+            var name = cookie.split("=")[0].trim();
+            document.cookie = name + '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/';
+        });        
+        // 清除本地存储
+        sessionStorage.clear();
+        // 重定向到登录页面
+        window.location.href = 'manage.php';
+    }
+
     // 频道映射自动添加空行
     function addRowIfNeeded(cell) {
         var row = cell.parentElement;

@@ -79,6 +79,7 @@ select[id="interval_hour"]{
     text-align: center;
 }
 input[type="submit"],
+.button-container button[name="logoutbtn"],
 .modal-content button {
     width: 100%;
     padding: 10px;
@@ -91,8 +92,14 @@ input[type="submit"],
     font-size: 16px;
     font-weight: bold;
 }
-input[type="submit"]:hover {
+input[type="submit"]:hover,
+.button-container button[name="logoutbtn"]:hover,
+.modal-content button:hover {
     background-color: #e68900;
+}
+.button-container button[name="logoutbtn"] {
+    border-radius: 10px;
+    width: 100px;
 }
 input[type="text"] {
     width: calc(100% - 22px);
@@ -284,7 +291,7 @@ select[id="proc_chname"] {
     padding: 5px;
     position: absolute;
     z-index: 1;
-    bottom: 125%; /* 上方显示 */
+    bottom: 110%; /* 上方显示 */
     left: 50%;
     margin-left: -60px;
     opacity: 0;

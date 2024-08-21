@@ -39,6 +39,13 @@ PHP 实现的 EPG（电子节目指南）服务端， `Docker` 部署，自带�
 
 ## 更新日志 📝
 
+### 2024-8-21更新：
+
+1. 新增：退出按钮（感谢[mxdabc](https://github.com/mxdabc/epgphp)）
+2. 修复：语法错误（感谢[mxdabc](https://github.com/mxdabc/epgphp)）
+3. 新增：使用 `GitHub Actions` 生成、推送镜像
+4. 修复：点击退出按钮后再次登录，无法查看日志
+
 ### 2024-8-20更新：
 
 1. 新增：同步提供 `腾讯云容器镜像` ，无法正常拉取镜像的用户可使用
