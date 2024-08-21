@@ -4,15 +4,35 @@
  * @brief 管理页面部分
  * 
  * 管理界面脚本，用于处理会话管理、密码更改、登录验证、配置更新、更新日志展示等功能。
+ * 修复原作者一点小小的语法错误和增加一个退出按钮方便操作，使用php的session_destroy();
  * 
  * 作者: Tak
  * GitHub: https://github.com/TakcC/PHP-EPG-Docker-Server
+ * 修改: mxdabc
+ * Github: https://github.com/mxdabc/epgphp
  */
 
 // 引入公共脚本
 require_once 'public.php';
 
 session_start();
+
+if (isset($_GET['logout'])) {
+    // 销毁所有cookies
+    if (isset($_COOKIE[session_name()])) {
+        setcookie(session_name(), '', time() - 42000);
+    }
+    foreach ($_COOKIE as $key => $value) {
+        setcookie($key, '', time() - 42000);
+    }
+    // 销毁session
+    $_SESSION = array();
+    if (ini_get("session.use_cookies")) {
+        $params = session_get_cookie_params();
+        setcookie(session_name(), '', time() - 42000, $params["path"], $params["domain"], $params["secure"], $params["httponly"]);
+    }
+    session_destroy();
+}
 
 // 设置会话变量，表明用户可以访问 phpliteadmin.php
 $_SESSION['can_access_phpliteadmin'] = true;
@@ -392,8 +412,9 @@ try {
             <a href="update.php" target="_blank">更新数据库</a>
             <a href="phpliteadmin.php" target="_blank">管理数据库</a>
             <button type="button" onclick="showModal('cron')">定时任务日志</button>
-            <button type="button" onclick="showModal('update')">数据库更新日志</button>
+            <button type="button" onclick="showModal('update')">更新日志</button>
             <button type="button" onclick="showModal('moresetting')">更多设置</button>
+            <button type="button" onclick="location.href='manage.php?logout=true';">退出</button>
         </div>
     </form>
 </div>
@@ -480,7 +501,7 @@ try {
             <option value="0" <?php if (isset($Config['ret_default']) && $Config['ret_default'] == 0) echo 'selected'; ?>>否</option>
         </select>
         <br><br>
-        <label for="gen_list_text"">仅生成以下频道的节目单：</label>
+        <label for="gen_list_text">仅生成以下频道的节目单：</label>
         <span onclick="parseSource()">
             （可粘贴 txt、m3u 直播源并<span style="color: blue; cursor: pointer;">点击解析</span>）
         </span><br><br>
