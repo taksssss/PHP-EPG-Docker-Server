@@ -8,45 +8,50 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4 # 检出代码
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3 # 设置 Docker Buildx，用于多架构构建
-
-    - name: Log in to Docker Hub
-      uses: docker/login-action@v3 # 登录 Docker Hub
-      with:
-        username: ${{ secrets.DOCKER_HUB_USERNAME }}
-        password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
-
-    - name: Log in to Tencent Cloud Container Registry
-      run: docker login ccr.ccs.tencentyun.com -u ${{ secrets.TENCENT_CCR_USERNAME }} -p ${{ secrets.TENCENT_CCR_PASSWORD }} # 登录腾讯云容器镜像服务
-
-    - name: Fetch existing tags from Docker Hub
-      id: get_tags
-      run: |
-        DATE_TAG=$(date +"%y.%m") # 生成当前月份的标签，如24.08
-        TAGS=$(curl -s -H "Authorization: Bearer ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}" \
-        "https://hub.docker.com/v2/repositories/taksss/php-epg/tags/?page_size=100" | jq -r '.results[].name') # 获取 Docker Hub 中现有的标签
-        COUNT=0
-        for tag in $TAGS; do
-          if [[ $tag == $DATE_TAG* ]]; then
-            COUNT=$((COUNT + 1)) # 计算现有相同月份标签的数量
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3 # 登录 Docker Hub
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+  
+      - name: Log in to Tencent Cloud Container Registry    
+        uses: docker/login-action@v3 # 登录 腾讯云容器镜像站
+        with:
+          registry: ccr.ccs.tencentyun.com
+          username: ${{ secrets.TENCENT_CCR_USERNAME }}
+          password: ${{ secrets.TENCENT_CCR_PASSWORD }}
+          
+      - name: Fetch existing tags from Docker Hub
+        id: get_tags
+        run: |
+          DATE_TAG=$(date +"%y.%m") # 生成当前月份的标签，如24.08
+          TAGS=$(curl -s -H "Authorization: Bearer ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}" \
+          "https://hub.docker.com/v2/repositories/taksss/php-epg/tags/?page_size=100" | jq -r '.results[].name') # 获取 Docker Hub 中现有的标签
+          COUNT=0
+          for tag in $TAGS; do
+            if [[ $tag == $DATE_TAG* ]]; then
+              COUNT=$((COUNT + 1)) # 计算现有相同月份标签的数量
+            fi
+          done
+          if [ $COUNT -eq 0 ]; then
+            NEW_TAG="${DATE_TAG}" # 如果没有相同标签，使用基础标签
+          else
+            NEW_TAG="${DATE_TAG}.${COUNT}" # 如果有相同标签，生成递增标签
           fi
-        done
-        if [ $COUNT -eq 0 ]; then
-          NEW_TAG="${DATE_TAG}" # 如果没有相同标签，使用基础标签
-        else
-          NEW_TAG="${DATE_TAG}.${COUNT}" # 如果有相同标签，生成递增标签
-        fi
-        echo "TAG=${NEW_TAG}" >> $GITHUB_ENV # 将新标签保存为环境变量
+          echo "TAG=${NEW_TAG}" >> $GITHUB_ENV # 将新标签保存为环境变量
 
-    - name: Build and push multi-architecture Docker image to Docker Hub and Tencent Cloud
-      run: |
-        docker buildx create --use # 创建并使用 buildx builder
-        docker buildx build --platform linux/amd64,linux/arm64 \
-        --tag taksss/php-epg:${{ env.TAG }} \
-        --tag taksss/php-epg:latest \
-        --tag ccr.ccs.tencentyun.com/taksss/php-epg:${{ env.TAG }} \
-        --tag ccr.ccs.tencentyun.com/taksss/php-epg:latest \
-        --push .
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          push: true
+          platforms: linux/amd64, linux/arm64
+          tags: taksss/php-epg:${{ env.TAG }}, 
+                taksss/php-epg:latest, 
+                ccr.ccs.tencentyun.com/taksss/php-epg:${{ env.TAG }}, 
+                ccr.ccs.tencentyun.com/taksss/php-epg:latest
