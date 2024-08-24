@@ -6,7 +6,7 @@ set -eu
 SERVER_ADMIN="${SERVER_ADMIN:-you@example.com}"
 HTTP_SERVER_NAME="${HTTP_SERVER_NAME:-www.example.com}"
 HTTPS_SERVER_NAME="${HTTPS_SERVER_NAME:-www.example.com}"
-LOG_LEVEL="${LOG_LEVEL:-error}"
+LOG_LEVEL="${LOG_LEVEL:-info}"
 TZ="${TZ:-Asia/Shanghai}"
 PHP_MEMORY_LIMIT="${PHP_MEMORY_LIMIT:-512M}"
 
@@ -47,7 +47,9 @@ sed -i "s#^;date.timezone =\$#date.timezone = \"${TZ}\"#" /etc/php83/php.ini
 chown -R apache:apache /htdocs/epg
 
 # Check if /htdocs/epg/data/config.json exists
+echo 'Checking if /htdocs/epg/data/config.json exists'
 if [ ! -f /htdocs/epg/data/config.json ]; then
+    echo 'config.json not found, copying default config'
     # If it does not exist, use config_default.json
     cp /htdocs/epg/config_default.json /htdocs/epg/data/config.json
 fi
@@ -55,7 +57,7 @@ fi
 echo 'Running cron.php and Apache'
 
 # Start cron.php
-php /htdocs/epg/cron.php &
+su -s /bin/sh -c "php /htdocs/epg/cron.php &" "apache"
 
 # Start Apache
 httpd -D FOREGROUND
