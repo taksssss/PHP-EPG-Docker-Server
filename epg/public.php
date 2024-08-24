@@ -13,14 +13,15 @@ require 'opencc/vendor/autoload.php'; // 引入 Composer 自动加载器
 use Overtrue\PHPOpenCC\OpenCC; // 使用 OpenCC 库
 
 // 引入并解析 JSON 配置文件
-$Config = json_decode(file_get_contents('config.json'), true);
+$config_path = __DIR__ . '/data/config.json';
+$Config = json_decode(file_get_contents($config_path), true);
 
 // 设置时区为亚洲/上海
 date_default_timezone_set("Asia/Shanghai");
 
 // 创建或打开数据库
 try {
-    $db_file = __DIR__ . '/adata.db';
+    $db_file = __DIR__ . '/data/data.db';
     $dsn = 'sqlite:' . $db_file;
     $db = new PDO($dsn);
     $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -90,4 +91,19 @@ function t2s($channel) {
     return OpenCC::convert($channel, 'TRADITIONAL_TO_SIMPLIFIED');
 }
 
+// 下载文件
+function downloadData($url, $timeout = 30) {
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1);
+    curl_setopt($ch, CURLOPT_TIMEOUT, $timeout);
+    $data = curl_exec($ch);
+    if (curl_errno($ch)) {
+        curl_close($ch);
+        return false;
+    }
+    curl_close($ch);
+    return $data;
+}
 ?>

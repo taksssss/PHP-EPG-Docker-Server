@@ -97,7 +97,8 @@ input[type="submit"]:hover,
 .modal-content button:hover {
     background-color: #e68900;
 }
-.button-container button[name="logoutbtn"] {
+.button-container button[name="logoutbtn"] {    
+    font-weight: normal;
     border-radius: 10px;
     width: 100px;
 }
@@ -256,8 +257,7 @@ input[type="text"] {
     text-align: center; /* 第二列表头居中 */
 }
 .modal-content select[id="gen_xml"],
-select[id="include_future_only"],
-select[id="proc_chname"] {
+select[id="include_future_only"] {
     width: 155px;
     text-align: center;
     margin-right: 0px;
@@ -266,13 +266,8 @@ select[id="proc_chname"] {
     width: 100px;
     margin-right: 25px;
 }
-.modal-content select[id="proc_chname"] {
-    width: 82px;
-    margin-right: 25px;
-}
 .modal-content select[id="ret_default"] {
-    width: 81px;
-    margin-right: 0px;
+    width: 72px;
 }
 /* 工具提示容器 */
 .tooltip {

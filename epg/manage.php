@@ -37,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['change_password'])) {
         $Config['manage_password'] = $newPassword;
 
         // 将新配置写回 config.json
-        file_put_contents('config.json', json_encode($Config, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        file_put_contents($config_path, json_encode($Config, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
 
         // 设置密码更改成功的标志变量
         $passwordChanged = true;
@@ -145,7 +145,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update'])) {
     $days_to_keep = intval($_POST['days_to_keep']);
     $gen_xml = isset($_POST['gen_xml']) ? intval($_POST['gen_xml']) : $Config['gen_xml'];
     $include_future_only = isset($_POST['include_future_only']) ? intval($_POST['include_future_only']) : $Config['include_future_only'];
-    $proc_chname = isset($_POST['proc_chname']) ? intval($_POST['proc_chname']) : $Config['proc_chname'];
     $ret_default = isset($_POST['ret_default']) ? intval($_POST['ret_default']) : $Config['ret_default'];
     $start_time = $_POST['start_time'];
     $end_time = $_POST['end_time'];
@@ -186,7 +185,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update'])) {
         'days_to_keep' => $days_to_keep,
         'gen_xml' => $gen_xml,
         'include_future_only' => $include_future_only,
-        'proc_chname' => $proc_chname,
         'ret_default' => $ret_default,
         'start_time' => $start_time,
         'end_time' => $end_time,
@@ -197,13 +195,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update'])) {
     ];
 
     // 将新配置写回 config.json
-    file_put_contents('config.json', json_encode($newConfig, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+    file_put_contents($config_path, json_encode($newConfig, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
 
     // 设置标志变量以显示弹窗
     $_SESSION['configUpdated'] = true;
 
     // 重新加载配置以确保页面显示更新的数据
-    $Config = json_decode(file_get_contents('config.json'), true);
+    $Config = json_decode(file_get_contents($config_path), true);
 
     // 重新启动 cron.php ，设置新的定时任务
     if ($oldConfig['start_time'] !== $start_time || $oldConfig['end_time'] !== $end_time || $oldConfig['interval_time'] !== $interval_time) {
@@ -293,6 +291,25 @@ try {
     $logData = [];
     $cronLogData = [];
     $channels = [];
+}
+
+// 根据请求下载数据
+if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
+    $url = filter_var($_GET['url'], FILTER_VALIDATE_URL);
+
+    if ($url) {
+        // 调用 downloadData 函数下载数据
+        $data = downloadData($url, 5); // 将超时时间作为参数传递
+
+        if ($data !== false) {
+            echo json_encode(['success' => true, 'data' => $data]);
+        } else {
+            echo json_encode(['success' => false, 'message' => '无法获取URL内容']);
+        }
+    } else {
+        echo json_encode(['success' => false, 'message' => '无效的URL']);
+    }
+    exit;
 }
 
 // 生成配置管理表单
@@ -393,10 +410,10 @@ try {
         </div>
         <br><br>
         <div class="button-container">
-            <a href="update.php" target="_blank">更新数据库</a>
-            <a href="phpliteadmin.php" target="_blank">管理数据库</a>
-            <button type="button" onclick="showModal('cron')">定时任务日志</button>
-            <button type="button" onclick="showModal('update')">数据库更新日志</button>
+            <a href="update.php" target="_blank">更新数据</a>
+            <a href="phpliteadmin.php" target="_blank">管理数据</a>
+            <button type="button" onclick="showModal('cron')">定时日志</button>
+            <button type="button" onclick="showModal('update')">更新日志</button>
             <button type="button" onclick="showModal('moresetting')">更多设置</button>
             <button type="button" name="logoutbtn" onclick="logout()">退出</button>
         </div>
@@ -463,10 +480,8 @@ try {
         <h2>更多设置</h2>
         <label for="gen_xml">生成 xmltv 文件：</label>
         <select id="gen_xml" name="gen_xml" required>
-            <option value="1" <?php if ($Config['gen_xml'] == 1) echo 'selected'; ?>>t.xml.gz</option>
-            <option value="2" <?php if ($Config['gen_xml'] == 2) echo 'selected'; ?>>t.xml</option>
-            <option value="3" <?php if ($Config['gen_xml'] == 3) echo 'selected'; ?>>同时生成</option>
-            <option value="0" <?php if ($Config['gen_xml'] == 0) echo 'selected'; ?>>不生成</option>
+            <option value="1" <?php if ($Config['gen_xml'] == 1) echo 'selected'; ?>>是</option>
+            <option value="0" <?php if ($Config['gen_xml'] == 0) echo 'selected'; ?>>否</option>
         </select>
         <label for="include_future_only">生成方式：</label>
         <select id="include_future_only" name="include_future_only" required>
@@ -474,20 +489,15 @@ try {
             <option value="0" <?php if ($Config['include_future_only'] == 0) echo 'selected'; ?>>所有数据</option>
         </select>
         <br><br>
-        <label for="proc_chname">入库前处理频道名：</label>
-        <select id="proc_chname" name="proc_chname" required>
-            <option value="1" <?php if (!isset($Config['proc_chname']) || $Config['proc_chname'] == 1) echo 'selected'; ?>>是</option>
-            <option value="0" <?php if (isset($Config['proc_chname']) && $Config['proc_chname'] == 0) echo 'selected'; ?>>否</option>
-        </select>
         <label for="ret_default">默认返回“精彩节目”：</label>
         <select id="ret_default" name="ret_default" required>
             <option value="1" <?php if (!isset($Config['ret_default']) || $Config['ret_default'] == 1) echo 'selected'; ?>>是</option>
             <option value="0" <?php if (isset($Config['ret_default']) && $Config['ret_default'] == 0) echo 'selected'; ?>>否</option>
         </select>
         <br><br>
-        <label for="gen_list_text">仅生成以下频道的节目单：</label>
-        <span onclick="parseSource()">
-            （可粘贴 txt、m3u 直播源并<span style="color: blue; cursor: pointer;">点击解析</span>）
+        <label for="gen_list_text">仅生成以下频道：</label>
+        <span>
+            （可粘贴 m3u、txt 地址或内容并<span onclick="parseSource()" style="color: blue; cursor: pointer;">点击解析</span>）
         </span><br><br>
         <textarea id="gen_list_text" style="width: 100%; height: 260px;"></textarea><br><br>
         <button id="saveConfig" type="button" onclick="saveAndUpdateConfig();">保存配置</button>
@@ -616,38 +626,38 @@ try {
     function showModal(type) {
         var modal, logSpan, logContent;
         switch (type) {
-        case 'update':
-            modal = document.getElementById("updatelogModal");
-            logSpan = document.getElementsByClassName("close")[1];
-            fetchLogs('<?php echo $_SERVER['PHP_SELF']; ?>?get_update_logs=true', updateLogTable);
-            break;
-        case 'cron':
-            modal = document.getElementById("cronlogModal");
-            logSpan = document.getElementsByClassName("close")[2];
-            fetchLogs('<?php echo $_SERVER['PHP_SELF']; ?>?get_cron_logs=true', updateCronLogContent);
-            break;
-        case 'channel':
-            modal = document.getElementById("channelModal");
-            logSpan = document.getElementsByClassName("close")[3];
-            fetchLogs('<?php echo $_SERVER['PHP_SELF']; ?>?get_channel=true', updateChannelList);
-            document.getElementById('searchInput').value = ""; // 清空搜索框
-            break;
-        case 'moresetting':
-            modal = document.getElementById("moreSettingModal");
-            logSpan = document.getElementsByClassName("close")[4];            
-            fetchLogs('<?php echo $_SERVER['PHP_SELF']; ?>?get_gen_list=true', updateGenList);
-            genListLoaded = true; // 数据已加载
-            break;
-        default:
-            console.error('Unknown type:', type);
-            break;
+            case 'update':
+                modal = document.getElementById("updatelogModal");
+                logSpan = document.getElementsByClassName("close")[1];
+                fetchLogs('<?php echo $_SERVER['PHP_SELF']; ?>?get_update_logs=true', updateLogTable);
+                break;
+            case 'cron':
+                modal = document.getElementById("cronlogModal");
+                logSpan = document.getElementsByClassName("close")[2];
+                fetchLogs('<?php echo $_SERVER['PHP_SELF']; ?>?get_cron_logs=true', updateCronLogContent);
+                break;
+            case 'channel':
+                modal = document.getElementById("channelModal");
+                logSpan = document.getElementsByClassName("close")[3];
+                fetchLogs('<?php echo $_SERVER['PHP_SELF']; ?>?get_channel=true', updateChannelList);
+                document.getElementById('searchInput').value = ""; // 清空搜索框
+                break;
+            case 'moresetting':
+                modal = document.getElementById("moreSettingModal");
+                logSpan = document.getElementsByClassName("close")[4];            
+                fetchLogs('<?php echo $_SERVER['PHP_SELF']; ?>?get_gen_list=true', updateGenList);
+                genListLoaded = true; // 数据已加载
+                break;
+            default:
+                console.error('Unknown type:', type);
+                break;
         }
         modal.style.display = "block";
         logSpan.onclick = function() {
             modal.style.display = "none";
         }
-        window.onclick = function(event) {
-            if (event.target == modal) {
+        window.onmousedown = function(event) {
+            if (event.target === modal) {
                 modal.style.display = "none";
             }
         }
@@ -707,23 +717,55 @@ try {
     }
 
     // 解析 txt、m3u 直播源，并生成频道列表
-    function parseSource() {
+    async function parseSource() {
         const textarea = document.getElementById('gen_list_text');
-        const text = textarea.value;
+        let text = textarea.value.trim();
         const channels = new Set();
-        if (text.includes('#EXTM3U')) {
-            if (text.includes('tvg-name')) {
-                text.replace(/tvg-name="([^"]+)"/g, (_, name) => channels.add(name.trim()));
-            } else {
-                text.replace(/#EXTINF:[^,]*,([^,\n]+)/g, (_, name) => channels.add(name.trim()));
-            }
-        } else {
-            text.split('\n').forEach(line => {
-                if (line && !line.includes('#genre#')) {
-                    channels.add(line.split(',')[0].trim());
+
+        // 拆分输入的内容，可能包含多个 URL 或文本
+        if(!text.includes('#EXTM3U')) {
+            let lines = text.split('\n').map(line => line.trim());
+            let urls = lines.filter(line => line.startsWith('http'));
+
+            // 如果存在 URL，则清空原本的 text 内容并逐个请求获取数据
+            if (urls.length > 0) {
+                text = '';
+                for (let url of urls) {
+                    try {
+                        const response = await fetch('manage.php?url=' + encodeURIComponent(url));
+                        const result = await response.json(); // 解析 JSON 响应
+                        
+                        if (result.success) {
+                            text += '\n' + result.data;
+                        } else {
+                            alert(`${result.message}：\n${url}`); // 显示 PHP 端返回的错误信息
+                        }
+                    } catch (error) {
+                        alert(`无法获取URL内容: ${url}\n错误信息: ${error.message}`); // 显示网络错误信息
+                    }
                 }
-            });
+            }
         }
+
+        // 获取完远程内容后，处理所有文本内容
+        text = text.toUpperCase();
+
+        // 处理 m3u 、 txt 文件内容
+        text.split('\n').forEach(line => {
+            if (line && !line.startsWith('HTTP') && !line.includes('#GENRE#') && !line.includes('#EXTM3U')) {
+                if (line.startsWith('#EXTINF:')) {
+                    const tvgIdMatch = line.match(/TVG-ID="([^"]+)"/);
+                    const tvgNameMatch = line.match(/TVG-NAME="([^"]+)"/);
+
+                    name = (tvgIdMatch ? tvgIdMatch[1] : tvgNameMatch ? tvgNameMatch[1] : line.split(',').slice(-1)[0]).trim();
+                } else {
+                    name = line.split(',')[0].trim(); // 处理非 #EXTINF: 开头的行
+                }
+                if (name) channels.add(name);
+            }
+        });
+
+        // 将解析后的频道列表放回文本区域
         textarea.value = Array.from(channels).join('\n');
     }
 
@@ -756,7 +798,7 @@ try {
 
     // 在提交表单时，将更多设置中的数据包括在表单数据中
     document.getElementById('settingsForm').addEventListener('submit', function() {
-        const fields = ['gen_xml', 'include_future_only', 'proc_chname', 'ret_default'];
+        const fields = ['gen_xml', 'include_future_only', 'ret_default'];
         fields.forEach(function(field) {
             const hiddenInput = document.createElement('input');
             hiddenInput.type = 'hidden';

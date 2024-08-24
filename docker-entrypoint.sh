@@ -42,14 +42,20 @@ sed -i 's/#LoadModule\ expires_module/LoadModule\ expires_module/' /etc/apache2/
 sed -i "s/memory_limit = .*/memory_limit = ${PHP_MEMORY_LIMIT}/" /etc/php83/php.ini
 sed -i "s#^;date.timezone =\$#date.timezone = \"${TZ}\"#" /etc/php83/php.ini
 
-echo 'Running cron.php and Apache'
 
 # Change ownership of /htdocs/epg
 chown -R apache:apache /htdocs/epg
 
+# Check if /htdocs/epg/data/config.json exists
+if [ ! -f /htdocs/epg/data/config.json ]; then
+    # If it does not exist, use config_default.json
+    cp /htdocs/epg/config_default.json /htdocs/epg/data/config.json
+fi
+
+echo 'Running cron.php and Apache'
+
 # Start cron.php
-cd /htdocs/epg
-php cron.php &
+php /htdocs/epg/cron.php &
 
 # Start Apache
 httpd -D FOREGROUND

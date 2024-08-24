@@ -33,6 +33,7 @@ RUN apk --no-cache --update \
     php83-session \
     php83-xml \
     php83-xmlreader \
+    php83-xmlwriter \
     php83-simplexml \
     php83-json \
     php83-posix \
@@ -45,7 +46,5 @@ EXPOSE 80 443
 
 ADD docker-entrypoint.sh /
 RUN chmod +x /docker-entrypoint.sh
-
-HEALTHCHECK --interval=20m CMD wget -q --no-cache --spider localhost
 
 ENTRYPOINT ["/docker-entrypoint.sh"]

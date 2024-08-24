@@ -53,11 +53,24 @@ function getFormatTime($time) {
 
 // 从数据库读取 diyp、lovetv 数据
 function readEPGData($date, $channel, $db, $type) {
-    $stmt = $db->prepare("SELECT epg_diyp FROM epg_data WHERE date = :date AND channel LIKE :channel COLLATE NOCASE");
-    $stmt->bindParam(':date', $date);
-    $channelPattern = '%' . $channel . '%';
-    $stmt->bindParam(':channel', $channelPattern);
-    $stmt->execute();
+    // 精确匹配优先
+    $stmt = $db->prepare("
+        SELECT epg_diyp 
+        FROM epg_data 
+        WHERE date = :date 
+        AND (
+            channel = :channel COLLATE NOCASE 
+            OR channel LIKE :like_channel COLLATE NOCASE
+        )
+        ORDER BY 
+            CASE WHEN channel = :channel THEN 1 ELSE 2 END
+        LIMIT 1
+    ");
+    $stmt->execute([
+        ':date' => $date, 
+        ':channel' => $channel, 
+        ':like_channel' => '%' . $channel . '%'
+    ]);
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
     
     if (!$row) {
@@ -147,12 +160,12 @@ function fetchHandler() {
 
     $date = isset($query_params['date']) ? getFormatTime(preg_replace('/\D+/', '', $query_params['date']))['date'] : getNowDate();
 
-    // 频道参数为空时，直接重定向到 t.xml 或 t.xml.gz 文件
+    // 频道参数为空时，直接重定向到 t.xml 文件
     if (empty($channel)) {
-        if ($Config['gen_xml'] == 1 || $Config['gen_xml'] == 3) {
-            header('Location: ./t.xml.gz');
-        } else if ($Config['gen_xml'] == 2) {
-            header('Location: ./t.xml');
+        if ($Config['gen_xml'] == 1) {
+            header('Content-Type: application/xml');
+            header('Content-Disposition: attachment; filename="t.xml"');
+            readfile('./t.xml');
         } else {
             // 输出消息并设置404状态码
             echo "404 Not Found. <br>未生成 xmltv 文件";
