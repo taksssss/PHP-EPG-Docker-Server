@@ -1,0 +1,34 @@
+{
+    "xml_urls": [ ],
+    "days_to_keep": 7,
+    "gen_xml": 1,
+    "include_future_only": 1,
+    "ret_default": 1,
+    "start_time": "00:00",
+    "end_time": "23:59",
+    "interval_time": 0,
+    "manage_password": "",
+    "channel_replacements": [
+        "HEVC",
+        "HD",
+        "FHD",
+        "1080P",
+        "标清",
+        "高清",
+        "全高清",
+        "频道",
+        "-",
+        "\\s",
+        "50FPS",
+        "NewTV",
+        "SiTV",
+        "iHOT",
+        "CHC"
+    ],
+    "channel_mappings": {
+        "regex:\/^CCTV[-\\s]*(\\p{Han})\/iu": "$1",
+        "regex:\/^CCTV[-\\s]*(\\d+(\\s*P(LUS)?|[K\\+])?)(?!美洲|欧洲).*\/i": "CCTV$1",
+        "CGTN Documentary, CGTN档案, CGTN记录": "CGTN纪录",
+        "CGTN英语": "CGTN"
+    }
+}
