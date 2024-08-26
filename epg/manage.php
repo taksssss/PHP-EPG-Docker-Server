@@ -158,22 +158,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update'])) {
     $channel_replacements = array_map('trim', explode("\n", trim($_POST['channel_replacements'])));
 
     // 处理频道映射
+    $channel_mappings_lines = array_map('trim', explode("\n", trim($_POST['channel_mappings'])));
     $channel_mappings = [];
-    $current_search = '';
-    foreach ($_POST['channel_mappings'] as $mapping) {
-        // 如果当前项是 search，则存储为当前搜索模式
-        if (isset($mapping['search'])) {
-            $current_search = trim(str_replace("，", ",", $mapping['search']));
-        }
-        // 如果当前项是 replace，则将其与当前 search 组合，并存入频道映射数组
-        elseif (isset($mapping['replace'])) {
-            $replace = trim($mapping['replace']);
-            if ($current_search !== '' && $replace !== '') {
-                $channel_mappings[$current_search] = $replace;
-            }
-            // 重置 current_search 以准备处理下一对 search-replace
-            $current_search = '';
-        }
+    foreach ($channel_mappings_lines as $line) {
+        list($search, $replace) = preg_split('/=》|=>/', $line);
+        $channel_mappings[trim(str_replace("，", ",", $search))] = trim($replace);
     }
 
     // 获取旧的配置
@@ -326,7 +315,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
     <form method="POST" id="settingsForm">
 
         <label for="xml_urls">EPG源地址（支持 xml 跟 .xml.gz 格式， # 为注释）</label><br><br>
-        <textarea placeholder="一行一个，地址前面加 # 可以临时停用，后面加 # 可以备注。快捷键： Ctrl+/  。" id="xml_urls" name="xml_urls" rows="5"><?php echo implode("\n", array_map('trim', $Config['xml_urls'])); ?></textarea><br><br>
+        <textarea placeholder="一行一个，地址前面加 # 可以临时停用，后面加 # 可以备注。快捷键： Ctrl+/  。" id="xml_urls" name="xml_urls" style="height: 122px;"><?php echo implode("\n", array_map('trim', $Config['xml_urls'])); ?></textarea><br><br>
 
         <div class="form-row">
             <label for="days_to_keep" class="label-days-to-keep">数据保存天数</label>
@@ -365,45 +354,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
         
         <div class="flex-container">
             <div class="flex-item" style="width: 40%;">
-                <label for="channel_replacements">频道忽略字符串（按顺序， \s 空格）</label><br><br>
-                <textarea id="channel_replacements" name="channel_replacements" style="height: 138px;"><?php echo implode("\n", array_map('trim', $Config['channel_replacements'])); ?></textarea><br><br>
+                <label for="channel_replacements">频道忽略字符串：（按顺序， \s 空格）</label><br><br>
+                <textarea id="channel_replacements" name="channel_replacements" style="height: 142px;"><?php echo implode("\n", array_map('trim', $Config['channel_replacements'])); ?></textarea><br><br>
             </div>
             <div class="flex-item" style="width: 60%;">
-                <label for="channel_mappings">频道映射（正则表达式 regex: ）</label><br><br>
-                <div class="table-wrapper">
-                    <table id="channelMappingsTable">
-                        <thead style="position: sticky; top: 0; background-color: #ffffff;"><tr>                                
-                            <th>自定义频道名（可用 , 分隔）</th>
-                            <th><span onclick="showModal('channel')" style="color: blue; cursor: pointer;">数据库频道名</span></th>
-                        </tr></thead>
-                        <tbody>
-                            <?php foreach ($Config['channel_mappings'] as $search => $replace): ?>
-                            <tr>
-                                <td contenteditable="true" oninput="updateHiddenInput(this); addRowIfNeeded(this)">
-                                    <?php echo htmlspecialchars(trim($search, '[]'), ENT_QUOTES); ?>
-                                    <input type="hidden" name="channel_mappings[][search]" value="<?php echo htmlspecialchars(trim($search, '[]'), ENT_QUOTES); ?>">
-                                </td>
-                                <td contenteditable="true" oninput="updateHiddenInput(this); addRowIfNeeded(this)">
-                                    <?php echo htmlspecialchars($replace, ENT_QUOTES); ?>
-                                    <input type="hidden" name="channel_mappings[][replace]" value="<?php echo htmlspecialchars($replace, ENT_QUOTES); ?>">
-                                </td>
-                            </tr>
-                            <?php endforeach; ?>
-                            <!-- 初始空行 -->
-                            <tr>
-                                <td contenteditable="true" oninput="updateHiddenInput(this); addRowIfNeeded(this)">
-                                    <input type="hidden" name="channel_mappings[][search]" value="">
-                                </td>
-                                <td contenteditable="true" oninput="updateHiddenInput(this); addRowIfNeeded(this)">
-                                    <input type="hidden" name="channel_mappings[][replace]" value="">
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div><br>
+            <label for="channel_mappings">
+                    频道映射： [自定1, 自定2, ...] => 
+                    <span id="dbChannelName" onclick="showModal('channel')" style="color: blue; text-decoration: underline; cursor: pointer;">数据库名</span>
+                    （正则表达式regex:）
+                </label><br><br>
+                <textarea id="channel_mappings" name="channel_mappings" style="height: 142px;"><?php echo implode("\n", array_map(function($search, $replace) { return $search . ' => ' . $replace; }, array_keys($Config['channel_mappings']), $Config['channel_mappings'])); ?></textarea><br><br>
             </div>
         </div>
-
         <div class="tooltip">
             <input id="updateConfig" type="submit" name="update" value="更新配置">
             <span class="tooltiptext">快捷键：Ctrl+S</span>
@@ -518,23 +480,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
         window.location.href = 'manage.php';
     }
 
-    // 频道映射自动添加空行
-    function addRowIfNeeded(cell) {
-        var row = cell.parentElement;
-        var table = row.parentElement;
-        var isLastRow = row === table.lastElementChild;
-        if (isLastRow && cell.innerText.trim() !== "") {
-            var newRow = table.insertRow();
-            newRow.innerHTML = `
-                <td contenteditable="true" oninput="updateHiddenInput(this); addRowIfNeeded(this)">
-                    <input type="hidden" name="channel_mappings[][search]" value="">
-                </td>
-                <td contenteditable="true" oninput="updateHiddenInput(this); addRowIfNeeded(this)">
-                    <input type="hidden" name="channel_mappings[][replace]" value="">
-                </td>`;
-            newRow.scrollIntoView({ behavior: 'smooth', block: 'end' });// 自动滚动到新添加的行
-        }
-    }
     function updateHiddenInput(cell) {
         var hiddenInput = cell.querySelector('input[type="hidden"]');
         hiddenInput.value = cell.textContent.trim();

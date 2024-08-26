@@ -234,6 +234,8 @@ function formatTime($date, $time) {
 
 // 处理 XML 数据并逐步存入数据库
 function processXmlData($xml_data, $date, $db, $gen_list) {
+    global $processedRecords;
+
     $reader = new XMLReader();
     if (!$reader->XML($xml_data)) {
         throw new Exception("无法解析 XML 数据");
@@ -284,17 +286,20 @@ function processXmlData($xml_data, $date, $db, $gen_list) {
         $start = getFormatTime((string)$programme['start']);
         $end = getFormatTime((string)$programme['stop']);
         $channelId = (string)$programme['channel'];
-    
+        $channelName = $channelNamesMap[$channelId] ?? null;
+        $recordKey = $channelName . '-' . $start['date'];
+
         // 优先处理跨天数据
         if (isset($crossDayProgrammes[$channelId][$start['date']])) {
             $currentChannelProgrammes[$channelId]['diyp_data'][$start['date']] = array_merge(
                 $currentChannelProgrammes[$channelId]['diyp_data'][$start['date']] ?? [],
                 $crossDayProgrammes[$channelId][$start['date']]
             );
+            $currentChannelProgrammes[$channelId]['channel_name'] = $channelName;
             unset($crossDayProgrammes[$channelId][$start['date']]);
         }
     
-        if (isset($channelNamesMap[$channelId])) {
+        if ($channelName && !isset($processedRecords[$recordKey])) {
             $programmeData = [
                 'title' => (string)$programme->title,
                 'start' => $start['time'],
@@ -314,7 +319,7 @@ function processXmlData($xml_data, $date, $db, $gen_list) {
                 ];
             }
     
-            $currentChannelProgrammes[$channelId]['channel_name'] = $channelNamesMap[$channelId];
+            $currentChannelProgrammes[$channelId]['channel_name'] = $channelName;
     
             // 每次达到 50 时，插入数据并保留最后一条
             if (count($currentChannelProgrammes) >= 50) {
@@ -337,8 +342,13 @@ function processXmlData($xml_data, $date, $db, $gen_list) {
 
 // 插入数据到数据库
 function insertDataToDatabase($channelsData, $db) {
+    global $processedRecords;
+
     foreach ($channelsData as $channelId => $channelData) {
         $channelName = $channelData['channel_name'];
+        if($channelName == null) {
+            print_r($channelData);
+        }
         foreach ($channelData['diyp_data'] as $date => $diypProgrammes) {
             // 生成 epg_diyp 数据内容
             $diypContent = json_encode([
@@ -356,6 +366,10 @@ function insertDataToDatabase($channelsData, $db) {
             $stmt->bindValue(':channel', $channelName, PDO::PARAM_STR);
             $stmt->bindValue(':epg_diyp', $diypContent, PDO::PARAM_STR);
             $stmt->execute();
+            if ($action == 'REPLACE' || $stmt->rowCount() > 0){
+                $recordKey = $channelName . '-' . $date;
+                $processedRecords[$recordKey] = true;
+            }
         }
     }
 }
@@ -373,6 +387,9 @@ deleteOldData($db, $Config['days_to_keep'], $log_messages);
 $gen_res = getGenList($db);
 $gen_list = $gen_res['gen_list'];
 $gen_list_mapping = $gen_res['gen_list_mapping'];
+
+// 全局变量，用于记录已处理的记录
+$processedRecords = [];
 
 // 更新数据
 foreach ($Config['xml_urls'] as $xml_url) {

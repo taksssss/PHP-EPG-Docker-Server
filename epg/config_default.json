@@ -26,9 +26,11 @@
         "CHC"
     ],
     "channel_mappings": {
+        "CCTV4EUO": "CCTV4欧洲",
+        "CCTV4AME": "CCTV4美洲",
         "regex:\/^CCTV[-\\s]*(\\p{Han})\/iu": "$1",
-        "regex:\/^CCTV[-\\s]*(\\d{1,2}(\\s*P(LUS)?|[K\\+])?)(?!美洲|欧洲).*\/i": "CCTV$1",
-        "CGTN Documentary, CGTN档案, CGTN记录": "CGTN纪录",
+        "regex:\/^CCTV[-\\s]*(\\d{1,2}(\\s*P(LUS)?|[K\\+])?)(?![\\s-]*(美洲|欧洲)).*\/i": "CCTV$1",
+        "[CGTN Documentary, CGTN档案, CGTN记录]": "CGTN纪录",
         "CGTN英语": "CGTN"
     }
 }
