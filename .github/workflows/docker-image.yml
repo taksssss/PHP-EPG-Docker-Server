@@ -1,7 +1,10 @@
 name: Docker Image CI
 
 on:
-  workflow_dispatch: # 允许手动触发
+  workflow_dispatch:  # 允许手动触发
+  push:               # 允许推送触发
+    branches:
+      - main
 
 jobs:
   build:
