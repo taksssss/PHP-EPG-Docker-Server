@@ -244,49 +244,26 @@ try {
         elseif (isset($_GET['get_channel_match'])) {
             // 从数据库中获取原始频道列表
             $channels = $db->query("SELECT channel FROM gen_list")->fetchAll(PDO::FETCH_COLUMN);
-
-            // 如果原始频道列表为空，返回空响应
-            if (empty($channels)) {
-                return [
-                    'ori_channels' => [],
-                    'clean_channels' => [],
-                    'match' => []
-                ];
-            }
+            if (empty($channels)) return ['ori_channels' => [], 'clean_channels' => [], 'match' => []];
 
             // 清理频道名
-            $cleanChannels = array_map('cleanChannelName', $channels);
-            $cleanChannels = explode("\n", t2s(implode("\n", $cleanChannels)));
+            $cleanChannels = explode("\n", t2s(implode("\n", array_map('cleanChannelName', $channels))));
 
-            // 从数据库中获取所有 EPG 数据
+            // 获取所有 EPG 数据
             $epgData = $db->query("SELECT channel FROM epg_data")->fetchAll(PDO::FETCH_COLUMN);
-
-            // 初始化匹配结果数组
             $matches = [];
 
             foreach ($cleanChannels as $index => $cleanChannel) {
                 $originalChannel = $channels[$index];
-
-                // 检查精确匹配
-                if (in_array($cleanChannel, $epgData)) {
-                    $matchType = ($cleanChannel === $originalChannel) ? '精确匹配' : '模糊匹配';
-                    $matches[$cleanChannel] = ['match' => $cleanChannel, 'type' => $matchType];
-                } else {
-                    // 检查模糊匹配
-                    $fuzzyMatch = array_filter($epgData, fn($epgChannel) => stripos($epgChannel, $cleanChannel) !== false);
-                    $matches[$cleanChannel] = [
-                        'match' => $fuzzyMatch ? reset($fuzzyMatch) : null,
-                        'type' => $fuzzyMatch || $cleanChannel !== $originalChannel ? '模糊匹配' : '未匹配'
-                    ];
-                }
+                $cleanChannel = $cleanChannels[$index];
+                $inArray = in_array($cleanChannel, $epgData);
+                $fuzzyMatch = array_values(array_filter($epgData, fn($epgChannel) => stripos($epgChannel, $cleanChannel) !== false));
+                $matchType = $inArray && $cleanChannel === $originalChannel ? '精确匹配' : ($fuzzyMatch ? '模糊匹配' : '未匹配');
+                $matches[$cleanChannel][] = ['ori_channel' => $originalChannel, 'clean_channel' => $cleanChannel, 'match' => $inArray? $cleanChannel : $fuzzyMatch[0] ?? null, 'type' => $matchType];
             }
 
             // 构建返回的响应数据
-            $dbResponse = [
-                'ori_channels' => $channels,
-                'clean_channels' => $cleanChannels,
-                'match' => $matches
-            ];
+            $dbResponse = $matches;
         }
 
         // 返回限定频道列表数据
@@ -743,24 +720,21 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
         const channelMatchTableBody = document.querySelector("#channelMatchTable tbody");
         channelMatchTableBody.innerHTML = '';
 
-        // 对匹配数据按类型排序
-        const sortedMatches = Object.keys(channelMatchdata.match).sort((a, b) => {
-            const typeOrder = { '未匹配': 1, '模糊匹配': 2, '精确匹配': 3 };
-            return typeOrder[channelMatchdata.match[a].type] - typeOrder[channelMatchdata.match[b].type];
-        });
+        const typeOrder = { '未匹配': 1, '模糊匹配': 2, '精确匹配': 3 };
+
+        // 处理并排序匹配数据
+        const sortedMatches = Object.values(channelMatchdata)
+            .flat()
+            .sort((a, b) => typeOrder[a.type] - typeOrder[b.type]);
 
         // 创建表格行
-        sortedMatches.forEach(cleanChannel => {
-            const matchData = channelMatchdata.match[cleanChannel];
-            const originalChannel = channelMatchdata.ori_channels[channelMatchdata.clean_channels.indexOf(cleanChannel)] || '';
-            const matchResult = matchData.match || '';
-            const matchType = matchData.type === '精确匹配' ? '' : matchData.type;
-
+        sortedMatches.forEach(({ ori_channel, clean_channel, match, type }) => {
+            const matchType = type === '精确匹配' ? '' : type;
             const row = document.createElement("tr");
             row.innerHTML = `
-                <td>${originalChannel}</td>
-                <td>${cleanChannel}</td>
-                <td>${matchResult}</td>
+                <td>${ori_channel}</td>
+                <td>${clean_channel}</td>
+                <td>${match || ''}</td>
                 <td>${matchType}</td>
             `;
             channelMatchTableBody.appendChild(row);

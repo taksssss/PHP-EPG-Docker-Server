@@ -31,7 +31,7 @@ PHP 实现的 EPG（电子节目指南）服务端， `Docker` 部署，自带�
 > - 以 `regex:` 作为前缀
 > - 示例：
 >   - `regex:/^CCTV[-\s]*(\p{Han})/iu, $1` ：将 `CCTV风云足球`、`cctv-风云音乐` 等替换成 `风云足球`、`风云音乐`
->   - `regex:/^CCTV[-\s]*(\d+(\s*P(LUS)?|[K\+])?)(?!美洲|欧洲).*/i => CCTV$1` ：将 `CCTV 1综合`、`CCTV-4K频道`、`CCTV - 5+频道`、`CCTV - 5PLUS频道` 等替换成 `CCTV1`、`CCTV4K`、`CCTV5+`、`CCTV5PLUS`（排除 `CCTV4美洲` 和 `CCTV4欧洲`）
+>   - `regex:/^CCTV[-\s]*(\d+(\s*P(LUS)?|[K\+])?)(?![\s-]*(美洲|欧洲)).*/i => CCTV$1` ：将 `CCTV 1综合`、`CCTV-4K频道`、`CCTV - 5+频道`、`CCTV - 5PLUS频道` 等替换成 `CCTV1`、`CCTV4K`、`CCTV5+`、`CCTV5PLUS`（排除 `CCTV4美洲` 和 `CCTV4欧洲`）
 >   - `regex:/^(深圳.*?)频道$/i, $1` ：将 `深圳xx频道` 替换成 `深圳xx`
 
 ## 更新日志 📝
