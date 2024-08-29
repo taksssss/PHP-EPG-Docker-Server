@@ -624,7 +624,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
         $configUpdated = false;
     }
 
-    function showModal(type) {
+    function showModal(type, $popup = true) {
         var modal, logSpan, logContent;
         switch (type) {
             case 'update':
@@ -644,10 +644,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
                 document.getElementById('searchInput').value = ""; // 清空搜索框
                 break;
             case 'channelmatch':
-                document.getElementById("moreSettingModal").style.display = "none";
                 modal = document.getElementById("channelMatchModal");
                 logSpan = document.getElementsByClassName("close")[4];
                 fetchLogs('<?php echo $_SERVER['PHP_SELF']; ?>?get_channel_match=true', updateChannelMatchList);
+                if (!$popup) {
+                    return;
+                }
+                document.getElementById("moreSettingModal").style.display = "none";
                 break;
             case 'moresetting':
                 modal = document.getElementById("moreSettingModal");
@@ -809,6 +812,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
         
         // 保存到数据库
         saveAndUpdateConfig($doUpdate = false);
+
+        // 预加载频道匹配结果
+        showModal('channelmatch', $popup = false);
     }
 
     // 保存数据并更新配置
