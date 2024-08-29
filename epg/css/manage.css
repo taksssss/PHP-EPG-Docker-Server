@@ -171,8 +171,7 @@ input[type="text"] {
     max-width: 830px;
     width: auto;
 }
-.cron-log-modal-content,
-.config-modal-content {
+.cron-log-modal-content {
     max-width: 65%;
     width: 500px;
 }
@@ -183,6 +182,10 @@ input[type="text"] {
     width: 300px;
 }
 .more-setting-modal-content {
+    width: 500px;
+}
+.channel-match-modal-content {
+    height: 533px;
     width: 500px;
 }
 .close {
@@ -197,64 +200,43 @@ input[type="text"] {
     text-decoration: none;
     cursor: pointer;
 }
-/* 频道映射的 CSS 规则 */
-.table-wrapper {
-    height: 138px; /* 固定高度 */
-    overflow-y: scroll; /* 启用垂直滚动条 */
-    border: 1px solid #ccc; /* 外边框 */
-    font-size: 15px; /* 字体大小 */
-    line-height: 1.5;
-    border-radius: 5px; /* 圆角边框 */
-    word-break: break-all; /* 单词换行 */
-}
-#channelMappingsTable {
-    border-collapse: separate;
-    border-spacing: 0;
-    font-family: SimSun; /* 设置字体 */
-    width: 100%; /* 表格宽度 */
-}
-#channelMappingsTable th {
-    text-align: left; /* 左对齐 */
-    width: 75%; /* 第一列宽度 */
-    padding: 0 5px; /* 左右内边距 */
-    border-bottom: 1.5px solid #ccc; /* 表头下边框 */
-    border-right: 1px solid #ccc; /* 表头右边框 */
-}
-#channelMappingsTable td {
-    padding: 0 5px; /* 左右内边距 */
-    border-bottom: 1px solid #ccc; /* 行间隔 */
-    border-right: 1px solid #ccc; /* 竖的内边框 */
-}
-#channelMappingsTable tr:last-child td {
-    /* 移除最后一行的底部边框 */
-    border-bottom: none;
-}
 .table-container {
     height: 440px; /* 固定高度 */
     overflow-y: scroll; /* 启用垂直滚动条 */
 }
-#logTable {
+.table-container[id="channel-match-table-container"] {
+    height: 442px;
+}
+#logTable, #channelMatchTable {
     width: 100%;
     border-collapse: separate;
     border-spacing: 0 5px; /* 调整行之间的垂直间距 */
     table-layout: fixed; /* 固定表格布局，防止内容超出 */
 }
-#logTable th, #logTable td {
+#channelMatchTable {
+    border-spacing: 0 0px; /* 调整行之间的垂直间距 */
+}
+#logTable th, #logTable td,
+#channelMatchTable th, #channelMatchTable td {
     border: 1px solid black;
     padding: 5px;
     text-align: left;
+    word-break: break-all; /* 允许单词内断行 */
+}
+#channelMatchTable th, #channelMatchTable td {
+    text-align: center;
 }
 #logTable th:nth-child(1), 
 #logTable td:nth-child(1) {
     width: 10%; /* 第一列宽度 */
     text-align: center;
 }
-#logTable th:nth-child(2), 
-#logTable td:nth-child(2) {
-    word-break: break-all; /* 允许单词内断行 */
-}
 #logTable th:nth-child(2) {
     text-align: center; /* 第二列表头居中 */
+}
+#channelMatchTable th:nth-child(4),
+#channelMatchTable td:nth-child(4) {
+    width: 15%; /* 第四列宽度 */
 }
 .modal-content select[id="gen_xml"],
 select[id="include_future_only"] {
@@ -265,9 +247,6 @@ select[id="include_future_only"] {
 .modal-content select[id="gen_xml"] {
     width: 100px;
     margin-right: 25px;
-}
-.modal-content select[id="ret_default"] {
-    width: 72px;
 }
 /* 工具提示容器 */
 .tooltip {
