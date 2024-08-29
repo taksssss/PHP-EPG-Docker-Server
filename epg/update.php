@@ -95,9 +95,11 @@ function saveHashesToJson($json_file, $hashes) {
 }
 
 // 获取限定频道列表及映射关系
-function getGenList($db) {
-    $channels = $db->query("SELECT channel FROM gen_list")->fetchAll(PDO::FETCH_COLUMN);
-    if (empty($channels)) {
+function getGenList($db) {    
+    global $Config;
+    
+    // 如果 $Config['gen_list_enable'] 不存在、为 0 或查询结果为空，直接返回空集
+    if (empty($Config['gen_list_enable']) || empty($channels = $db->query("SELECT channel FROM gen_list")->fetchAll(PDO::FETCH_COLUMN))) {
         return [
             'gen_list_mapping' => [],
             'gen_list' => []

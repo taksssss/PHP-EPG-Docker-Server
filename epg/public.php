@@ -12,9 +12,12 @@
 require 'opencc/vendor/autoload.php'; // 引入 Composer 自动加载器
 use Overtrue\PHPOpenCC\OpenCC; // 使用 OpenCC 库
 
-// 引入并解析 JSON 配置文件
+// 引入并解析 JSON 配置文件，不存在则创建默认配置文件
 $config_path = __DIR__ . '/data/config.json';
-$Config = json_decode(file_get_contents($config_path), true);
+@mkdir(dirname($config_path), 0755, true);
+file_exists($config_path) || copy(__DIR__ . '/config_default.json', $config_path);
+$Config = json_decode(file_get_contents($config_path), true) 
+    or die("配置文件解析失败: " . json_last_error_msg());
 
 // 设置时区为亚洲/上海
 date_default_timezone_set("Asia/Shanghai");
@@ -79,10 +82,10 @@ function cleanChannelName($channel, $t2s = false) {
         $channel = t2s($channel);
     }
     // 如果配置中包含 '\\s'，则替换空格；否则不替换
-    $channel = str_ireplace($Config['channel_replacements'], '', $channel);
     if (in_array('\\s', $Config['channel_replacements'])) {
         $channel = str_replace(' ', '', $channel);
     }
+    $channel = str_ireplace($Config['channel_replacements'], '', $channel);
     return $channel;
 }
 

@@ -146,6 +146,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update'])) {
     $gen_xml = isset($_POST['gen_xml']) ? intval($_POST['gen_xml']) : $Config['gen_xml'];
     $include_future_only = isset($_POST['include_future_only']) ? intval($_POST['include_future_only']) : $Config['include_future_only'];
     $ret_default = isset($_POST['ret_default']) ? intval($_POST['ret_default']) : $Config['ret_default'];
+    $gen_list_enable = isset($_POST['gen_list_enable']) ? intval($_POST['gen_list_enable']) : $Config['gen_list_enable'];
     $start_time = $_POST['start_time'];
     $end_time = $_POST['end_time'];
     
@@ -175,6 +176,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update'])) {
         'gen_xml' => $gen_xml,
         'include_future_only' => $include_future_only,
         'ret_default' => $ret_default,
+        'gen_list_enable' => $gen_list_enable,
         'start_time' => $start_time,
         'end_time' => $end_time,
         'interval_time' => $interval_time,
@@ -238,7 +240,56 @@ try {
             ];
         }
 
-        // 返回待保存频道列表数据
+        // 返回频道匹配数据
+        elseif (isset($_GET['get_channel_match'])) {
+            // 从数据库中获取原始频道列表
+            $channels = $db->query("SELECT channel FROM gen_list")->fetchAll(PDO::FETCH_COLUMN);
+
+            // 如果原始频道列表为空，返回空响应
+            if (empty($channels)) {
+                return [
+                    'ori_channels' => [],
+                    'clean_channels' => [],
+                    'match' => []
+                ];
+            }
+
+            // 清理频道名
+            $cleanChannels = array_map('cleanChannelName', $channels);
+            $cleanChannels = explode("\n", t2s(implode("\n", $cleanChannels)));
+
+            // 从数据库中获取所有 EPG 数据
+            $epgData = $db->query("SELECT channel FROM epg_data")->fetchAll(PDO::FETCH_COLUMN);
+
+            // 初始化匹配结果数组
+            $matches = [];
+
+            foreach ($cleanChannels as $index => $cleanChannel) {
+                $originalChannel = $channels[$index];
+
+                // 检查精确匹配
+                if (in_array($cleanChannel, $epgData)) {
+                    $matchType = ($cleanChannel === $originalChannel) ? '精确匹配' : '模糊匹配';
+                    $matches[$cleanChannel] = ['match' => $cleanChannel, 'type' => $matchType];
+                } else {
+                    // 检查模糊匹配
+                    $fuzzyMatch = array_filter($epgData, fn($epgChannel) => stripos($epgChannel, $cleanChannel) !== false);
+                    $matches[$cleanChannel] = [
+                        'match' => $fuzzyMatch ? reset($fuzzyMatch) : null,
+                        'type' => $fuzzyMatch || $cleanChannel !== $originalChannel ? '模糊匹配' : '未匹配'
+                    ];
+                }
+            }
+
+            // 构建返回的响应数据
+            $dbResponse = [
+                'ori_channels' => $channels,
+                'clean_channels' => $cleanChannels,
+                'match' => $matches
+            ];
+        }
+
+        // 返回限定频道列表数据
         elseif (isset($_GET['get_gen_list'])) {
             $dbResponse = $db->query("SELECT channel FROM gen_list")->fetchAll(PDO::FETCH_COLUMN);
         }
@@ -435,6 +486,29 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
     </div>
 </div>
 
+<!-- 频道匹配结果模态框 -->
+<div id="channelMatchModal" class="modal">
+    <div class="modal-content channel-match-modal-content">
+        <span class="close">&times;</span>
+        <h2>频道匹配结果</h2>
+        <div class="table-container" id="channel-match-table-container">
+            <table id="channelMatchTable">
+                <thead style="position: sticky; top: 0; background-color: white;">
+                    <tr>
+                        <th>原频道名</th>
+                        <th>处理后频道名</th>
+                        <th>匹配结果</th>
+                        <th>备注</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- 数据由 JavaScript 动态生成 -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
 <!-- 更多设置模态框 -->
 <div id="moreSettingModal" class="modal">
     <div class="modal-content more-setting-modal-content">
@@ -452,16 +526,21 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
         </select>
         <br><br>
         <label for="ret_default">默认返回“精彩节目”：</label>
-        <select id="ret_default" name="ret_default" required>
+        <select id="ret_default" name="ret_default" style="width: 72px"; required>
             <option value="1" <?php if (!isset($Config['ret_default']) || $Config['ret_default'] == 1) echo 'selected'; ?>>是</option>
             <option value="0" <?php if (isset($Config['ret_default']) && $Config['ret_default'] == 0) echo 'selected'; ?>>否</option>
         </select>
         <br><br>
         <label for="gen_list_text">仅生成以下频道：</label>
-        <span>
-            （可粘贴 m3u、txt 地址或内容并<span onclick="parseSource()" style="color: blue; cursor: pointer;">点击解析</span>）
+        <select id="gen_list_enable" name="gen_list_enable" style="width: 48px; margin-right: 0px;" required>
+            <option value="1" <?php if (isset($Config['gen_list_enable']) && $Config['gen_list_enable'] == 1) echo 'selected'; ?>>是</option>
+            <option value="0" <?php if (!isset($Config['gen_list_enable']) || $Config['gen_list_enable'] == 0) echo 'selected'; ?>>否</option>
+        </select>
+        <span style="font-size: 14.5px;">
+            （粘贴m3u、txt地址或内容，<span onclick="parseSource()" style="color: blue; cursor: pointer; text-decoration: underline;">解析</span> 后
+            <span onclick="showModal('channelmatch')" style="color: blue; cursor: pointer; text-decoration: underline;">查看匹配</span>）
         </span><br><br>
-        <textarea id="gen_list_text" style="width: 100%; height: 260px;"></textarea><br><br>
+        <textarea id="gen_list_text" style="width: 100%; height: 253px;"></textarea><br><br>
         <button id="saveConfig" type="button" onclick="saveAndUpdateConfig();">保存配置</button>
     </div>
 </div>
@@ -587,9 +666,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
                 fetchLogs('<?php echo $_SERVER['PHP_SELF']; ?>?get_channel=true', updateChannelList);
                 document.getElementById('searchInput').value = ""; // 清空搜索框
                 break;
+            case 'channelmatch':
+                document.getElementById("moreSettingModal").style.display = "none";
+                modal = document.getElementById("channelMatchModal");
+                logSpan = document.getElementsByClassName("close")[4];
+                fetchLogs('<?php echo $_SERVER['PHP_SELF']; ?>?get_channel_match=true', updateChannelMatchList);
+                break;
             case 'moresetting':
                 modal = document.getElementById("moreSettingModal");
-                logSpan = document.getElementsByClassName("close")[4];            
+                logSpan = document.getElementsByClassName("close")[5];            
                 fetchLogs('<?php echo $_SERVER['PHP_SELF']; ?>?get_gen_list=true', updateGenList);
                 genListLoaded = true; // 数据已加载
                 break;
@@ -600,10 +685,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
         modal.style.display = "block";
         logSpan.onclick = function() {
             modal.style.display = "none";
+            if (type === 'channelmatch') {
+                showModal('moresetting');
+            }
         }
         window.onmousedown = function(event) {
             if (event.target === modal) {
                 modal.style.display = "none";
+                if (type === 'channelmatch') {
+                    showModal('moresetting');
+                }
             }
         }
     }
@@ -640,17 +731,49 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
         logContent.scrollTop = logContent.scrollHeight;
     }
 
-    function updateChannelList(data) {
+    function updateChannelList(channelData) {
         const channelList = document.getElementById('channelList');
         const channelTitle = document.getElementById('channelModalTitle');
-        channelList.dataset.allChannels = data.channels.join('\n'); // 保存所有频道数据
+        channelList.dataset.allChannels = channelData.channels.join('\n'); // 保存所有频道数据
         channelList.value = channelList.dataset.allChannels;
-        channelTitle.innerHTML = `频道列表<span style="font-size: 18px;">（总数：${data.count}）</span>`; // 更新频道总数
+        channelTitle.innerHTML = `频道列表<span style="font-size: 18px;">（总数：${channelData.count}）</span>`; // 更新频道总数
+    }
+
+    function updateChannelMatchList(channelMatchdata) {
+        const channelMatchTableBody = document.querySelector("#channelMatchTable tbody");
+        channelMatchTableBody.innerHTML = '';
+
+        // 对匹配数据按类型排序
+        const sortedMatches = Object.keys(channelMatchdata.match).sort((a, b) => {
+            const typeOrder = { '未匹配': 1, '模糊匹配': 2, '精确匹配': 3 };
+            return typeOrder[channelMatchdata.match[a].type] - typeOrder[channelMatchdata.match[b].type];
+        });
+
+        // 创建表格行
+        sortedMatches.forEach(cleanChannel => {
+            const matchData = channelMatchdata.match[cleanChannel];
+            const originalChannel = channelMatchdata.ori_channels[channelMatchdata.clean_channels.indexOf(cleanChannel)] || '';
+            const matchResult = matchData.match || '';
+            const matchType = matchData.type === '精确匹配' ? '' : matchData.type;
+
+            const row = document.createElement("tr");
+            row.innerHTML = `
+                <td>${originalChannel}</td>
+                <td>${cleanChannel}</td>
+                <td>${matchResult}</td>
+                <td>${matchType}</td>
+            `;
+            channelMatchTableBody.appendChild(row);
+        });
+
+        document.getElementById("channel-match-table-container").style.display = 'block';
     }
 
     function updateGenList(genData) {
         const gen_list_text = document.getElementById('gen_list_text');
-        gen_list_text.value = genData.join('\n');
+        if(!gen_list_text.value) {
+            gen_list_text.value = genData.join('\n');
+        }
     }
 
     function filterChannels() {
@@ -692,19 +815,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
             }
         }
 
-        // 获取完远程内容后，处理所有文本内容
-        text = text.toUpperCase();
-
         // 处理 m3u 、 txt 文件内容
         text.split('\n').forEach(line => {
-            if (line && !line.startsWith('HTTP') && !line.includes('#GENRE#') && !line.includes('#EXTM3U')) {
-                if (line.startsWith('#EXTINF:')) {
-                    const tvgIdMatch = line.match(/TVG-ID="([^"]+)"/);
-                    const tvgNameMatch = line.match(/TVG-NAME="([^"]+)"/);
+            if (line && !/^http/i.test(line) && !/#genre#/i.test(line) && !/#extm3u/i.test(line)) {
+                if (/^#extinf:/i.test(line)) {
+                    const tvgIdMatch = line.match(/tvg-id="([^"]+)"/i);
+                    const tvgNameMatch = line.match(/tvg-name="([^"]+)"/i);
 
-                    name = (tvgIdMatch ? tvgIdMatch[1] : tvgNameMatch ? tvgNameMatch[1] : line.split(',').slice(-1)[0]).trim();
+                    name = (tvgIdMatch && /\D/.test(tvgIdMatch[1]) ? tvgIdMatch[1] : tvgNameMatch ? tvgNameMatch[1] : line.split(',').slice(-1)[0]).trim();
                 } else {
-                    name = line.split(',')[0].trim(); // 处理非 #EXTINF: 开头的行
+                    name = line.split(',')[0].trim();
                 }
                 if (name) channels.add(name);
             }
@@ -712,10 +832,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
 
         // 将解析后的频道列表放回文本区域
         textarea.value = Array.from(channels).join('\n');
+        
+        // 保存到数据库
+        saveAndUpdateConfig($doUpdate = false);
     }
 
     // 保存数据并更新配置
-    function saveAndUpdateConfig() {
+    function saveAndUpdateConfig($doUpdate = true) {
         if (!genListLoaded) {
             document.getElementById('updateConfig').click();
             return;
@@ -731,7 +854,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
         .then(response => response.text())
         .then(responseText => {
             if (responseText.trim() === 'success') {
-                document.getElementById('updateConfig').click();
+                if($doUpdate){
+                    document.getElementById('updateConfig').click();
+                }
             } else {
                 console.error('服务器响应错误:', responseText);
             }
@@ -743,7 +868,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
 
     // 在提交表单时，将更多设置中的数据包括在表单数据中
     document.getElementById('settingsForm').addEventListener('submit', function() {
-        const fields = ['gen_xml', 'include_future_only', 'ret_default'];
+        const fields = ['gen_xml', 'include_future_only', 'ret_default', 'gen_list_enable'];
         fields.forEach(function(field) {
             const hiddenInput = document.createElement('input');
             hiddenInput.type = 'hidden';

@@ -4,6 +4,7 @@
     "gen_xml": 1,
     "include_future_only": 1,
     "ret_default": 1,
+    "gen_list_enable": 0,
     "start_time": "00:00",
     "end_time": "23:59",
     "interval_time": 0,
