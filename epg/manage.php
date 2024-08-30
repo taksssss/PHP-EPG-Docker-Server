@@ -163,7 +163,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update'])) {
     $channel_mappings = [];
     foreach ($channel_mappings_lines as $line) {
         list($search, $replace) = preg_split('/=》|=>/', $line);
-        $channel_mappings[trim(str_replace("，", ",", $search))] = trim($replace);
+        $channel_mappings[trim(trim(str_replace("，", ",", $search)), '[]')] = trim($replace);
     }
 
     // 获取旧的配置
@@ -233,10 +233,45 @@ try {
 
         // 返回所有频道数据和频道数量
         elseif (isset($_GET['get_channel'])) {
-            $channels = $db->query("SELECT DISTINCT channel FROM epg_data ORDER BY channel ASC")->fetchAll(PDO::FETCH_COLUMN);
+            // 从数据库中获取频道
+            $channels = $db->query("SELECT DISTINCT UPPER(channel) FROM epg_data ORDER BY UPPER(channel) ASC")->fetchAll(PDO::FETCH_COLUMN);
+
+            // 创建反向映射关系，排除正则表达式映射
+            $channelMappings = $Config['channel_mappings'];            
+            $reverseMappings = [];
+            foreach ($channelMappings as $search => $replace) {
+                if (strpos($search, 'regex:') === 0) {
+                    continue; // 跳过正则表达式映射
+                }
+                $reverseMappings[$replace] = $search;
+            }
+
+            // 反转频道数组以便快速查找
+            $remainingChannels = array_flip($channels);
+            
+            // 按照 reverseMappings 的顺序处理频道
+            $mappedChannels = [];
+            foreach ($reverseMappings as $mapped => $original) {
+                if (isset($remainingChannels[$mapped])) {
+                    $mappedChannels[] = [
+                        'original' => $mapped,
+                        'mapped' => $original
+                    ];
+                    unset($remainingChannels[$mapped]); // 从剩余频道中移除
+                }
+            }
+
+            // 添加剩下的频道，mapped 为空
+            foreach ($remainingChannels as $channel => $_) {
+                $mappedChannels[] = [
+                    'original' => $channel,
+                    'mapped' => ''
+                ];
+            }
+
             $dbResponse = [
-                'channels' => $channels,
-                'count' => count($channels)
+                'channels' => $mappedChannels,
+                'count' => count($mappedChannels)
             ];
         }
 
@@ -349,7 +384,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
             <label for="days_to_keep" class="label-days-to-keep">数据保存天数</label>
             <label for="start_time" class="label-time custom-margin1">【定时任务】： 开始时间</label>
             <label for="end_time" class="label-time2 custom-margin2">结束时间</label>
-            <label for="interval_time" class="label-time3 custom-margin3">间隔周期 (选0小时0分钟取消)</label>
+            <label for="interval_time" class="label-time3 custom-margin3">间隔周期（选0小时0分钟取消）</label>
         </div>
 
         <div class="form-row">
@@ -366,7 +401,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
             <!-- Interval Time Controls -->
             <select id="interval_hour" name="interval_hour" required>
                 <?php for ($h = 0; $h < 24; $h++): ?>
-                    <option value="<?php echo $h; ?>" <?php echo intval($Config['interval_time']) / 3600 == $h ? 'selected' : ''; ?>>
+                    <option value="<?php echo $h; ?>" <?php echo floor($Config['interval_time'] / 3600) == $h ? 'selected' : ''; ?>>
                         <?php echo $h; ?>
                     </option>
                 <?php endfor; ?>
@@ -387,9 +422,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
             </div>
             <div class="flex-item" style="width: 60%;">
             <label for="channel_mappings">
-                    频道映射： [自定1, 自定2, ...] => 
-                    <span id="dbChannelName" onclick="showModal('channel')" style="color: blue; text-decoration: underline; cursor: pointer;">数据库名</span>
-                    （正则表达式regex:）
+                    频道映射： 自定1, 自定2, ... => 数据库频道名 
+                    <span id="dbChannelName" onclick="showModal('channel')" style="color: blue; cursor: pointer;">（点击编辑）</span>
                 </label><br><br>
                 <textarea id="channel_mappings" name="channel_mappings" style="height: 142px;"><?php echo implode("\n", array_map(function($search, $replace) { return $search . ' => ' . $replace; }, array_keys($Config['channel_mappings']), $Config['channel_mappings'])); ?></textarea><br><br>
             </div>
@@ -459,7 +493,21 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
         <span class="close">&times;</span>
         <h2 id="channelModalTitle">频道列表</h2>
         <input type="text" id="searchInput" placeholder="搜索频道名..." onkeyup="filterChannels()">
-        <textarea id="channelList" readonly style="width: 100%; height: 390px;"></textarea>
+        <div class="table-container" id="channel-table-container">
+            <table id="channelTable">
+                <thead style="position: sticky; top: 0; background-color: white;">
+                    <tr>
+                        <th>数据库频道名</th>
+                        <th>自定1, 自定2, ...</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- 数据由 JavaScript 动态生成 -->
+                </tbody>
+            </table>
+        </div>
+        <br>
+        <button id="saveConfig" type="button" onclick="updateChannelMapping();">保存配置</button>
     </div>
 </div>
 
@@ -513,11 +561,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
             <option value="1" <?php if (isset($Config['gen_list_enable']) && $Config['gen_list_enable'] == 1) echo 'selected'; ?>>是</option>
             <option value="0" <?php if (!isset($Config['gen_list_enable']) || $Config['gen_list_enable'] == 0) echo 'selected'; ?>>否</option>
         </select>
-        <span style="font-size: 14.5px;">
+        <span>
             （粘贴m3u、txt地址或内容，<span onclick="parseSource()" style="color: blue; cursor: pointer; text-decoration: underline;">解析</span> 后
             <span onclick="showModal('channelmatch')" style="color: blue; cursor: pointer; text-decoration: underline;">查看匹配</span>）
         </span><br><br>
-        <textarea id="gen_list_text" style="width: 100%; height: 253px;"></textarea><br><br>
+        <textarea id="gen_list_text"></textarea><br><br>
         <button id="saveConfig" type="button" onclick="saveAndUpdateConfig();">保存配置</button>
     </div>
 </div>
@@ -534,11 +582,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
         sessionStorage.clear();
         // 重定向到登录页面
         window.location.href = 'manage.php';
-    }
-
-    function updateHiddenInput(cell) {
-        var hiddenInput = cell.querySelector('input[type="hidden"]');
-        hiddenInput.value = cell.textContent.trim();
     }
 
     let genListLoaded = false; // 用于跟踪数据是否已加载
@@ -711,12 +754,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
         logContent.scrollTop = logContent.scrollHeight;
     }
 
-    function updateChannelList(channelData) {
-        const channelList = document.getElementById('channelList');
+    function updateChannelList(channelsData) {
+        var channelTableBody = document.querySelector("#channelTable tbody");
         const channelTitle = document.getElementById('channelModalTitle');
-        channelList.dataset.allChannels = channelData.channels.join('\n'); // 保存所有频道数据
-        channelList.value = channelList.dataset.allChannels;
-        channelTitle.innerHTML = `频道列表<span style="font-size: 18px;">（总数：${channelData.count}）</span>`; // 更新频道总数
+        channelTitle.innerHTML = `频道列表<span style="font-size: 18px;">（总数：${channelsData.count}）</span>`; // 更新频道总数
+        document.getElementById('channelTable').dataset.allChannels = JSON.stringify(channelsData.channels); // 将原始频道和映射后的频道数据存储到 dataset 中
+        filterChannels(); // 生成数据
     }
 
     function updateChannelMatchList(channelMatchdata) {
@@ -755,10 +798,52 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
 
     function filterChannels() {
         var input = document.getElementById('searchInput').value.toLowerCase();
-        var channelList = document.getElementById('channelList');
-        var allChannels = channelList.dataset.allChannels.split('\n');
-        var filteredChannels = allChannels.filter(channel => channel.toLowerCase().includes(input));
-        channelList.value = filteredChannels.join('\n');
+        var channelTableBody = document.querySelector("#channelTable tbody");
+        var allChannels = JSON.parse(document.getElementById('channelTable').dataset.allChannels);
+
+        // 清空现有表格
+        channelTableBody.innerHTML = '';
+
+        allChannels.forEach((channel, index) => {
+            if (String(channel.original).toLowerCase().includes(input)) {
+                var row = document.createElement('tr');
+
+                row.innerHTML = `
+                    <td>${String(channel.original)}</td>
+                    <td contenteditable="true">${channel.mapped}</td>
+                `;
+
+                row.querySelector('td[contenteditable]').addEventListener('blur', function() {
+                    channel.mapped = this.textContent;
+                    document.getElementById('channelTable').dataset.allChannels = JSON.stringify(allChannels);
+                });
+
+                channelTableBody.appendChild(row);
+            }
+        });
+    }
+
+    function updateChannelMapping() {
+        var allChannels = JSON.parse(document.getElementById('channelTable').dataset.allChannels);
+        var existingMappings = document.getElementById('channel_mappings').value.split('\n');
+        var newMappings = [];
+
+        // 保留正则表达式映射关系
+        var regexMappings = existingMappings.filter(line => line.startsWith('regex:'));
+
+        // 处理表格数据，生成新的映射关系
+        allChannels.forEach(channel => {
+            if (channel.mapped.trim() !== '') {
+                newMappings.push(`${channel.mapped} => ${channel.original}`);
+            }
+        });
+
+        // 合并新映射和正则表达式映射
+        var updatedMappings = [...newMappings, ...regexMappings].join('\n');
+        document.getElementById('channel_mappings').value = updatedMappings;
+
+        // 保存更新后的配置
+        saveAndUpdateConfig();
     }
 
     // 解析 txt、m3u 直播源，并生成频道列表

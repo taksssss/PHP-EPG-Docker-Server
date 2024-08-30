@@ -48,7 +48,8 @@ echo 'Running cron.php and Apache'
 chown -R apache:apache /htdocs/epg
 
 # Start cron.php
-su -s /bin/sh -c "php /htdocs/epg/cron.php &" "apache"
+cd /htdocs/epg
+su -s /bin/sh -c "php cron.php &" "apache"
 
 # Start Apache
 httpd -D FOREGROUND
