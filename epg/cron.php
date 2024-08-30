@@ -34,18 +34,13 @@ function logMessage($message) {
     }
 }
 
-// 获取当前进程的PID
-$currentPid = getmypid();
+$currentPid = posix_getpid(); // 获取当前进程ID
+$processName = 'cron.php';
+$oldPids = [];
+exec("pgrep -f '{$processName}'", $oldPids);
 
-// 检查是否已有实例在运行
-$output = [];
-exec("ps aux | grep '[c]ron.php'", $output);
-foreach ($output as $line) {
-    // 提取进程信息
-    $parts = preg_split('/\s+/', $line);
-    $pid = $parts[1];
-    // 排除当前进程的PID
-    if (isset($pid) && $pid != $currentPid && posix_kill($pid, 0)) {
+foreach ($oldPids as $pid) {
+    if ($pid != $currentPid && posix_kill($pid, 0)) {
         if (posix_kill($pid, 9)) {
             logMessage("【终止旧进程】 {$pid}");
         } else {
@@ -150,7 +145,7 @@ sleep($initial_sleep);
 // 无限循环，可以使用实际需求中的退出条件
 while (true) {
     // 执行update.php
-    exec('php update.php');
+    exec('php ' . __DIR__ . '/update.php');
     logMessage("【成功执行】 update.php");
 
     // 计算下一个执行时间
