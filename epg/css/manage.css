@@ -31,6 +31,10 @@ textarea {
 textarea[id="cronLogContent"], textarea[id="channelList"] {
     white-space: pre-wrap; /* 自动换行 */
 }
+textarea[id="gen_list_text"] {
+    height: 250px;
+}
+
 .form-row {
     display: flex;
     align-items: center;
@@ -106,6 +110,8 @@ input[type="text"] {
     width: calc(100% - 22px);
     padding: 10px;
     margin-bottom: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
 }
 .button-container {
     display: flex;
@@ -165,28 +171,21 @@ input[type="text"] {
     position: relative;
     box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2);
     top: 50%;
-    transform: translateY(-50%);
+    transform: translateY(-50%);    
+    height: 510px;
+    width: 530px;
 }
 .update-log-modal-content {
-    max-width: 830px;
-    width: auto;
-}
-.cron-log-modal-content {
-    max-width: 65%;
-    width: 500px;
+    width: 830px;
 }
 .config-modal-content {
     width: 200px;
+    height: auto;
 }
-.channel-modal-content {
-    width: 300px;
-}
-.more-setting-modal-content {
-    width: 500px;
-}
+.more-setting-modal-content,
+.channel-modal-content,
 .channel-match-modal-content {
-    height: 533px;
-    width: 500px;
+    height: 530px;
 }
 .close {
     color: #aaa;
@@ -203,26 +202,33 @@ input[type="text"] {
 .table-container {
     height: 440px; /* 固定高度 */
     overflow-y: scroll; /* 启用垂直滚动条 */
+    border: 1px solid #ccc;
+    border-radius: 5px;
+}
+.table-container[id="channel-table-container"] {
+    height: 354px;
 }
 .table-container[id="channel-match-table-container"] {
-    height: 442px;
+    height: 460px;
 }
-#logTable, #channelMatchTable {
+#logTable, #channelMatchTable, #channelTable {
     width: 100%;
     border-collapse: separate;
     border-spacing: 0 5px; /* 调整行之间的垂直间距 */
     table-layout: fixed; /* 固定表格布局，防止内容超出 */
 }
-#channelMatchTable {
+#channelMatchTable, #channelTable {
     border-spacing: 0 0px; /* 调整行之间的垂直间距 */
 }
 #logTable th, #logTable td,
+#channelTable th, #channelTable td,
 #channelMatchTable th, #channelMatchTable td {
-    border: 1px solid black;
+    border: 1px solid #ccc;
     padding: 5px;
     text-align: left;
     word-break: break-all; /* 允许单词内断行 */
 }
+#channelTable th, #channelTable td,
 #channelMatchTable th, #channelMatchTable td {
     text-align: center;
 }
@@ -233,6 +239,10 @@ input[type="text"] {
 }
 #logTable th:nth-child(2) {
     text-align: center; /* 第二列表头居中 */
+}
+#channelTable th:nth-child(1),
+#channelTable td:nth-child(1) {
+    width: 30%; /* 第一列宽度 */
 }
 #channelMatchTable th:nth-child(4),
 #channelMatchTable td:nth-child(4) {
@@ -246,7 +256,7 @@ select[id="include_future_only"] {
 }
 .modal-content select[id="gen_xml"] {
     width: 100px;
-    margin-right: 25px;
+    margin-right: 50px;
 }
 /* 工具提示容器 */
 .tooltip {
