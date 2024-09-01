@@ -894,10 +894,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
                         const response = await fetch('manage.php?url=' + encodeURIComponent(url));
                         const result = await response.json(); // 解析 JSON 响应
                         
-                        if (result.success) {
+                        if (result.success && !/not found/i.test(result.data)) {
                             text += '\n' + result.data;
                         } else {
-                            alert(`${result.message}：\n${url}`); // 显示 PHP 端返回的错误信息
+                            alert(/not found/i.test(result.data) ? `Error: ${result.data}` : `${result.message}：\n${url}`);
                         }
                     } catch (error) {
                         alert(`无法获取URL内容: ${url}\n错误信息: ${error.message}`); // 显示网络错误信息

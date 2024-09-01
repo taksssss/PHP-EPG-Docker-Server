@@ -98,57 +98,33 @@ function saveHashesToJson($json_file, $hashes) {
 function getGenList($db) {
     $channels = $db->query("SELECT channel FROM gen_list")->fetchAll(PDO::FETCH_COLUMN);
     if (empty($channels)) {
-        return [
-            'gen_list_mapping' => [],
-            'gen_list' => []
-        ];
+        return ['gen_list_mapping' => [], 'gen_list' => []];
     }
-    
-    $channelsString = implode("\n", $channels);
-    $channelsSimplified = t2s($channelsString);
+
+    $channelsSimplified = explode("\n", t2s(implode("\n", $channels)));
+    $allEpgChannels = $db->query("SELECT DISTINCT channel FROM epg_data")->fetchAll(PDO::FETCH_COLUMN);
 
     $gen_list_mapping = [];
-    $cleanedChannels = [];
+    $cleanedChannels = array_map('cleanChannelName', $channelsSimplified);
 
-    foreach (explode("\n", $channelsSimplified) as $index => $simplifiedChannel) {
-        $cleanedChannel = cleanChannelName($simplifiedChannel);
-        $cleanedChannels[] = $cleanedChannel;
-        
-        // 优先精准匹配，其次正向模糊匹配，最后反向模糊匹配
-        $stmt = $db->prepare("
-            SELECT DISTINCT channel
-            FROM epg_data 
-            WHERE 
-                channel = :channel COLLATE NOCASE 
-                OR channel LIKE :like_channel COLLATE NOCASE
-                OR :channel LIKE '%' || channel || '%' COLLATE NOCASE
-            ORDER BY 
-                CASE 
-                    WHEN channel = :channel COLLATE NOCASE THEN 1 
-                    WHEN channel LIKE :like_channel COLLATE NOCASE THEN 2 
-                    ELSE 3 
-                END, 
-                LENGTH(channel) DESC
-            LIMIT 1
-        ");
-        $stmt->execute([
-            ':channel' => $cleanedChannel, 
-            ':like_channel' => $cleanedChannel . '%'
-        ]);
-        $dbChannel = $stmt->fetchColumn() ?: $cleanedChannel;
-        
-        // 如果该清理后的频道名称已经存在于映射中，则将原始频道名称追加到数组中
-        if (!isset($gen_list_mapping[$dbChannel])) {
-            $gen_list_mapping[$dbChannel] = [];
+    foreach ($cleanedChannels as $index => $cleanedChannel) {
+        $dbChannel = $cleanedChannel;  // 默认使用清理后的频道名
+        foreach ($allEpgChannels as $epgChannel) {
+            if (strcasecmp($cleanedChannel, $epgChannel) === 0 ||
+                stripos($epgChannel, $cleanedChannel) === 0 || 
+                stripos($cleanedChannel, $epgChannel) !== false) {
+                $dbChannel = $epgChannel;
+                break;  // 找到最优匹配后跳出循环
+            }
         }
+
+        // 将原始频道名称添加到映射数组中
         $gen_list_mapping[$dbChannel][] = $channels[$index];
     }
-    
-    $gen_list = array_unique($cleanedChannels);
 
     return [
         'gen_list_mapping' => $gen_list_mapping,
-        'gen_list' => $gen_list
+        'gen_list' => array_unique($cleanedChannels)
     ];
 }
 
@@ -316,11 +292,13 @@ function processXmlData($xml_data, $date, $db, $gen_list) {
         $recordKey = $channelName . '-' . $start['date'];
 
         // 优先处理跨天数据
-        if (isset($crossDayProgrammes[$channelId][$start['date']])) {
+        if (isset($crossDayProgrammes[$channelId][$start['date']]) && !isset($processedRecords[$recordKey])) {
             $currentChannelProgrammes[$channelId]['diyp_data'][$start['date']] = array_merge(
                 $currentChannelProgrammes[$channelId]['diyp_data'][$start['date']] ?? [],
                 $crossDayProgrammes[$channelId][$start['date']]
             );
+            print_r($crossDayProgrammes[$channelId][$start['date']]);
+            echo "<br>";
             $currentChannelProgrammes[$channelId]['channel_name'] = $channelName;
             unset($crossDayProgrammes[$channelId][$start['date']]);
         }
