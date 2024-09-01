@@ -95,11 +95,9 @@ function saveHashesToJson($json_file, $hashes) {
 }
 
 // 获取限定频道列表及映射关系
-function getGenList($db) {    
-    global $Config;
-    
-    // 如果 $Config['gen_list_enable'] 不存在、为 0 或查询结果为空，直接返回空集
-    if (empty($Config['gen_list_enable']) || empty($channels = $db->query("SELECT channel FROM gen_list")->fetchAll(PDO::FETCH_COLUMN))) {
+function getGenList($db) {
+    $channels = $db->query("SELECT channel FROM gen_list")->fetchAll(PDO::FETCH_COLUMN);
+    if (empty($channels)) {
         return [
             'gen_list_mapping' => [],
             'gen_list' => []
@@ -116,11 +114,34 @@ function getGenList($db) {
         $cleanedChannel = cleanChannelName($simplifiedChannel);
         $cleanedChannels[] = $cleanedChannel;
         
+        // 优先精准匹配，其次正向模糊匹配，最后反向模糊匹配
+        $stmt = $db->prepare("
+            SELECT DISTINCT channel
+            FROM epg_data 
+            WHERE 
+                channel = :channel COLLATE NOCASE 
+                OR channel LIKE :like_channel COLLATE NOCASE
+                OR :channel LIKE '%' || channel || '%' COLLATE NOCASE
+            ORDER BY 
+                CASE 
+                    WHEN channel = :channel COLLATE NOCASE THEN 1 
+                    WHEN channel LIKE :like_channel COLLATE NOCASE THEN 2 
+                    ELSE 3 
+                END, 
+                LENGTH(channel) DESC
+            LIMIT 1
+        ");
+        $stmt->execute([
+            ':channel' => $cleanedChannel, 
+            ':like_channel' => $cleanedChannel . '%'
+        ]);
+        $dbChannel = $stmt->fetchColumn() ?: $cleanedChannel;
+        
         // 如果该清理后的频道名称已经存在于映射中，则将原始频道名称追加到数组中
-        if (!isset($gen_list_mapping[$cleanedChannel])) {
-            $gen_list_mapping[$cleanedChannel] = [];
+        if (!isset($gen_list_mapping[$dbChannel])) {
+            $gen_list_mapping[$dbChannel] = [];
         }
-        $gen_list_mapping[$cleanedChannel][] = $channels[$index];
+        $gen_list_mapping[$dbChannel][] = $channels[$index];
     }
     
     $gen_list = array_unique($cleanedChannels);
@@ -133,14 +154,13 @@ function getGenList($db) {
 
 // 从 epg_data 表生成 XML 数据并逐个频道写入 t.xml 文件
 function generateXmlFromEpgData($db, $include_future_only, $gen_list_mapping) {
+    global $Config;
     $currentDate = date('Y-m-d'); // 获取当前日期
     $dateCondition = $include_future_only ? "WHERE date >= '$currentDate'" : '';
 
     // 合并查询
     $query = "SELECT date, channel, epg_diyp FROM epg_data $dateCondition ORDER BY channel ASC, date ASC";
     $stmt = $db->query($query);
-
-    $mappingIsEmpty = empty($gen_list_mapping); // 检查 $gen_list_mapping 是否为空
 
     // 创建 XMLWriter 实例
     $xmlWriter = new XMLWriter();
@@ -157,16 +177,19 @@ function generateXmlFromEpgData($db, $include_future_only, $gen_list_mapping) {
 
     while ($program = $stmt->fetch(PDO::FETCH_ASSOC)) {
         $originalChannel = $program['channel'];
-        if ($mappingIsEmpty || isset($gen_list_mapping[$originalChannel])) {
-            $channelsToProcess = $mappingIsEmpty ? [$originalChannel] : $gen_list_mapping[$originalChannel];
+    
+        // 确定要处理的频道列表
+        $channelsToProcess = $Config['gen_list_enable']
+            ? ($gen_list_mapping[$originalChannel] ?? [])
+            : array_unique(array_merge([$originalChannel], $gen_list_mapping[$originalChannel] ?? []));
+    
+        // 如果不需要生成列表或映射为空或存在映射，则处理频道数据
+        if (empty($Config['gen_list_enable']) || empty($gen_list_mapping) || isset($gen_list_mapping[$originalChannel])) {
             foreach ($channelsToProcess as $mappedChannel) {
-                if (!isset($channelData[$mappedChannel])) {
-                    $channelData[$mappedChannel] = [];
-                }
                 $channelData[$mappedChannel][] = $program;
             }
         }
-    }
+    }    
 
     // 逐个频道处理
     foreach ($channelData as $mappedChannel => $programs) {
@@ -236,6 +259,7 @@ function formatTime($date, $time) {
 
 // 处理 XML 数据并逐步存入数据库
 function processXmlData($xml_data, $date, $db, $gen_list) {
+    global $Config;
     global $processedRecords;
 
     $reader = new XMLReader();
@@ -259,8 +283,8 @@ function processXmlData($xml_data, $date, $db, $gen_list) {
     $channelNamesMap = [];
     foreach ($cleanChannelNames as $channelId => $channelName) {
         $channelNameSimplified = array_shift($simplifiedChannelNames);
-        // 当 gen_list 为空时，插入所有数据
-        if (empty($gen_list)) {
+        // 当 gen_list_enable 为 0 或 gen_list 为空，插入所有数据
+        if (empty($Config['gen_list_enable']) || empty($gen_list)) {
             $channelNamesMap[$channelId] = $channelNameSimplified;
             continue;
         }

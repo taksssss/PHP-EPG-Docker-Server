@@ -53,36 +53,42 @@ function getFormatTime($time) {
 
 // 从数据库读取 diyp、lovetv 数据
 function readEPGData($date, $channel, $db, $type) {
-    // 精确匹配优先
+    // 优先精准匹配，其次正向模糊匹配，最后反向模糊匹配
     $stmt = $db->prepare("
-        SELECT epg_diyp 
+        SELECT DISTINCT epg_diyp
         FROM epg_data 
         WHERE date = :date 
         AND (
             channel = :channel COLLATE NOCASE 
             OR channel LIKE :like_channel COLLATE NOCASE
+            OR :channel LIKE '%' || channel || '%' COLLATE NOCASE
         )
         ORDER BY 
-            CASE WHEN channel = :channel THEN 1 ELSE 2 END
+            CASE 
+                WHEN channel = :channel COLLATE NOCASE THEN 1 
+                WHEN channel LIKE :like_channel COLLATE NOCASE THEN 2 
+                ELSE 3 
+            END, 
+            LENGTH(channel) DESC
         LIMIT 1
     ");
     $stmt->execute([
         ':date' => $date, 
         ':channel' => $channel, 
-        ':like_channel' => '%' . $channel . '%'
+        ':like_channel' => $channel . '%'
     ]);
-    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    $row = $stmt->fetchColumn();
     
     if (!$row) {
         return false;
     }
 
     if ($type === 'diyp') {
-        return $row['epg_diyp'];
+        return $row;
     }
 
     if ($type === 'lovetv') {
-        $diyp_data = json_decode($row['epg_diyp'], true);
+        $diyp_data = json_decode($row, true);
         $program = array_map(function($epg) {
             $start_time = strtotime($epg['start']);
             $end_time = strtotime($epg['end']);

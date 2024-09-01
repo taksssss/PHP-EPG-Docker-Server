@@ -281,20 +281,49 @@ try {
             $channels = $db->query("SELECT channel FROM gen_list")->fetchAll(PDO::FETCH_COLUMN);
             if (empty($channels)) return ['ori_channels' => [], 'clean_channels' => [], 'match' => []];
 
-            // 清理频道名
+            // 清理频道名并获取 EPG 数据
             $cleanChannels = explode("\n", t2s(implode("\n", array_map('cleanChannelName', $channels))));
-
-            // 获取所有 EPG 数据
             $epgData = $db->query("SELECT channel FROM epg_data")->fetchAll(PDO::FETCH_COLUMN);
+
+            // 建立干净频道名和原始频道的映射
+            $channelMap = array_combine($cleanChannels, $channels);
+
             $matches = [];
 
-            foreach ($cleanChannels as $index => $cleanChannel) {
-                $originalChannel = $channels[$index];
-                $cleanChannel = $cleanChannels[$index];
-                $inArray = in_array($cleanChannel, $epgData);
-                $fuzzyMatch = array_values(array_filter($epgData, fn($epgChannel) => stripos($epgChannel, $cleanChannel) !== false));
-                $matchType = $inArray && $cleanChannel === $originalChannel ? '精确匹配' : ($fuzzyMatch ? '模糊匹配' : '未匹配');
-                $matches[$cleanChannel][] = ['ori_channel' => $originalChannel, 'clean_channel' => $cleanChannel, 'match' => $inArray? $cleanChannel : $fuzzyMatch[0] ?? null, 'type' => $matchType];
+            foreach ($cleanChannels as $cleanChannel) {
+                $originalChannel = $channelMap[$cleanChannel];
+                $matchResult = null;
+                $matchType = '未匹配';
+
+                // 精确匹配
+                if (in_array($cleanChannel, $epgData) && $cleanChannel === $originalChannel) {
+                    $matchResult = $cleanChannel;
+                    $matchType = '精确匹配';
+                } else {
+                    // 正向模糊匹配
+                    foreach ($epgData as $epgChannel) {
+                        if (stripos($epgChannel, $cleanChannel) !== false) {
+                            $matchResult = $epgChannel;
+                            $matchType = '正向模糊';
+                            break;
+                        }
+                    }
+
+                    // 反向模糊匹配
+                    if (!$matchResult) {
+                        foreach ($epgData as $epgChannel) {
+                            if (stripos($cleanChannel, $epgChannel) !== false) {
+                                if (!$matchResult || strlen($epgChannel) > strlen($matchResult)) {
+                                    $matchResult = $epgChannel;
+                                    $matchType = '反向模糊';
+                }}}}}
+
+                $matches[$cleanChannel] = [
+                    'ori_channel' => $originalChannel,
+                    'clean_channel' => $cleanChannel,
+                    'match' => $matchResult,
+                    'type' => $matchType
+                ];
             }
 
             // 构建返回的响应数据
@@ -498,7 +527,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
                 <thead style="position: sticky; top: 0; background-color: white;">
                     <tr>
                         <th>数据库频道名</th>
-                        <th>自定1, 自定2, ...</th>
+                        <th>自定频道名</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -551,7 +580,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
         </select>
         <br><br>
         <label for="ret_default">默认返回“精彩节目”：</label>
-        <select id="ret_default" name="ret_default" style="width: 72px"; required>
+        <select id="ret_default" name="ret_default" required>
             <option value="1" <?php if (!isset($Config['ret_default']) || $Config['ret_default'] == 1) echo 'selected'; ?>>是</option>
             <option value="0" <?php if (isset($Config['ret_default']) && $Config['ret_default'] == 0) echo 'selected'; ?>>否</option>
         </select>
@@ -739,7 +768,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
         logData.forEach(log => {
             var row = document.createElement("tr");
             row.innerHTML = `
-                <td>${new Date(log.timestamp).toLocaleString()}</td>
+                <td>${new Date(log.timestamp).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}</td>
                 <td>${log.log_message}</td>
             `;
             logTableBody.appendChild(row);
@@ -750,7 +779,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
 
     function updateCronLogContent(logData) {
         var logContent = document.getElementById("cronLogContent");
-        logContent.value = logData.map(log => `[${new Date(log.timestamp).toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' })} ${new Date(log.timestamp).toLocaleTimeString()}] ${log.log_message}`).join('\n');
+        logContent.value = logData.map(log => `[${new Date(log.timestamp).toLocaleString('zh-CN', {month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}] ${log.log_message}`).join('\n');
         logContent.scrollTop = logContent.scrollHeight;
     }
 
@@ -766,7 +795,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
         const channelMatchTableBody = document.querySelector("#channelMatchTable tbody");
         channelMatchTableBody.innerHTML = '';
 
-        const typeOrder = { '未匹配': 1, '模糊匹配': 2, '精确匹配': 3 };
+        const typeOrder = { '未匹配': 1, '反向模糊': 2, '正向模糊': 3, '精确匹配': 4 };
 
         // 处理并排序匹配数据
         const sortedMatches = Object.values(channelMatchdata)
