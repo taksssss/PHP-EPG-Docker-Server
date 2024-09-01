@@ -297,8 +297,6 @@ function processXmlData($xml_data, $date, $db, $gen_list) {
                 $currentChannelProgrammes[$channelId]['diyp_data'][$start['date']] ?? [],
                 $crossDayProgrammes[$channelId][$start['date']]
             );
-            print_r($crossDayProgrammes[$channelId][$start['date']]);
-            echo "<br>";
             $currentChannelProgrammes[$channelId]['channel_name'] = $channelName;
             unset($crossDayProgrammes[$channelId][$start['date']]);
         }
@@ -350,9 +348,6 @@ function insertDataToDatabase($channelsData, $db) {
 
     foreach ($channelsData as $channelId => $channelData) {
         $channelName = $channelData['channel_name'];
-        if($channelName == null) {
-            print_r($channelData);
-        }
         foreach ($channelData['diyp_data'] as $date => $diypProgrammes) {
             // 生成 epg_diyp 数据内容
             $diypContent = json_encode([
