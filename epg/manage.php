@@ -26,6 +26,13 @@ if ($configUpdated) {
     unset($_SESSION['configUpdated']);
 }
 
+if (isset($_SESSION['import_message'])) {
+    $importMessage = $_SESSION['import_message'];
+    unset($_SESSION['import_message']); // 清除消息以防再次显示
+} else {
+    $importMessage = '';
+}
+
 // 处理密码更新请求
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['change_password'])) {
     $oldPassword = $_POST['old_password'];
@@ -367,6 +374,46 @@ try {
         }
         exit;
     }
+
+    // 导入配置
+    if (!empty($_FILES['importFile']['tmp_name'])) {
+        $zip = new ZipArchive();
+        $importFile = $_FILES['importFile']['tmp_name'];
+        $message = "";
+
+        if ($zip->open($importFile) === TRUE) {
+            if ($zip->extractTo('.')) {
+                $message = "导入成功！";
+            } else {
+                $message = "导入失败！解压过程中发生问题。";
+            }
+            $zip->close();
+        } else {
+            $message = "导入失败！无法打开压缩文件。";
+        }
+
+        $_SESSION['import_message'] = $message;
+        header('Location: manage.php');
+        exit;
+    }
+
+    // 导出配置
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_FILES['importFile']['tmp_name'])) {
+        $zip = new ZipArchive();
+        $zipFileName = 't.gz';
+
+        if ($zip->open($zipFileName, ZipArchive::CREATE | ZipArchive::OVERWRITE) === TRUE) {
+            $zip->addFile('data/config.json');
+            $zip->addFile('data/data.db');
+            $zip->close();
+
+            header('Content-Type: application/zip');
+            header('Content-Disposition: attachment; filename=' . $zipFileName);
+            readfile($zipFileName);
+            unlink($zipFileName);
+        }
+        exit;
+    }
 } catch (Exception $e) {
     // 处理数据库连接错误
     $logData = [];
@@ -584,6 +631,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
             <option value="1" <?php if (!isset($Config['ret_default']) || $Config['ret_default'] == 1) echo 'selected'; ?>>是</option>
             <option value="0" <?php if (isset($Config['ret_default']) && $Config['ret_default'] == 0) echo 'selected'; ?>>否</option>
         </select>
+        <form id="importForm" method="post" enctype="multipart/form-data" style="display: inline-block;">
+            <input type="file" name="importFile" id="importFile" style="display: none;" accept=".gz" onchange="document.getElementById('importForm').submit();">
+            <span id="import" onclick="document.getElementById('importFile').click()" style="color: blue; cursor: pointer; margin-right: 20px;">数据导入</span>
+            <span id="export" onclick="document.getElementById('importForm').submit()" style="color: blue; cursor: pointer;">数据导出</span>
+        </form>
         <br><br>
         <label for="gen_list_text">仅生成以下频道：</label>
         <select id="gen_list_enable" name="gen_list_enable" style="width: 48px; margin-right: 0px;" required>
@@ -674,26 +726,39 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
     var intervalTime = "<?php echo $Config['interval_time']; ?>";
     var startTime = "<?php echo $Config['start_time']; ?>";
     var endTime = "<?php echo $Config['end_time']; ?>";
+    var importMessage = <?php echo json_encode($importMessage); ?>;
 
-    if (configUpdated) {
+    function displayModal(message) {
         var modal = document.getElementById("myModal");
         var span = document.getElementsByClassName("close")[0];
         var modalMessage = document.getElementById("modalMessage");
-        if (intervalTime === "0") {
-            modalMessage.innerHTML = "配置已更新<br><br>已取消定时任务";
-        } else {
-            modalMessage.innerHTML = `配置已更新<br><br>已设置定时任务<br>开始时间：${startTime}<br>结束时间：${endTime}<br>间隔周期：${formatTime(intervalTime)}`;
-        }
+
+        modalMessage.innerHTML = message;
         modal.style.display = "block";
+
         span.onclick = function() {
             modal.style.display = "none";
-        }
+        };
+
         window.onclick = function(event) {
             if (event.target == modal) {
                 modal.style.display = "none";
             }
+        };
+    }
+
+    if (configUpdated) {
+        var message;
+        if (intervalTime === "0") {
+            message = "配置已更新<br><br>已取消定时任务";
+        } else {
+            message = `配置已更新<br><br>已设置定时任务<br>开始时间：${startTime}<br>结束时间：${endTime}<br>间隔周期：${formatTime(intervalTime)}`;
         }
-        $configUpdated = false;
+        displayModal(message);
+    }
+
+    if (importMessage) {
+        displayModal(importMessage);
     }
 
     function showModal(type, $popup = true) {

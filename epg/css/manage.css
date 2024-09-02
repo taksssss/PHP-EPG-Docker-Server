@@ -258,6 +258,7 @@ input[type="text"] {
 }
 .modal-content select[id="ret_default"] {
     width: 72px;
+    margin-right: 50px;
 }
 /* 工具提示容器 */
 .tooltip {
