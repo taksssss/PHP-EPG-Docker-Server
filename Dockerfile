@@ -37,6 +37,7 @@ RUN apk --no-cache --update \
     php83-simplexml \
     php83-json \
     php83-posix \
+    php83-zip \
     && mkdir /htdocs
 
 # 复制 ./epg 文件夹到 /htdocs
