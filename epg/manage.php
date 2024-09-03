@@ -376,7 +376,7 @@ try {
     }
 
     // 导入配置
-    if (!empty($_FILES['importFile']['tmp_name'])) {
+    elseif (!empty($_FILES['importFile']['tmp_name'])) {
         $zip = new ZipArchive();
         $importFile = $_FILES['importFile']['tmp_name'];
         $message = "";
@@ -398,7 +398,7 @@ try {
     }
 
     // 导出配置
-    if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_FILES['importFile']['tmp_name'])) {
+    elseif ($requestMethod === 'POST' && isset($_POST['action']) && empty($_FILES['importFile']['tmp_name'])) {
         $zip = new ZipArchive();
         $zipFileName = 't.gz';
 
@@ -633,6 +633,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
         </select>
         <form id="importForm" method="post" enctype="multipart/form-data" style="display: inline-block;">
             <input type="file" name="importFile" id="importFile" style="display: none;" accept=".gz" onchange="document.getElementById('importForm').submit();">
+            <input type="hidden" name="action" id="formAction" value="">
             <span id="import" onclick="document.getElementById('importFile').click()" style="color: blue; cursor: pointer; margin-right: 20px;">数据导入</span>
             <span id="export" onclick="document.getElementById('importForm').submit()" style="color: blue; cursor: pointer;">数据导出</span>
         </form>
