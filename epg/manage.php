@@ -166,11 +166,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update'])) {
     $channel_replacements = array_map('trim', explode("\n", trim($_POST['channel_replacements'])));
 
     // 处理频道映射
-    $channel_mappings_lines = array_map('trim', explode("\n", trim($_POST['channel_mappings'])));
     $channel_mappings = [];
-    foreach ($channel_mappings_lines as $line) {
-        list($search, $replace) = preg_split('/=》|=>/', $line);
-        $channel_mappings[trim(trim(str_replace("，", ",", $search)), '[]')] = trim($replace);
+    if ($mappings = trim($_POST['channel_mappings'] ?? '')) {
+        foreach (array_filter(array_map('trim', explode("\n", $mappings))) as $line) {
+            list($search, $replace) = preg_split('/=》|=>/', $line);
+            $channel_mappings[trim(str_replace("，", ",", trim($search)), '[]')] = trim($replace);
+        }
     }
 
     // 获取旧的配置

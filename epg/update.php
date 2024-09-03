@@ -108,18 +108,25 @@ function getGenList($db) {
     $cleanedChannels = array_map('cleanChannelName', $channelsSimplified);
 
     foreach ($cleanedChannels as $index => $cleanedChannel) {
-        $dbChannel = $cleanedChannel;  // 默认使用清理后的频道名
+        $bestMatch = $cleanedChannel;  // 默认使用清理后的频道名
+        $bestMatchLength = 0;  // 初始为0，表示未找到任何匹配
+
         foreach ($allEpgChannels as $epgChannel) {
-            if (strcasecmp($cleanedChannel, $epgChannel) === 0 ||
-                stripos($epgChannel, $cleanedChannel) === 0 || 
-                stripos($cleanedChannel, $epgChannel) !== false) {
-                $dbChannel = $epgChannel;
-                break;  // 找到最优匹配后跳出循环
+            if (strcasecmp($cleanedChannel, $epgChannel) === 0) {
+                $bestMatch = $epgChannel;
+                break;  // 精确匹配，立即跳出循环
+            }
+
+            // 模糊匹配并选择最长的频道名称
+            if ((stripos($epgChannel, $cleanedChannel) === 0 || stripos($cleanedChannel, $epgChannel) !== false) 
+                && strlen($epgChannel) > $bestMatchLength) {
+                $bestMatch = $epgChannel;
+                $bestMatchLength = strlen($epgChannel);  // 更新为更长的匹配
             }
         }
 
         // 将原始频道名称添加到映射数组中
-        $gen_list_mapping[$dbChannel][] = $channels[$index];
+        $gen_list_mapping[$bestMatch][] = $channels[$index];
     }
 
     return [
