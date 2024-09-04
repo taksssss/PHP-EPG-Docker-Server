@@ -304,27 +304,24 @@ try {
                 $matchType = '未匹配';
 
                 // 精确匹配
-                if (in_array($cleanChannel, $epgData) && $cleanChannel === $originalChannel) {
+                if (in_array($cleanChannel, $epgData)) {
                     $matchResult = $cleanChannel;
                     $matchType = '精确匹配';
+                    if($cleanChannel !== $originalChannel) {
+                        $matchType = '映射/忽略';
+                    }
                 } else {
-                    // 正向模糊匹配
                     foreach ($epgData as $epgChannel) {
                         if (stripos($epgChannel, $cleanChannel) !== false) {
-                            $matchResult = $epgChannel;
-                            $matchType = '正向模糊';
-                            break;
-                        }
-                    }
-
-                    // 反向模糊匹配
-                    if (!$matchResult) {
-                        foreach ($epgData as $epgChannel) {
-                            if (stripos($cleanChannel, $epgChannel) !== false) {
-                                if (!$matchResult || strlen($epgChannel) > strlen($matchResult)) {
-                                    $matchResult = $epgChannel;
-                                    $matchType = '反向模糊';
-                }}}}}
+                            if (!isset($matchResult) || strlen($epgChannel) < strlen($matchResult)) {
+                                $matchResult = $epgChannel;
+                                $matchType = '正向模糊';
+                            }
+                        } elseif (stripos($cleanChannel, $epgChannel) !== false) {
+                            if (!isset($matchResult) || strlen($epgChannel) > strlen($matchResult)) {
+                                $matchResult = $epgChannel;
+                                $matchType = '反向模糊';
+                }}}}
 
                 $matches[$cleanChannel] = [
                     'ori_channel' => $originalChannel,
@@ -862,7 +859,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
         const channelMatchTableBody = document.querySelector("#channelMatchTable tbody");
         channelMatchTableBody.innerHTML = '';
 
-        const typeOrder = { '未匹配': 1, '反向模糊': 2, '正向模糊': 3, '精确匹配': 4 };
+        const typeOrder = { '未匹配': 1, '反向模糊': 2, '正向模糊': 3, '映射/忽略': 4, '精确匹配': 5 };
 
         // 处理并排序匹配数据
         const sortedMatches = Object.values(channelMatchdata)

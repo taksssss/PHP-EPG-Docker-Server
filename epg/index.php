@@ -69,7 +69,11 @@ function readEPGData($date, $channel, $db, $type) {
                 WHEN channel LIKE :like_channel COLLATE NOCASE THEN 2 
                 ELSE 3 
             END, 
-            LENGTH(channel) DESC
+            CASE 
+                WHEN channel = :channel COLLATE NOCASE THEN NULL
+                WHEN channel LIKE :like_channel COLLATE NOCASE THEN LENGTH(channel)
+                ELSE -LENGTH(channel)
+            END
         LIMIT 1
     ");
     $stmt->execute([

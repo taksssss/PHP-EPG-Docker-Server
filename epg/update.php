@@ -102,7 +102,7 @@ function getGenList($db) {
     }
 
     $channelsSimplified = explode("\n", t2s(implode("\n", $channels)));
-    $allEpgChannels = $db->query("SELECT DISTINCT channel FROM epg_data")->fetchAll(PDO::FETCH_COLUMN);
+    $allEpgChannels = $db->query("SELECT DISTINCT channel FROM epg_data WHERE date = DATE('now')")->fetchAll(PDO::FETCH_COLUMN); // 避免匹配只有历史 EPG 的频道
 
     $gen_list_mapping = [];
     $cleanedChannels = array_map('cleanChannelName', $channelsSimplified);
@@ -356,6 +356,11 @@ function insertDataToDatabase($channelsData, $db) {
     foreach ($channelsData as $channelId => $channelData) {
         $channelName = $channelData['channel_name'];
         foreach ($channelData['diyp_data'] as $date => $diypProgrammes) {
+            // 检查是否全天只有一个节目
+            if (!empty($diypProgrammes) && count(array_unique(array_column($diypProgrammes, 'title'))) === 1) {
+                return; // 跳过后续处理
+            }
+
             // 生成 epg_diyp 数据内容
             $diypContent = json_encode([
                 'channel_name' => $channelName,
