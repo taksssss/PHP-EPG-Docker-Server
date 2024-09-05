@@ -182,8 +182,12 @@ input[type="text"] {
     width: 200px;
     height: auto;
 }
+.channel-bind-epg-modal-content {
+    width: 600px;
+}
 .more-setting-modal-content,
 .channel-modal-content,
+.channel-bind-epg-modal-content,
 .channel-match-modal-content {
     height: 530px;
 }
@@ -208,20 +212,24 @@ input[type="text"] {
 .table-container[id="channel-table-container"] {
     height: 354px;
 }
+.table-container[id="channel-bind-epg-table-container"] {
+    height: 400px;
+}
 .table-container[id="channel-match-table-container"] {
     height: 460px;
 }
-#logTable, #channelMatchTable, #channelTable {
+#logTable, #channelMatchTable, #channelTable, #channelBindEPGTable {
     width: 100%;
     border-collapse: separate;
     border-spacing: 0 5px; /* 调整行之间的垂直间距 */
     table-layout: fixed; /* 固定表格布局，防止内容超出 */
 }
-#channelMatchTable, #channelTable {
+#channelMatchTable, #channelTable, #channelBindEPGTable {
     border-spacing: 0 0px; /* 调整行之间的垂直间距 */
 }
 #logTable th, #logTable td,
 #channelTable th, #channelTable td,
+#channelBindEPGTable th, #channelBindEPGTable td,
 #channelMatchTable th, #channelMatchTable td {
     border: 1px solid #ccc;
     padding: 5px;
@@ -229,7 +237,8 @@ input[type="text"] {
     word-break: break-all; /* 允许单词内断行 */
 }
 #channelTable th, #channelTable td,
-#channelMatchTable th, #channelMatchTable td {
+#channelMatchTable th, #channelMatchTable td,
+#channelBindEPGTable th {
     text-align: center;
 }
 #logTable th:nth-child(1), 

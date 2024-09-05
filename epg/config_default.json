@@ -9,6 +9,8 @@
     "end_time": "23:59",
     "interval_time": 0,
     "manage_password": "",
+    "channel_bind_epg": {
+    },
     "channel_replacements": [
         "-",
         "\\s"
