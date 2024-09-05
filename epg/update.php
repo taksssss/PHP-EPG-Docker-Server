@@ -357,8 +357,8 @@ function insertDataToDatabase($channelsData, $db) {
         $channelName = $channelData['channel_name'];
         foreach ($channelData['diyp_data'] as $date => $diypProgrammes) {
             // 检查是否全天只有一个节目
-            if (!empty($diypProgrammes) && count(array_unique(array_column($diypProgrammes, 'title'))) === 1) {
-                return; // 跳过后续处理
+            if (count(array_unique(array_column($diypProgrammes, 'title'))) === 1) {
+                continue; // 跳过后续处理
             }
 
             // 生成 epg_diyp 数据内容
