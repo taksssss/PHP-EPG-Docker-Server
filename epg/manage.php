@@ -174,11 +174,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update'])) {
         }
     }
 
-    // 处理频道绑定 EPG 数据
+    // 处理频道指定 EPG 数据
     $channel_bind_epg = isset($_POST['channel_bind_epg']) ? 
         array_filter(
             array_column(json_decode($_POST['channel_bind_epg'], true), 'channels', 'epg_src'), 
-            fn($channels) => !empty($channels)
+            function($channels) {
+                return !empty($channels);
+            }
         ) : [];
 
     // 获取旧的配置
@@ -291,7 +293,7 @@ try {
             ];
         }
         
-        // 返回频道绑定 EPG 数据
+        // 返回频道指定 EPG 数据
         elseif (isset($_GET['get_channel_bind_epg'])) {
             // 从数据库中获取频道
             $channels = $db->query("SELECT DISTINCT UPPER(channel) FROM epg_data ORDER BY UPPER(channel) ASC")->fetchAll(PDO::FETCH_COLUMN);
@@ -327,7 +329,9 @@ try {
                         'epg_src' => $cleanEpgSrc,
                         'channels' => $channelBindEpg[$cleanEpgSrc] ?? ''
                     ];
-                }, array_filter($filteredUrls, fn($epgSrc) => strpos(trim($epgSrc), '#') !== 0)),
+                }, array_filter($filteredUrls, function($epgSrc) {
+                    return strpos(trim($epgSrc), '#') !== 0;
+                })),
 
                 array_map(function($epgSrc) use ($channelBindEpg) {
                     $cleanEpgSrc = trim(preg_replace('/^\s*#\s*/', '', $epgSrc));
@@ -335,7 +339,9 @@ try {
                         'epg_src' => '【已停用】' . ltrim($cleanEpgSrc, '#'),
                         'channels' => $channelBindEpg[$cleanEpgSrc] ?? ''
                     ];
-                }, array_filter($filteredUrls, fn($epgSrc) => strpos(trim($epgSrc), '#') === 0))
+                }, array_filter($filteredUrls, function($epgSrc) {
+                    return strpos(trim($epgSrc), '#') === 0;
+                }))
             );
         }
 
@@ -507,7 +513,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
     <h2>管理配置</h2>
     <form method="POST" id="settingsForm">
 
-        <label for="xml_urls">EPG源地址（支持 xml 跟 .xml.gz 格式， # 为注释）</label><span id="channelbind" onclick="showModal('channelbindepg')" style="color: blue; cursor: pointer;">（频道绑定EPG源）</span><br><br>
+        <label for="xml_urls">EPG源地址（支持 xml 跟 .xml.gz 格式， # 为注释）</label><span id="channelbind" onclick="showModal('channelbindepg')" style="color: blue; cursor: pointer;">（频道指定EPG源）</span><br><br>
         <textarea placeholder="一行一个，地址前面加 # 可以临时停用，后面加 # 可以备注。快捷键： Ctrl+/  。" id="xml_urls" name="xml_urls" style="height: 122px;"><?php echo implode("\n", array_map('trim', $Config['xml_urls'])); ?></textarea><br><br>
 
         <div class="form-row">
@@ -641,17 +647,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
     </div>
 </div>
 
-<!-- 频道绑定EPG模态框 -->
+<!-- 频道指定EPG模态框 -->
 <div id="channelBindEPGModal" class="modal">
     <div class="modal-content channel-bind-epg-modal-content">
         <span class="close">&times;</span>
-        <h2>频道绑定EPG源</h2>
+        <h2>频道指定EPG源<span style="font-size: 14px;">（无指定则按靠前的源更新）</span></h2>
         <div class="table-container" id="channel-bind-epg-table-container">
             <table id="channelBindEPGTable">
                 <thead style="position: sticky; top: 0; background-color: white;">
                     <tr>
-                        <th>EPG源地址</th>
-                        <th>绑定频道（可 , 分隔）</th>
+                        <th>指定EPG源</th>
+                        <th>频道（可 , 分隔）</th>
                     </tr>
                 </thead>
                 <tbody>

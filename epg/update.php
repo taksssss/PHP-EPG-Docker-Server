@@ -135,7 +135,7 @@ function getGenList($db) {
     ];
 }
 
-// 获取频道绑定 EPG 关系
+// 获取频道指定 EPG 关系
 function getChannelBindEPG() {
     global $Config;
     $channelBindEPG = [];
@@ -422,7 +422,7 @@ $gen_res = getGenList($db);
 $gen_list = $gen_res['gen_list'];
 $gen_list_mapping = $gen_res['gen_list_mapping'];
 
-// 获取频道绑定 EPG 关系
+// 获取频道指定 EPG 关系
 $channel_bind_epg = getChannelBindEPG();
 
 // 全局变量，用于记录已处理的记录
