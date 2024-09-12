@@ -9,11 +9,15 @@
     "end_time": "23:59",
     "interval_time": 0,
     "manage_password": "",
+    "channel_bind_epg": {
+    },
     "channel_replacements": [
         "-",
         "\\s"
     ],
     "channel_mappings": {
+        "CCTV4AME": "CCTV4美洲",
+        "CCTV4EUO": "CCTV4欧洲",
         "CGTN Documentary, CGTN档案, CGTN记录": "CGTN纪录",
         "regex:\/^CCTV[-\\s]*(\\d{1,2}(\\s*P(LUS)?|[K\\+])?)(?![\\s-]*(美洲|欧洲)).*\/i": "CCTV$1"
     }

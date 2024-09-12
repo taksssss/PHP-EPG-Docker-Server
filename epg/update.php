@@ -47,11 +47,13 @@ function deleteOldData($db, $keep_days, &$log_messages) {
     }
 }
 
-// 格式化时间函数
+// 格式化时间函数，同时转化为 UTC+8 时间
 function getFormatTime($time) {
+    $time = str_replace(' ', '', $time);
+    $date = DateTime::createFromFormat('YmdHisO', $time)->setTimezone(new DateTimeZone('+0800'));
     return [
-        'date' => substr($time, 0, 4) . '-' . substr($time, 4, 2) . '-' . substr($time, 6, 2),
-        'time' => strlen($time) >= 12 ? substr($time, 8, 2) . ':' . substr($time, 10, 2) : ''
+        'date' => $date->format('Y-m-d'),
+        'time' => $date->format('H:i')
     ];
 }
 
@@ -69,7 +71,7 @@ function processData($xml_url, $db, &$log_messages, $gen_list) {
         }
         $db->beginTransaction();
         try {
-            processXmlData($xml_data, date('Y-m-d'), $db, $gen_list);
+            processXmlData($xml_url, $xml_data, date('Y-m-d'), $db, $gen_list);
             $db->commit();
             logMessage($log_messages, "【更新】 成功");
         } catch (Exception $e) {
@@ -102,7 +104,7 @@ function getGenList($db) {
     }
 
     $channelsSimplified = explode("\n", t2s(implode("\n", $channels)));
-    $allEpgChannels = $db->query("SELECT DISTINCT channel FROM epg_data")->fetchAll(PDO::FETCH_COLUMN);
+    $allEpgChannels = $db->query("SELECT DISTINCT channel FROM epg_data WHERE date = DATE('now')")->fetchAll(PDO::FETCH_COLUMN); // 避免匹配只有历史 EPG 的频道
 
     $gen_list_mapping = [];
     $cleanedChannels = array_map('cleanChannelName', $channelsSimplified);
@@ -133,6 +135,19 @@ function getGenList($db) {
         'gen_list_mapping' => $gen_list_mapping,
         'gen_list' => array_unique($cleanedChannels)
     ];
+}
+
+// 获取频道指定 EPG 关系
+function getChannelBindEPG() {
+    global $Config;
+    $channelBindEPG = [];
+    foreach ($Config['channel_bind_epg'] ?? [] as $epg_src => $channels) {
+        $channelList = array_map('trim', explode(',', $channels));
+        foreach ($channelList as $channel) {
+            $channelBindEPG[$channel][] = $epg_src;
+        }
+    }
+    return $channelBindEPG;
 }
 
 // 从 epg_data 表生成 XML 数据并逐个频道写入 t.xml 文件
@@ -241,9 +256,10 @@ function formatTime($date, $time) {
 }
 
 // 处理 XML 数据并逐步存入数据库
-function processXmlData($xml_data, $date, $db, $gen_list) {
+function processXmlData($xml_url, $xml_data, $date, $db, $gen_list) {
     global $Config;
     global $processedRecords;
+    global $channel_bind_epg;
 
     $reader = new XMLReader();
     if (!$reader->XML($xml_data)) {
@@ -266,8 +282,17 @@ function processXmlData($xml_data, $date, $db, $gen_list) {
     $channelNamesMap = [];
     foreach ($cleanChannelNames as $channelId => $channelName) {
         $channelNameSimplified = array_shift($simplifiedChannelNames);
-        // 当 gen_list_enable 为 0 或 gen_list 为空，插入所有数据
-        if (empty($Config['gen_list_enable']) || empty($gen_list)) {
+
+        // 假如 channel_bind_epg 存在且频道在其中有记录，且不为当前 xml_url，直接跳过
+        if (!empty($channel_bind_epg) && 
+            isset($channel_bind_epg[$channelNameSimplified]) && 
+            !in_array($xml_url, $channel_bind_epg[$channelNameSimplified])
+        ) {
+            continue; // 跳过当前循环，继续处理下一个
+        }
+
+        // 当 gen_list_enable 为 0 时，插入所有数据
+        if (empty($Config['gen_list_enable'])) {
             $channelNamesMap[$channelId] = $channelNameSimplified;
             continue;
         }
@@ -356,6 +381,11 @@ function insertDataToDatabase($channelsData, $db) {
     foreach ($channelsData as $channelId => $channelData) {
         $channelName = $channelData['channel_name'];
         foreach ($channelData['diyp_data'] as $date => $diypProgrammes) {
+            // 检查是否全天只有一个节目
+            if (count(array_unique(array_column($diypProgrammes, 'title'))) === 1) {
+                continue; // 跳过后续处理
+            }
+
             // 生成 epg_diyp 数据内容
             $diypContent = json_encode([
                 'channel_name' => $channelName,
@@ -393,6 +423,9 @@ deleteOldData($db, $Config['days_to_keep'], $log_messages);
 $gen_res = getGenList($db);
 $gen_list = $gen_res['gen_list'];
 $gen_list_mapping = $gen_res['gen_list_mapping'];
+
+// 获取频道指定 EPG 关系
+$channel_bind_epg = getChannelBindEPG();
 
 // 全局变量，用于记录已处理的记录
 $processedRecords = [];

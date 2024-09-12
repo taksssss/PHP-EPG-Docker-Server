@@ -149,6 +149,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update'])) {
 
     // 获取表单数据并去除每个 URL 末尾的换行符
     $xml_urls = array_map('trim', explode("\n", trim($_POST['xml_urls'])));
+
+    // 过滤和规范化 xml_urls
+    $xml_urls = array_values(array_map(function($url) {
+        return preg_replace('/^#\s*(?:#\s*)*(\S+)(\s*#.*)?$/', '# $1$2', trim($url));
+    }, $xml_urls));
+    
     $days_to_keep = intval($_POST['days_to_keep']);
     $gen_xml = isset($_POST['gen_xml']) ? intval($_POST['gen_xml']) : $Config['gen_xml'];
     $include_future_only = isset($_POST['include_future_only']) ? intval($_POST['include_future_only']) : $Config['include_future_only'];
@@ -174,6 +180,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update'])) {
         }
     }
 
+    // 处理频道指定 EPG 数据，去掉 epg_src 前面的【已停用】
+    $channel_bind_epg = isset($_POST['channel_bind_epg']) ? 
+        array_filter(
+            array_reduce(json_decode($_POST['channel_bind_epg'], true), function($result, $item) {
+                $epgSrc = preg_replace('/^【已停用】/', '', $item['epg_src']);
+                if (!empty($item['channels'])) {
+                    $result[$epgSrc] = $item['channels'];
+                }
+                return $result;
+            }, [])
+        ) : [];
+
     // 获取旧的配置
     $oldConfig = $Config;
 
@@ -189,6 +207,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update'])) {
         'end_time' => $end_time,
         'interval_time' => $interval_time,
         'manage_password' => $Config['manage_password'], // 保留密码
+        'channel_bind_epg' => $channel_bind_epg,
         'channel_replacements' => $channel_replacements,
         'channel_mappings' => $channel_mappings
     ];
@@ -245,7 +264,7 @@ try {
             $channels = $db->query("SELECT DISTINCT UPPER(channel) FROM epg_data ORDER BY UPPER(channel) ASC")->fetchAll(PDO::FETCH_COLUMN);
 
             // 创建反向映射关系，排除正则表达式映射
-            $channelMappings = $Config['channel_mappings'];            
+            $channelMappings = $Config['channel_mappings'];
             $reverseMappings = [];
             foreach ($channelMappings as $search => $replace) {
                 if (strpos($search, 'regex:') === 0) {
@@ -282,6 +301,41 @@ try {
                 'count' => count($mappedChannels)
             ];
         }
+        
+        // 返回频道指定 EPG 数据
+        elseif (isset($_GET['get_channel_bind_epg'])) {
+            // 从数据库中获取频道
+            $channels = $db->query("SELECT DISTINCT UPPER(channel) FROM epg_data ORDER BY UPPER(channel) ASC")->fetchAll(PDO::FETCH_COLUMN);
+
+            $channelBindEpg = $Config['channel_bind_epg'] ?? [];
+            $xmlUrls = $Config['xml_urls'];
+
+            // 过滤 xml_urls，同时重置下标
+            $filteredUrls = array_values(array_map(function($url) {
+                $url = trim($url);
+                // 如果以 # 开头，去掉第二个 # 后的内容；否则，去掉第一个 # 后的内容，并修剪空格
+                $url = (strpos($url, '#') === 0) 
+                    ? preg_replace('/^([^#]*#[^#]*)#.*$/', '$1', $url) 
+                    : preg_replace('/#.*$/', '', $url);
+                return trim($url); // 去掉多余空格
+            }, $xmlUrls));
+
+            // 生成 $dbResponse
+            $dbResponse = array_map(function($epgSrc) use ($channelBindEpg) {
+                $cleanEpgSrc = trim(preg_replace('/^\s*#\s*/', '', $epgSrc));
+                $isInactive = strpos(trim($epgSrc), '#') === 0;
+                return [
+                    'epg_src' => ($isInactive ? '【已停用】' : '') . $cleanEpgSrc,
+                    'channels' => $channelBindEpg[$cleanEpgSrc] ?? ''
+                ];
+            }, $filteredUrls);
+
+            // 将已停用的放到后面
+            $dbResponse = array_merge(
+                array_filter($dbResponse, function($item) { return strpos($item['epg_src'], '【已停用】') === false; }),
+                array_filter($dbResponse, function($item) { return strpos($item['epg_src'], '【已停用】') !== false; })
+            );
+        }
 
         // 返回频道匹配数据
         elseif (isset($_GET['get_channel_match'])) {
@@ -304,27 +358,24 @@ try {
                 $matchType = '未匹配';
 
                 // 精确匹配
-                if (in_array($cleanChannel, $epgData) && $cleanChannel === $originalChannel) {
+                if (in_array($cleanChannel, $epgData)) {
                     $matchResult = $cleanChannel;
                     $matchType = '精确匹配';
+                    if($cleanChannel !== $originalChannel) {
+                        $matchType = '映射/忽略';
+                    }
                 } else {
-                    // 正向模糊匹配
                     foreach ($epgData as $epgChannel) {
                         if (stripos($epgChannel, $cleanChannel) !== false) {
-                            $matchResult = $epgChannel;
-                            $matchType = '正向模糊';
-                            break;
-                        }
-                    }
-
-                    // 反向模糊匹配
-                    if (!$matchResult) {
-                        foreach ($epgData as $epgChannel) {
-                            if (stripos($cleanChannel, $epgChannel) !== false) {
-                                if (!$matchResult || strlen($epgChannel) > strlen($matchResult)) {
-                                    $matchResult = $epgChannel;
-                                    $matchType = '反向模糊';
-                }}}}}
+                            if (!isset($matchResult) || strlen($epgChannel) < strlen($matchResult)) {
+                                $matchResult = $epgChannel;
+                                $matchType = '正向模糊';
+                            }
+                        } elseif (stripos($cleanChannel, $epgChannel) !== false) {
+                            if (!isset($matchResult) || strlen($epgChannel) > strlen($matchResult)) {
+                                $matchResult = $epgChannel;
+                                $matchType = '反向模糊';
+                }}}}
 
                 $matches[$cleanChannel] = [
                     'ori_channel' => $originalChannel,
@@ -399,7 +450,7 @@ try {
     }
 
     // 导出配置
-    elseif ($requestMethod === 'POST' && isset($_POST['action']) && empty($_FILES['importFile']['tmp_name'])) {
+    elseif (isset($_POST['action']) && empty($_FILES['importFile']['tmp_name'])) {
         $zip = new ZipArchive();
         $zipFileName = 't.gz';
 
@@ -454,7 +505,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
     <h2>管理配置</h2>
     <form method="POST" id="settingsForm">
 
-        <label for="xml_urls">EPG源地址（支持 xml 跟 .xml.gz 格式， # 为注释）</label><br><br>
+        <label for="xml_urls">EPG源地址（支持 xml 跟 .xml.gz 格式， # 为注释）</label><span id="channelbind" onclick="showModal('channelbindepg')" style="color: blue; cursor: pointer;">（频道指定EPG源）</span><br><br>
         <textarea placeholder="一行一个，地址前面加 # 可以临时停用，后面加 # 可以备注。快捷键： Ctrl+/  。" id="xml_urls" name="xml_urls" style="height: 122px;"><?php echo implode("\n", array_map('trim', $Config['xml_urls'])); ?></textarea><br><br>
 
         <div class="form-row">
@@ -588,6 +639,29 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
     </div>
 </div>
 
+<!-- 频道指定EPG模态框 -->
+<div id="channelBindEPGModal" class="modal">
+    <div class="modal-content channel-bind-epg-modal-content">
+        <span class="close">&times;</span>
+        <h2>频道指定EPG源<span style="font-size: 14px;">（无指定则按靠前的源更新）</span></h2>
+        <div class="table-container" id="channel-bind-epg-table-container">
+            <table id="channelBindEPGTable">
+                <thead style="position: sticky; top: 0; background-color: white;">
+                    <tr>
+                        <th>指定EPG源</th>
+                        <th>频道（可 , 分隔）</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- 数据由 JavaScript 动态生成 -->
+                </tbody>
+            </table>
+        </div>
+        <br>
+        <button id="saveConfig" type="button" onclick="saveAndUpdateConfig();">保存配置</button>
+    </div>
+</div>
+
 <!-- 频道匹配结果模态框 -->
 <div id="channelMatchModal" class="modal">
     <div class="modal-content channel-match-modal-content">
@@ -654,6 +728,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
 </div>
 
 <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // 页面加载时执行，预加载数据，减少等待时间
+        showModal('channelbindepg', $popup = false); // 这一行必须有，否则保存时丢失数据
+        showModal('update', $popup = false);
+        showModal('cron', $popup = false);
+        showModal('channel', $popup = false);
+        showModal('channelmatch', $popup = false);
+        showModal('moresetting', $popup = false);
+    });
+
     // 退出登录
     function logout() {
         // 清除所有cookies
@@ -780,26 +864,30 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
                 modal = document.getElementById("channelModal");
                 logSpan = document.getElementsByClassName("close")[3];
                 fetchLogs('<?php echo $_SERVER['PHP_SELF']; ?>?get_channel=true', updateChannelList);
-                document.getElementById('searchInput').value = ""; // 清空搜索框
+                break;
+            case 'channelbindepg':
+                modal = document.getElementById("channelBindEPGModal");
+                logSpan = document.getElementsByClassName("close")[4];
+                fetchLogs('<?php echo $_SERVER['PHP_SELF']; ?>?get_channel_bind_epg=true', updateChannelBindEPGList);
                 break;
             case 'channelmatch':
                 modal = document.getElementById("channelMatchModal");
-                logSpan = document.getElementsByClassName("close")[4];
+                logSpan = document.getElementsByClassName("close")[5];
                 fetchLogs('<?php echo $_SERVER['PHP_SELF']; ?>?get_channel_match=true', updateChannelMatchList);
-                if (!$popup) {
-                    return;
-                }
                 document.getElementById("moreSettingModal").style.display = "none";
                 break;
             case 'moresetting':
                 modal = document.getElementById("moreSettingModal");
-                logSpan = document.getElementsByClassName("close")[5];            
+                logSpan = document.getElementsByClassName("close")[6];
                 fetchLogs('<?php echo $_SERVER['PHP_SELF']; ?>?get_gen_list=true', updateGenList);
                 genListLoaded = true; // 数据已加载
                 break;
             default:
                 console.error('Unknown type:', type);
                 break;
+        }
+        if (!$popup) {
+            return;
         }
         modal.style.display = "block";
         logSpan.onclick = function() {
@@ -851,18 +939,49 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
     }
 
     function updateChannelList(channelsData) {
-        var channelTableBody = document.querySelector("#channelTable tbody");
         const channelTitle = document.getElementById('channelModalTitle');
         channelTitle.innerHTML = `频道列表<span style="font-size: 18px;">（总数：${channelsData.count}）</span>`; // 更新频道总数
         document.getElementById('channelTable').dataset.allChannels = JSON.stringify(channelsData.channels); // 将原始频道和映射后的频道数据存储到 dataset 中
         filterChannels(); // 生成数据
     }
 
+    function updateChannelBindEPGList(channelBindEPGData) {
+        // 创建并添加隐藏字段
+        const channelBindEPGInput = document.createElement('input');
+        channelBindEPGInput.type = 'hidden';
+        channelBindEPGInput.name = 'channel_bind_epg';
+        document.getElementById('settingsForm').appendChild(channelBindEPGInput);
+
+        document.getElementById('channelBindEPGTable').dataset.allChannelBindEPG = JSON.stringify(channelBindEPGData);
+        var channelBindEPGTableBody = document.querySelector("#channelBindEPGTable tbody");
+        var allChannelBindEPG = JSON.parse(document.getElementById('channelBindEPGTable').dataset.allChannelBindEPG);
+        channelBindEPGInput.value = JSON.stringify(allChannelBindEPG);
+
+        // 清空现有表格
+        channelBindEPGTableBody.innerHTML = '';
+
+        allChannelBindEPG.forEach(channelbindepg => {
+            var row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${String(channelbindepg.epg_src)}</td>
+                <td contenteditable="true">${channelbindepg.channels}</td>
+            `;
+
+            row.querySelector('td[contenteditable]').addEventListener('input', function() {
+                channelbindepg.channels = this.textContent;
+                document.getElementById('channelBindEPGTable').dataset.allChannelBindEPG = JSON.stringify(allChannelBindEPG);
+                channelBindEPGInput.value = JSON.stringify(allChannelBindEPG);
+            });
+
+            channelBindEPGTableBody.appendChild(row);
+        });
+    }
+
     function updateChannelMatchList(channelMatchdata) {
         const channelMatchTableBody = document.querySelector("#channelMatchTable tbody");
         channelMatchTableBody.innerHTML = '';
 
-        const typeOrder = { '未匹配': 1, '反向模糊': 2, '正向模糊': 3, '精确匹配': 4 };
+        const typeOrder = { '未匹配': 1, '反向模糊': 2, '正向模糊': 3, '映射/忽略': 4, '精确匹配': 5 };
 
         // 处理并排序匹配数据
         const sortedMatches = Object.values(channelMatchdata)
@@ -900,7 +1019,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
         // 清空现有表格
         channelTableBody.innerHTML = '';
 
-        allChannels.forEach((channel, index) => {
+        allChannels.forEach(channel => {
             if (String(channel.original).toLowerCase().includes(input)) {
                 var row = document.createElement('tr');
 
@@ -909,7 +1028,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
                     <td contenteditable="true">${channel.mapped}</td>
                 `;
 
-                row.querySelector('td[contenteditable]').addEventListener('blur', function() {
+                row.querySelector('td[contenteditable]').addEventListener('input', function() {
                     channel.mapped = this.textContent;
                     document.getElementById('channelTable').dataset.allChannels = JSON.stringify(allChannels);
                 });
@@ -993,9 +1112,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
         
         // 保存到数据库
         saveAndUpdateConfig($doUpdate = false);
-
-        // 预加载频道匹配结果
-        showModal('channelmatch', $popup = false);
     }
 
     // 保存数据并更新配置

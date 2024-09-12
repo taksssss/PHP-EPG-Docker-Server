@@ -95,18 +95,24 @@ function t2s($channel) {
 }
 
 // 下载文件
-function downloadData($url, $timeout = 30) {
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, $url);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1);
-    curl_setopt($ch, CURLOPT_TIMEOUT, $timeout);
-    $data = curl_exec($ch);
-    if (curl_errno($ch)) {
-        curl_close($ch);
-        return false;
+function downloadData($url, $timeout = 30, $connectTimeout = 10, $retry = 3) {
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => 1,
+        CURLOPT_FOLLOWLOCATION => 1,
+        CURLOPT_TIMEOUT => $timeout,
+        CURLOPT_CONNECTTIMEOUT => $connectTimeout,
+        CURLOPT_HTTPHEADER => [
+            'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.121 Safari/537.36',
+            'Accept: */*',
+            'Connection: keep-alive'
+        ]
+    ]);
+    while ($retry--) {
+        $data = curl_exec($ch);
+        if (!curl_errno($ch)) break;
     }
     curl_close($ch);
-    return $data;
+    return $data ?: false;
 }
 ?>
