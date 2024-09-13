@@ -55,23 +55,23 @@ function getFormatTime($time) {
 function readEPGData($date, $channel, $db, $type) {
     // 优先精准匹配，其次正向模糊匹配，最后反向模糊匹配
     $stmt = $db->prepare("
-        SELECT DISTINCT epg_diyp
+        SELECT DISTINCT epg_diyp, channel
         FROM epg_data 
         WHERE date = :date 
         AND (
-            channel = :channel COLLATE NOCASE 
-            OR channel LIKE :like_channel COLLATE NOCASE
-            OR :channel LIKE '%' || channel || '%' COLLATE NOCASE
+            LOWER(channel) = LOWER(:channel)
+            OR LOWER(channel) LIKE LOWER(:like_channel)
+            OR LOWER(:channel) LIKE CONCAT('%', LOWER(channel), '%')
         )
         ORDER BY 
             CASE 
-                WHEN channel = :channel COLLATE NOCASE THEN 1 
-                WHEN channel LIKE :like_channel COLLATE NOCASE THEN 2 
+                WHEN LOWER(channel) = LOWER(:channel) THEN 1 
+                WHEN LOWER(channel) LIKE LOWER(:like_channel) THEN 2 
                 ELSE 3 
             END, 
             CASE 
-                WHEN channel = :channel COLLATE NOCASE THEN NULL
-                WHEN channel LIKE :like_channel COLLATE NOCASE THEN LENGTH(channel)
+                WHEN LOWER(channel) = LOWER(:channel) THEN NULL
+                WHEN LOWER(channel) LIKE LOWER(:like_channel) THEN LENGTH(channel)
                 ELSE -LENGTH(channel)
             END
         LIMIT 1

@@ -8,4 +8,30 @@ services:
     # 默认端口5678
     ports:
       - "5678:80"
+    depends_on:
+      - mysql
+      - phpmyadmin
     restart: always
+
+  mysql:
+    image: mysql:8.0
+    container_name: mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: phpepg
+      MYSQL_USER: phpepg
+      MYSQL_PASSWORD: phpepg
+    ports:
+      - "3306:3306"
+    restart: always
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:latest
+    container_name: phpmyadmin
+    ports:
+      - "8080:80"
+    environment:
+      PMA_HOST: mysql
+      PMA_PORT: 3306
+    depends_on:
+      - mysql

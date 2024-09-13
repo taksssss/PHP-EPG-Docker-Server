@@ -377,6 +377,7 @@ function processXmlData($xml_url, $xml_data, $date, $db, $gen_list) {
 // 插入数据到数据库
 function insertDataToDatabase($channelsData, $db) {
     global $processedRecords;
+    global $Config;
 
     foreach ($channelsData as $channelId => $channelData) {
         $channelName = $channelData['channel_name'];
@@ -396,8 +397,20 @@ function insertDataToDatabase($channelsData, $db) {
 
             // 当天及未来数据覆盖，其他日期数据忽略
             $action = $date >= date('Y-m-d') ? 'REPLACE' : 'IGNORE';
-            $stmt = $db->prepare("INSERT OR $action INTO epg_data (date, channel, epg_diyp)
-                                VALUES (:date, :channel, :epg_diyp)");
+            
+            // 检测数据库类型
+            $is_sqlite = $Config['db_type'] === 'sqlite';
+
+            // 选择 SQL 语句
+            $sql = $is_sqlite 
+                ? "INSERT OR $action INTO epg_data (date, channel, epg_diyp) VALUES (:date, :channel, :epg_diyp)"
+                : ($date >= date('Y-m-d') 
+                    ? "REPLACE INTO epg_data (date, channel, epg_diyp) VALUES (:date, :channel, :epg_diyp)" 
+                    : "INSERT IGNORE INTO epg_data (date, channel, epg_diyp) VALUES (:date, :channel, :epg_diyp)"
+                );
+
+            // 准备并执行 SQL 语句
+            $stmt = $db->prepare($sql);
             $stmt->bindValue(':date', $date, PDO::PARAM_STR);
             $stmt->bindValue(':channel', $channelName, PDO::PARAM_STR);
             $stmt->bindValue(':epg_diyp', $diypContent, PDO::PARAM_STR);

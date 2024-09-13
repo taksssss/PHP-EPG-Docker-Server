@@ -160,6 +160,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update'])) {
     $include_future_only = isset($_POST['include_future_only']) ? intval($_POST['include_future_only']) : $Config['include_future_only'];
     $ret_default = isset($_POST['ret_default']) ? intval($_POST['ret_default']) : $Config['ret_default'];
     $gen_list_enable = isset($_POST['gen_list_enable']) ? intval($_POST['gen_list_enable']) : $Config['gen_list_enable'];
+    $db_type = isset($_POST['db_type']) ? $_POST['db_type'] : $Config['db_type'];
+    $mysql_host = isset($_POST['mysql_host']) ? $_POST['mysql_host'] : $Config['mysql_host'];
+    $mysql_dbname = isset($_POST['mysql_dbname']) ? $_POST['mysql_dbname'] : $Config['mysql_dbname'];
+    $mysql_username = isset($_POST['mysql_username']) ? $_POST['mysql_username'] : $Config['mysql_username'];
+    $mysql_password = isset($_POST['mysql_password']) ? $_POST['mysql_password'] : $Config['mysql_password'];
+    $mysql = ["host" => $mysql_host, "dbname" => $mysql_dbname, "username" => $mysql_username, "password" => $mysql_password];
     $start_time = $_POST['start_time'];
     $end_time = $_POST['end_time'];
     
@@ -203,6 +209,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update'])) {
         'include_future_only' => $include_future_only,
         'ret_default' => $ret_default,
         'gen_list_enable' => $gen_list_enable,
+        'db_type' => $db_type,
+        'mysql' => $mysql,
         'start_time' => $start_time,
         'end_time' => $end_time,
         'interval_time' => $interval_time,
@@ -341,7 +349,10 @@ try {
         elseif (isset($_GET['get_channel_match'])) {
             // 从数据库中获取原始频道列表
             $channels = $db->query("SELECT channel FROM gen_list")->fetchAll(PDO::FETCH_COLUMN);
-            if (empty($channels)) return ['ori_channels' => [], 'clean_channels' => [], 'match' => []];
+            if (empty($channels)){
+                echo json_encode(['ori_channels' => [], 'clean_channels' => [], 'match' => [], 'type' => []]);
+                exit;
+            }
 
             // 清理频道名并获取 EPG 数据
             $cleanChannels = explode("\n", t2s(implode("\n", array_map('cleanChannelName', $channels))));
@@ -563,7 +574,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
         <br><br>
         <div class="button-container">
             <a href="update.php" target="_blank">更新数据</a>
-            <a href="phpliteadmin.php" target="_blank">管理数据</a>
+            <a href="phpliteadmin.php" target="_blank" onclick="return handleDbManagement();">管理数据</a>
             <button type="button" onclick="showModal('cron')">定时日志</button>
             <button type="button" onclick="showModal('update')">更新日志</button>
             <button type="button" onclick="showModal('moresetting')">更多设置</button>
@@ -713,6 +724,21 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
             <span id="export" onclick="document.getElementById('importForm').submit()" style="color: blue; cursor: pointer;">数据导出</span>
         </form>
         <br><br>
+        <label for="db_type">数据库类型：</label>
+        <select id="db_type" name="db_type" required>
+            <option value="sqlite" <?php if (!isset($Config['db_type']) || $Config['db_type'] == 'sqlite') echo 'selected'; ?>>SQLite</option>
+            <option value="mysql" <?php if (isset($Config['db_type']) && $Config['db_type'] == 'mysql') echo 'selected'; ?>>MySQL</option>
+        </select>
+        <label for="mysql_host">数据库地址：</label>
+        <textarea id="mysql_host"><?php echo htmlspecialchars($Config['mysql']['host'] ?? ''); ?></textarea>
+        <br><br>
+        <label for="mysql_dbname">数据库名：</label>
+        <textarea id="mysql_dbname"><?php echo htmlspecialchars($Config['mysql']['dbname'] ?? ''); ?></textarea>
+        <label for="mysql_username">用户名：</label>
+        <textarea id="mysql_username"><?php echo htmlspecialchars($Config['mysql']['username'] ?? ''); ?></textarea>
+        <label for="mysql_password">密码：</label>
+        <textarea id="mysql_password"><?php echo htmlspecialchars($Config['mysql']['password'] ?? ''); ?></textarea>
+        <br><br>
         <label for="gen_list_text">仅生成以下频道：</label>
         <select id="gen_list_enable" name="gen_list_enable" style="width: 48px; margin-right: 0px;" required>
             <option value="1" <?php if (isset($Config['gen_list_enable']) && $Config['gen_list_enable'] == 1) echo 'selected'; ?>>是</option>
@@ -736,7 +762,29 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
         showModal('channel', $popup = false);
         showModal('channelmatch', $popup = false);
         showModal('moresetting', $popup = false);
+        
+        // 设置 MySQL 相关输入框状态
+        updateMySQLFields();
+        document.getElementById('db_type').addEventListener('change', updateMySQLFields);
     });
+
+    function handleDbManagement() {
+        if (document.getElementById('db_type').value === 'mysql') {
+            var img = new Image();
+            var timeout = setTimeout(function() {img.onerror();}, 1000); // 设置 1 秒超时
+            img.onload = function() {
+                clearTimeout(timeout); // 清除超时
+                window.open('http://' + window.location.hostname + ':8080', '_blank');
+            };
+            img.onerror = function() {
+                clearTimeout(timeout); // 清除超时
+                alert('无法访问 phpMyAdmin 8080 端口，请自行使用 MySQL 管理工具进行管理。');
+            };
+            img.src = 'http://' + window.location.hostname + ':8080/favicon.ico'; // 测试 8080 端口
+            return false;
+        }
+        return true; // 如果不是 MySQL，正常跳转
+    }
 
     // 退出登录
     function logout() {
@@ -750,8 +798,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
         // 重定向到登录页面
         window.location.href = 'manage.php';
     }
-
-    let genListLoaded = false; // 用于跟踪数据是否已加载
 
     // Ctrl+S 保存设置
     document.addEventListener("keydown", function(event) {
@@ -806,6 +852,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
         const hours = Math.floor(seconds / 3600);
         const minutes = Math.floor((seconds % 3600) / 60);
         return `${hours}小时${minutes}分钟`;
+    }
+
+    function updateMySQLFields() {
+        var dbType = document.getElementById('db_type').value;
+        var isSQLite = (dbType === 'sqlite');
+        document.getElementById('mysql_host').disabled = isSQLite;
+        document.getElementById('mysql_dbname').disabled = isSQLite;
+        document.getElementById('mysql_username').disabled = isSQLite;
+        document.getElementById('mysql_password').disabled = isSQLite;
     }
 
     var configUpdated = <?php echo json_encode($configUpdated); ?>;
@@ -880,7 +935,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
                 modal = document.getElementById("moreSettingModal");
                 logSpan = document.getElementsByClassName("close")[6];
                 fetchLogs('<?php echo $_SERVER['PHP_SELF']; ?>?get_gen_list=true', updateGenList);
-                genListLoaded = true; // 数据已加载
                 break;
             default:
                 console.error('Unknown type:', type);
@@ -1116,10 +1170,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
 
     // 保存数据并更新配置
     function saveAndUpdateConfig($doUpdate = true) {
-        if (!genListLoaded) {
-            document.getElementById('updateConfig').click();
-            return;
-        }
         const textAreaContent = document.getElementById('gen_list_text').value;
         fetch('<?php echo $_SERVER['PHP_SELF']; ?>?set_gen_list=true', {
             method: 'POST',
@@ -1145,7 +1195,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
 
     // 在提交表单时，将更多设置中的数据包括在表单数据中
     document.getElementById('settingsForm').addEventListener('submit', function() {
-        const fields = ['gen_xml', 'include_future_only', 'ret_default', 'gen_list_enable'];
+        const fields = ['gen_xml', 'include_future_only', 'ret_default', 'gen_list_enable', 
+                        'db_type', 'mysql_host', 'mysql_dbname', 'mysql_username', 'mysql_password'];
         fields.forEach(function(field) {
             const hiddenInput = document.createElement('input');
             hiddenInput.type = 'hidden';

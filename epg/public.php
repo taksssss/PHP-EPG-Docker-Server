@@ -24,37 +24,52 @@ date_default_timezone_set("Asia/Shanghai");
 
 // 创建或打开数据库
 try {
-    $db_file = __DIR__ . '/data/data.db';
-    $dsn = 'sqlite:' . $db_file;
-    $db = new PDO($dsn);
+    // 检测数据库类型
+    $is_sqlite = $Config['db_type'] === 'sqlite';
+    
+    $dsn = $is_sqlite ? 'sqlite:' . __DIR__ . '/data/data.db' 
+        : "mysql:host={$Config['mysql']['host']};dbname={$Config['mysql']['dbname']};charset=utf8mb4";
+    
+    $db = new PDO($dsn, $Config['mysql']['username'] ?? null, $Config['mysql']['password'] ?? null);
     $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
     // 初始化数据库表
-    $db->exec("CREATE TABLE IF NOT EXISTS epg_data (
-        date TEXT NOT NULL,
-        channel TEXT NOT NULL,
-        epg_diyp TEXT,
-        PRIMARY KEY (date, channel)
-    )");
-    
-    $db->exec("CREATE TABLE IF NOT EXISTS gen_list (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        channel TEXT NOT NULL
-    )");
+    $tables = [
+        "CREATE TABLE IF NOT EXISTS epg_data (
+            date " . ($is_sqlite ? 'TEXT' : 'VARCHAR(255)') . " NOT NULL,
+            channel " . ($is_sqlite ? 'TEXT' : 'VARCHAR(255)') . " NOT NULL,
+            epg_diyp TEXT,
+            PRIMARY KEY (date, channel)
+        )",        
+        "CREATE TABLE IF NOT EXISTS gen_list (
+            id " . ($is_sqlite ? 'INTEGER PRIMARY KEY AUTOINCREMENT' : 'INT PRIMARY KEY AUTO_INCREMENT') . ",
+            channel " . ($is_sqlite ? 'TEXT' : 'VARCHAR(255)') . " NOT NULL
+        )",
+        "CREATE TABLE IF NOT EXISTS update_log (
+            id " . ($is_sqlite ? 'INTEGER PRIMARY KEY AUTOINCREMENT' : 'INT PRIMARY KEY AUTO_INCREMENT') . ",
+            timestamp " . ($is_sqlite ? 'DATETIME DEFAULT CURRENT_TIMESTAMP' : 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP') . ",
+            log_message TEXT NOT NULL
+        )",
+        "CREATE TABLE IF NOT EXISTS cron_log (
+            id " . ($is_sqlite ? 'INTEGER PRIMARY KEY AUTOINCREMENT' : 'INT PRIMARY KEY AUTO_INCREMENT') . ",
+            timestamp " . ($is_sqlite ? 'DATETIME DEFAULT CURRENT_TIMESTAMP' : 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP') . ",
+            log_message TEXT NOT NULL
+        )"
+    ];
 
-    $db->exec("CREATE TABLE IF NOT EXISTS update_log (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
-        log_message TEXT NOT NULL
-    )");
-
-    $db->exec("CREATE TABLE IF NOT EXISTS cron_log (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
-        log_message TEXT NOT NULL
-    )");
+    foreach ($tables as $table) {
+        $db->exec($table);
+    }
 } catch (PDOException $e) {
     echo '数据库连接失败: ' . $e->getMessage();
+    if (!$is_sqlite) {
+        // 如果是 MySQL 连接失败，则修改配置为 SQLite 并提示用户
+        $Config['db_type'] = 'sqlite';
+        file_put_contents($config_path, json_encode($Config, JSON_PRETTY_PRINT));
+        
+        echo '<p>MySQL 配置错误，已修改为 SQLite。<br>5 秒后自动刷新...</p>';
+        echo '<meta http-equiv="refresh" content="5">';
+    }
     exit();
 }
 
