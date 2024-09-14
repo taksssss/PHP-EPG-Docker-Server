@@ -76,18 +76,17 @@ try {
 // 获取处理后的频道名：$t2s参数表示繁简转换，默认false
 function cleanChannelName($channel, $t2s = false) {
     global $Config;
-    // 频道映射，优先级最高，匹配后直接返回，支持正则表达式映射，以 regex: 开头
-    foreach ($Config['channel_mappings'] as $search => $replace) {
+    // 频道映射，优先级最高，支持正则表达式和多对一映射
+    foreach ($Config['channel_mappings'] as $replace => $search) {
         if (strpos($search, 'regex:') === 0) {
             $pattern = substr($search, 6);
             if (preg_match($pattern, $channel)) {
                 return preg_replace($pattern, $replace, $channel);
             }
         } else {
-            // 检查是否为一对一映射或多对一映射，忽略所有空格和大小写
-            $search = str_replace(' ', '', $search);
+            // 普通映射，可能为多对一，忽略所有空格和大小写
             $channelNoSpaces = str_replace(' ', '', $channel);
-            $channels = strpos($search, ',') !== false ? explode(',', trim($search, '[]')) : [$search];
+            $channels = array_map('trim', explode(',', $search));
             foreach ($channels as $singleChannel) {
                 if (strcasecmp($channelNoSpaces, str_replace(' ', '', trim($singleChannel))) === 0) {
                     return $replace;
@@ -96,11 +95,9 @@ function cleanChannelName($channel, $t2s = false) {
     if ($t2s) {
         $channel = t2s($channel);
     }
-    // 如果配置中包含 '\\s'，则替换空格；否则不替换
-    if (in_array('\\s', $Config['channel_replacements'])) {
-        $channel = str_replace(' ', '', $channel);
-    }
-    $channel = str_ireplace($Config['channel_replacements'], '', $channel);
+    // 默认忽略 - 跟 空格 
+    $channel_replacements = ['-', ' '];
+    $channel = str_ireplace($channel_replacements, '', $channel);
     return $channel;
 }
 

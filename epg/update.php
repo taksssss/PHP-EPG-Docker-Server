@@ -175,29 +175,42 @@ function generateXmlFromEpgData($db, $include_future_only, $gen_list_mapping) {
 
     while ($program = $stmt->fetch(PDO::FETCH_ASSOC)) {
         $originalChannel = $program['channel'];
-    
+
         // 确定要处理的频道列表
         $channelsToProcess = $Config['gen_list_enable']
             ? ($gen_list_mapping[$originalChannel] ?? [])
             : array_unique(array_merge([$originalChannel], $gen_list_mapping[$originalChannel] ?? []));
-    
+
         // 如果不需要生成列表或映射为空或存在映射，则处理频道数据
         if (empty($Config['gen_list_enable']) || empty($gen_list_mapping) || isset($gen_list_mapping[$originalChannel])) {
-            foreach ($channelsToProcess as $mappedChannel) {
-                $channelData[$mappedChannel][] = $program;
-            }
+            $channelData[$originalChannel][] = $program;
         }
-    }    
+    }
+
+    // 将 $Config['channel_mappings'] 中的映射值转换为数组
+    $channelMappings = array_map(function($mapped) {
+        return strpos($mapped, 'regex:') === 0 ? [$mapped] : array_map('trim', explode(',', $mapped));
+    }, $Config['channel_mappings']);
 
     // 逐个频道处理
-    foreach ($channelData as $mappedChannel => $programs) {
+    foreach ($channelData as $originalChannel => $programs) {
         // 写入频道信息
         $xmlWriter->startElement('channel');
-        $xmlWriter->writeAttribute('id', htmlspecialchars($mappedChannel, ENT_XML1, 'UTF-8'));
-        $xmlWriter->startElement('display-name');
-        $xmlWriter->writeAttribute('lang', 'zh');
-        $xmlWriter->text(htmlspecialchars($mappedChannel, ENT_XML1, 'UTF-8'));
-        $xmlWriter->endElement(); // display-name
+        $xmlWriter->writeAttribute('id', htmlspecialchars($originalChannel, ENT_XML1, 'UTF-8'));
+
+        // 为该频道生成多个 display-name ，包括原频道名、限定频道列表、频道别名
+        $displayNames = array_unique(array_merge(
+            [$originalChannel],
+            $gen_list_mapping[$originalChannel] ?? [],
+            $channelMappings[$originalChannel] ?? []
+        ));
+        foreach ($displayNames as $displayName) {
+            $xmlWriter->startElement('display-name');
+            $xmlWriter->writeAttribute('lang', 'zh');
+            $xmlWriter->text(htmlspecialchars($displayName, ENT_XML1, 'UTF-8'));
+            $xmlWriter->endElement(); // display-name
+        }
+
         $xmlWriter->endElement(); // channel
 
         // 写入该频道的所有节目数据
@@ -205,7 +218,7 @@ function generateXmlFromEpgData($db, $include_future_only, $gen_list_mapping) {
             $data = json_decode($program['epg_diyp'], true);
             foreach ($data['epg_data'] as $item) {
                 $xmlWriter->startElement('programme');
-                $xmlWriter->writeAttribute('channel', htmlspecialchars($mappedChannel, ENT_XML1, 'UTF-8'));
+                $xmlWriter->writeAttribute('channel', htmlspecialchars($originalChannel, ENT_XML1, 'UTF-8'));
                 $xmlWriter->writeAttribute('start', formatTime($program['date'], $item['start']));
                 $xmlWriter->writeAttribute('stop', formatTime($program['date'], $item['end']));
                 $xmlWriter->startElement('title');

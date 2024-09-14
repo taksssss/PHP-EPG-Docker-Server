@@ -174,10 +174,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update'])) {
     $interval_minute = intval($_POST['interval_minute']);
     $interval_time = $interval_hour * 3600 + $interval_minute * 60;
 
-    // 处理频道替换
-    $channel_replacements = array_map('trim', explode("\n", trim($_POST['channel_replacements'])));
-
-    // 处理频道映射
+    // 处理频道别名
     $channel_mappings = [];
     if ($mappings = trim($_POST['channel_mappings'] ?? '')) {
         foreach (array_filter(array_map('trim', explode("\n", $mappings))) as $line) {
@@ -216,7 +213,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update'])) {
         'interval_time' => $interval_time,
         'manage_password' => $Config['manage_password'], // 保留密码
         'channel_bind_epg' => $channel_bind_epg,
-        'channel_replacements' => $channel_replacements,
         'channel_mappings' => $channel_mappings
     ];
 
@@ -268,42 +264,33 @@ try {
 
         // 返回所有频道数据和频道数量
         elseif (isset($_GET['get_channel'])) {
-            // 从数据库中获取频道
-            $channels = $db->query("SELECT DISTINCT UPPER(channel) FROM epg_data ORDER BY UPPER(channel) ASC")->fetchAll(PDO::FETCH_COLUMN);
+            // 获取数据库中的频道，并转换为大写
+            $channels = array_map('strtoupper', $db->query("SELECT DISTINCT channel FROM epg_data ORDER BY channel ASC")->fetchAll(PDO::FETCH_COLUMN));
 
-            // 创建反向映射关系，排除正则表达式映射
+            // 获取频道别名映射
             $channelMappings = $Config['channel_mappings'];
-            $reverseMappings = [];
-            foreach ($channelMappings as $search => $replace) {
-                if (strpos($search, 'regex:') === 0) {
-                    continue; // 跳过正则表达式映射
-                }
-                $reverseMappings[$replace] = $search;
-            }
 
-            // 反转频道数组以便快速查找
-            $remainingChannels = array_flip($channels);
-            
-            // 按照 reverseMappings 的顺序处理频道
+            // 处理映射频道，并移除匹配的原始频道
             $mappedChannels = [];
-            foreach ($reverseMappings as $mapped => $original) {
-                if (isset($remainingChannels[$mapped])) {
+            foreach ($channelMappings as $mapped => $original) {
+                if (($index = array_search(strtoupper($mapped), $channels)) !== false) {
                     $mappedChannels[] = [
                         'original' => $mapped,
                         'mapped' => $original
                     ];
-                    unset($remainingChannels[$mapped]); // 从剩余频道中移除
+                    unset($channels[$index]); // 从剩余频道中移除
                 }
             }
 
-            // 添加剩下的频道，mapped 为空
-            foreach ($remainingChannels as $channel => $_) {
+            // 添加剩余频道，映射为空
+            foreach ($channels as $channel) {
                 $mappedChannels[] = [
                     'original' => $channel,
                     'mapped' => ''
                 ];
             }
 
+            // 返回频道数据和数量
             $dbResponse = [
                 'channels' => $mappedChannels,
                 'count' => count($mappedChannels)
@@ -373,7 +360,7 @@ try {
                     $matchResult = $cleanChannel;
                     $matchType = '精确匹配';
                     if($cleanChannel !== $originalChannel) {
-                        $matchType = '映射/忽略';
+                        $matchType = '别名/忽略';
                     }
                 } else {
                     foreach ($epgData as $epgChannel) {
@@ -516,7 +503,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
     <h2>管理配置</h2>
     <form method="POST" id="settingsForm">
 
-        <label for="xml_urls">EPG源地址（支持 xml 跟 .xml.gz 格式， # 为注释）</label><span id="channelbind" onclick="showModal('channelbindepg')" style="color: blue; cursor: pointer;">（频道指定EPG源）</span><br><br>
+        <label for="xml_urls">【EPG源地址】（支持 xml 跟 .xml.gz 格式， # 为注释）</label><span id="channelbind" onclick="showModal('channelbindepg')" style="color: blue; cursor: pointer;">（频道指定EPG源）</span><br><br>
         <textarea placeholder="一行一个，地址前面加 # 可以临时停用，后面加 # 可以备注。快捷键： Ctrl+/  。" id="xml_urls" name="xml_urls" style="height: 122px;"><?php echo implode("\n", array_map('trim', $Config['xml_urls'])); ?></textarea><br><br>
 
         <div class="form-row">
@@ -555,14 +542,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
         </div><br>
         
         <div class="flex-container">
-            <div class="flex-item" style="width: 40%;">
-                <label for="channel_replacements">频道忽略字符串：（按顺序， \s 空格）</label><br><br>
-                <textarea id="channel_replacements" name="channel_replacements" style="height: 142px;"><?php echo implode("\n", array_map('trim', $Config['channel_replacements'])); ?></textarea><br><br>
-            </div>
-            <div class="flex-item" style="width: 60%;">
-            <label for="channel_mappings">
-                    频道映射： 自定1, 自定2, ... => 数据库频道名 
-                    <span id="dbChannelName" onclick="showModal('channel')" style="color: blue; cursor: pointer;">（点击编辑）</span>
+            <div class="flex-item" style="width: 100%;">
+                <label for="channel_mappings">
+                    【频道别名】（数据库频道名 => 频道别名1, 频道别名2, ...）<span id="dbChannelName" onclick="showModal('channel')" style="color: blue; cursor: pointer;">（点击编辑）</span>
                 </label><br><br>
                 <textarea id="channel_mappings" name="channel_mappings" style="height: 142px;"><?php echo implode("\n", array_map(function($search, $replace) { return $search . ' => ' . $replace; }, array_keys($Config['channel_mappings']), $Config['channel_mappings'])); ?></textarea><br><br>
             </div>
@@ -637,7 +619,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
                 <thead style="position: sticky; top: 0; background-color: white;">
                     <tr>
                         <th>数据库频道名</th>
-                        <th>自定频道名</th>
+                        <th>频道别名</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -1035,7 +1017,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
         const channelMatchTableBody = document.querySelector("#channelMatchTable tbody");
         channelMatchTableBody.innerHTML = '';
 
-        const typeOrder = { '未匹配': 1, '反向模糊': 2, '正向模糊': 3, '映射/忽略': 4, '精确匹配': 5 };
+        const typeOrder = { '未匹配': 1, '反向模糊': 2, '正向模糊': 3, '别名/忽略': 4, '精确匹配': 5 };
 
         // 处理并排序匹配数据
         const sortedMatches = Object.values(channelMatchdata)
@@ -1095,23 +1077,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
     function updateChannelMapping() {
         var allChannels = JSON.parse(document.getElementById('channelTable').dataset.allChannels);
         var existingMappings = document.getElementById('channel_mappings').value.split('\n');
-        var newMappings = [];
 
-        // 保留正则表达式映射关系
-        var regexMappings = existingMappings.filter(line => line.startsWith('regex:'));
+        // 过滤出现有映射中的正则表达式映射
+        var regexMappings = existingMappings.filter(line => line.includes('regex:'));
 
-        // 处理表格数据，生成新的映射关系
-        allChannels.forEach(channel => {
-            if (channel.mapped.trim() !== '') {
-                newMappings.push(`${channel.mapped} => ${channel.original}`);
-            }
-        });
+        // 生成新的频道别名映射
+        var newMappings = allChannels
+            .filter(channel => channel.mapped.trim() !== '')
+            .map(channel => `${channel.original} => ${channel.mapped}`);
 
-        // 合并新映射和正则表达式映射
-        var updatedMappings = [...newMappings, ...regexMappings].join('\n');
-        document.getElementById('channel_mappings').value = updatedMappings;
-
-        // 保存更新后的配置
+        // 更新映射文本框并保存配置
+        document.getElementById('channel_mappings').value = [...newMappings, ...regexMappings].join('\n');
         saveAndUpdateConfig();
     }
 
