@@ -53,6 +53,11 @@ function getFormatTime($time) {
 
 // 从数据库读取 diyp、lovetv 数据
 function readEPGData($date, $channel, $db, $type) {
+    // 获取数据库类型（mysql 或 sqlite）
+    $concat = $db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql' 
+        ? "CONCAT('%', LOWER(channel), '%')" 
+        : "'%' || LOWER(channel) || '%'";
+    
     // 优先精准匹配，其次正向模糊匹配，最后反向模糊匹配
     $stmt = $db->prepare("
         SELECT DISTINCT epg_diyp, channel
@@ -61,7 +66,7 @@ function readEPGData($date, $channel, $db, $type) {
         AND (
             LOWER(channel) = LOWER(:channel)
             OR LOWER(channel) LIKE LOWER(:like_channel)
-            OR LOWER(:channel) LIKE CONCAT('%', LOWER(channel), '%')
+            OR LOWER(:channel) LIKE $concat
         )
         ORDER BY 
             CASE 
