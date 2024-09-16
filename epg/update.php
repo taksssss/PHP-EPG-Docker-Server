@@ -211,6 +211,11 @@ function generateXmlFromEpgData($db, $include_future_only, $gen_list_mapping) {
             $xmlWriter->endElement(); // display-name
         }
 
+        // 写入台标信息
+        $xmlWriter->startElement('icon');
+        $xmlWriter->writeAttribute('src', "https://live.fanmingming.com/tv/" . htmlspecialchars($originalChannel, ENT_XML1, 'UTF-8') . ".png");
+        $xmlWriter->endElement(); // icon
+
         $xmlWriter->endElement(); // channel
 
         // 写入该频道的所有节目数据

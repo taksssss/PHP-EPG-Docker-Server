@@ -44,11 +44,16 @@ textarea[id="mysql_username"], textarea[id="mysql_password"] {
     padding-left: 5px;
     padding-right: 5px;
 }
-textarea[id="mysql_host"] {
-    width: 143px;
-}
-textarea[id="mysql_dbname"], textarea[id="mysql_username"] {    
+.modal-content select[id="db_type"], textarea[id="mysql_username"] {
+    width: 85px;
     margin-right: 5px;
+}
+textarea[id="mysql_host"], textarea[id="mysql_password"] {
+    width: 118px;
+}
+textarea[id="mysql_dbname"] {
+    width: 88px;
+    margin-right: 18px;
 }
 .form-row {
     display: flex;
@@ -284,9 +289,9 @@ input[type="text"] {
     width: 72px;
     margin-right: 50px;
 }
-.modal-content select[id="db_type"] {
-    width: 131px;
-    margin-right: 50px;
+.modal-content select[id="cache_time"] {
+    width: 50px;
+    margin-right: 0px;
 }
 /* 工具提示容器 */
 .tooltip {

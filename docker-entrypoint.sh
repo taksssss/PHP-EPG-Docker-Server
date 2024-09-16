@@ -51,5 +51,5 @@ chown -R apache:apache /htdocs/epg
 cd /htdocs/epg
 su -s /bin/sh -c "php cron.php &" "apache"
 
-# Start Apache
-httpd -D FOREGROUND
+# Start Memcached and Apache
+memcached -u nobody -d && httpd -D FOREGROUND

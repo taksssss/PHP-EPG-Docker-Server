@@ -51,13 +51,34 @@ function getFormatTime($time) {
     return ['date' => $date, 'time' => $time];
 }
 
-// 从数据库读取 diyp、lovetv 数据
+// 从数据库读取 diyp、lovetv 数据，兼容未安装 memcached 的情况
 function readEPGData($date, $channel, $db, $type) {
+    global $Config;
+
+    // 如果传入的日期小于当前日期，设置 cache_time 为 7 天
+    $cache_time = ($date < date('Y-m-d')) ? 7 * 24 * 3600 : $Config['cache_time'];
+    
+    // 检查是否开启缓存并安装了 Memcached 类
+    $memcached_enabled = $Config['cache_time'] && class_exists('Memcached');
+    $cache_key = base64_encode("{$date}_{$channel}_{$type}");
+    
+    if ($memcached_enabled) {
+        // 初始化 Memcached
+        $memcached = new Memcached();
+        $memcached->addServer('127.0.0.1', 11211); // 请确保 Memcached 服务器地址和端口正确
+
+        // 从缓存中读取数据
+        $cached_data = $memcached->get($cache_key);
+        if ($cached_data) {
+            return $cached_data;
+        }
+    }
+
     // 获取数据库类型（mysql 或 sqlite）
     $concat = $db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql' 
         ? "CONCAT('%', LOWER(channel), '%')" 
         : "'%' || LOWER(channel) || '%'";
-    
+
     // 优先精准匹配，其次正向模糊匹配，最后反向模糊匹配
     $stmt = $db->prepare("
         SELECT DISTINCT epg_diyp, channel
@@ -87,12 +108,16 @@ function readEPGData($date, $channel, $db, $type) {
         ':like_channel' => $channel . '%'
     ]);
     $row = $stmt->fetchColumn();
-    
+
     if (!$row) {
         return false;
     }
 
     if ($type === 'diyp') {
+        // 如果 Memcached 可用，将结果存储到缓存中
+        if ($memcached_enabled) {
+            $memcached->set($cache_key, $row, $cache_time);
+        }
         return $row;
     }
 
@@ -138,7 +163,14 @@ function readEPGData($date, $channel, $db, $type) {
             ]
         ];
 
-        return json_encode($lovetv_data, JSON_UNESCAPED_UNICODE);
+        $response = json_encode($lovetv_data, JSON_UNESCAPED_UNICODE);
+
+        // 如果 Memcached 可用，将结果存储到缓存中
+        if ($memcached_enabled) {
+            $memcached->set($cache_key, $response, $cache_time);
+        }
+
+        return $response;
     }
 
     return false;

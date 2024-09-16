@@ -32,8 +32,23 @@ try {
     
     $db = new PDO($dsn, $Config['mysql']['username'] ?? null, $Config['mysql']['password'] ?? null);
     $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+} catch (PDOException $e) {
+    echo '数据库连接失败: ' . $e->getMessage();
+    if (!$is_sqlite) {
+        // 如果是 MySQL 连接失败，则修改配置为 SQLite 并提示用户
+        $Config['db_type'] = 'sqlite';
+        file_put_contents($config_path, json_encode($Config, JSON_PRETTY_PRINT));
+        
+        echo '<p>MySQL 配置错误，已修改为 SQLite。<br>5 秒后自动刷新...</p>';
+        echo '<meta http-equiv="refresh" content="5">';
+    }
+    exit();
+}
 
-    // 初始化数据库表
+// 初始化数据库表
+function initialDB() {
+    global $db;
+    global $is_sqlite;
     $tables = [
         "CREATE TABLE IF NOT EXISTS epg_data (
             date " . ($is_sqlite ? 'TEXT' : 'VARCHAR(255)') . " NOT NULL,
@@ -60,17 +75,6 @@ try {
     foreach ($tables as $table) {
         $db->exec($table);
     }
-} catch (PDOException $e) {
-    echo '数据库连接失败: ' . $e->getMessage();
-    if (!$is_sqlite) {
-        // 如果是 MySQL 连接失败，则修改配置为 SQLite 并提示用户
-        $Config['db_type'] = 'sqlite';
-        file_put_contents($config_path, json_encode($Config, JSON_PRETTY_PRINT));
-        
-        echo '<p>MySQL 配置错误，已修改为 SQLite。<br>5 秒后自动刷新...</p>';
-        echo '<meta http-equiv="refresh" content="5">';
-    }
-    exit();
 }
 
 // 获取处理后的频道名：$t2s参数表示繁简转换，默认false

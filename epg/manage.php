@@ -12,8 +12,9 @@
  * Github: https://github.com/mxdabc/epgphp
  */
 
-// 引入公共脚本
+// 引入公共脚本，初始化数据库
 require_once 'public.php';
+initialDB();
 
 session_start();
 
@@ -160,6 +161,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update'])) {
     $include_future_only = isset($_POST['include_future_only']) ? intval($_POST['include_future_only']) : $Config['include_future_only'];
     $ret_default = isset($_POST['ret_default']) ? intval($_POST['ret_default']) : $Config['ret_default'];
     $gen_list_enable = isset($_POST['gen_list_enable']) ? intval($_POST['gen_list_enable']) : $Config['gen_list_enable'];
+    $cache_time = intval($_POST['cache_time']) * 3600;
     $db_type = isset($_POST['db_type']) ? $_POST['db_type'] : $Config['db_type'];
     $mysql_host = isset($_POST['mysql_host']) ? $_POST['mysql_host'] : $Config['mysql_host'];
     $mysql_dbname = isset($_POST['mysql_dbname']) ? $_POST['mysql_dbname'] : $Config['mysql_dbname'];
@@ -206,6 +208,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update'])) {
         'include_future_only' => $include_future_only,
         'ret_default' => $ret_default,
         'gen_list_enable' => $gen_list_enable,
+        'cache_time' => $cache_time,
         'db_type' => $db_type,
         'mysql' => $mysql,
         'start_time' => $start_time,
@@ -706,12 +709,20 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
             <span id="export" onclick="document.getElementById('importForm').submit()" style="color: blue; cursor: pointer;">数据导出</span>
         </form>
         <br><br>
-        <label for="db_type">数据库类型：</label>
+        <label for="cache_time">缓存时间：</label>
+        <select id="cache_time" name="cache_time" required>
+            <?php for ($h = 0; $h < 24; $h++): ?>
+                <option value="<?php echo $h; ?>" <?php echo floor($Config['cache_time'] / 3600) == $h ? 'selected' : ''; ?>>
+                    <?php echo $h; ?>
+                </option>
+            <?php endfor; ?>
+        </select> 小时
+        <label for="db_type" style="margin-left: 20px;">数据库：</label>
         <select id="db_type" name="db_type" required>
             <option value="sqlite" <?php if (!isset($Config['db_type']) || $Config['db_type'] == 'sqlite') echo 'selected'; ?>>SQLite</option>
             <option value="mysql" <?php if (isset($Config['db_type']) && $Config['db_type'] == 'mysql') echo 'selected'; ?>>MySQL</option>
         </select>
-        <label for="mysql_host">数据库地址：</label>
+        <label for="mysql_host">地址：</label>
         <textarea id="mysql_host"><?php echo htmlspecialchars($Config['mysql']['host'] ?? ''); ?></textarea>
         <br><br>
         <label for="mysql_dbname">数据库名：</label>
@@ -1172,7 +1183,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
     // 在提交表单时，将更多设置中的数据包括在表单数据中
     document.getElementById('settingsForm').addEventListener('submit', function() {
         const fields = ['gen_xml', 'include_future_only', 'ret_default', 'gen_list_enable', 
-                        'db_type', 'mysql_host', 'mysql_dbname', 'mysql_username', 'mysql_password'];
+                        'cache_time', 'db_type', 'mysql_host', 'mysql_dbname', 'mysql_username', 'mysql_password'];
         fields.forEach(function(field) {
             const hiddenInput = document.createElement('input');
             hiddenInput.type = 'hidden';

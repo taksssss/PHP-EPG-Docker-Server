@@ -12,6 +12,7 @@ RUN apk --no-cache --update \
     add apache2 \
     apache2-ssl \
     curl \
+    memcached \
     php83-apache2 \
     php83-bcmath \
     php83-bz2 \
@@ -38,6 +39,7 @@ RUN apk --no-cache --update \
     php83-json \
     php83-posix \
     php83-zip \
+    php83-pecl-memcached \
     && mkdir /htdocs
 
 # 复制 ./epg 文件夹到 /htdocs

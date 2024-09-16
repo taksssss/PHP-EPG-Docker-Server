@@ -5,6 +5,7 @@
     "include_future_only": 1,
     "ret_default": 1,
     "gen_list_enable": 0,
+    "cache_time": 21600,
     "db_type": "sqlite",
     "mysql": {
         "host": "mysql",
@@ -14,7 +15,7 @@
     },
     "start_time": "00:00",
     "end_time": "23:59",
-    "interval_time": 0,
+    "interval_time": 21600,
     "manage_password": "",
     "channel_bind_epg": [],
     "channel_mappings": {
