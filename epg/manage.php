@@ -16,9 +16,6 @@ initialDB();
 
 session_start();
 
-// 设置会话变量，表明用户可以访问 phpliteadmin.php
-$_SESSION['can_access_phpliteadmin'] = true;
-
 // 读取 configUpdated 状态
 $configUpdated = isset($_SESSION['configUpdated']) && $_SESSION['configUpdated'];
 if ($configUpdated) {
@@ -60,6 +57,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['login'])) {
     if ($password === $Config['manage_password']) {
         // 密码正确，设置会话变量
         $_SESSION['loggedin'] = true;
+
+        // 设置会话变量，表明用户可以访问 phpliteadmin.php
+        $_SESSION['can_access_phpliteadmin'] = true;
     } else {
         $error = "密码错误";
     }
@@ -1182,11 +1182,11 @@ try {
         // 清空现有表格
         tableBody.innerHTML = '';
 
-        allData.forEach(item => {
+        allData.forEach((item, index) => {
             const searchText = type === 'channel' ? item.original : item.channel;
             if (String(searchText).toUpperCase().includes(input)) {
                 var row = document.createElement('tr');
-                const id = (item.channel || item.original).replace(/[^\w]/g, '_'); // 生成合法的ID
+                const id = index; // 生成唯一ID
 
                 if (type === 'channel') {
                     row.innerHTML = `

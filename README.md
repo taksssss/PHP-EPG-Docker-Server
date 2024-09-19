@@ -1,9 +1,9 @@
-![php-epg](https://socialify.git.ci/TakcC/PHP-EPG-Docker-Server/image?description=1&descriptionEditable=Docker%F0%9F%90%B3%20%E9%83%A8%E7%BD%B2%EF%BC%8C%E5%B8%A6%E8%AE%BE%E7%BD%AE%E7%95%8C%E9%9D%A2%EF%BC%8C%E6%94%AF%E6%8C%81%20DIYP%20%26%20%E7%99%BE%E5%B7%9D%20%E3%80%81%20%E8%B6%85%E7%BA%A7%E7%9B%B4%E6%92%AD%20%E4%BB%A5%E5%8F%8A%20xmltv%20%E3%80%82&font=Inter&forks=1&issues=1&language=1&name=1&owner=1&pattern=Circuit%20Board&pulls=1&stargazers=1&theme=Auto)
+![PHP-EPG-Docker-Server](https://socialify.git.ci/TakcC/PHP-EPG-Docker-Server/image?description=1&descriptionEditable=Docker%F0%9F%90%B3%E9%83%A8%E7%BD%B2%EF%BC%8C%E5%B8%A6%E8%AE%BE%E7%BD%AE%E7%95%8C%E9%9D%A2%E3%80%81%E5%8F%B0%E6%A0%87%E7%AE%A1%E7%90%86%EF%BC%8C%E6%94%AF%E6%8C%81DIYP%E3%80%81%E8%B6%85%E7%BA%A7%E7%9B%B4%E6%92%AD%E5%8F%8Axmltv%E3%80%82&font=Inter&forks=1&issues=1&language=1&owner=1&pattern=Circuit%20Board&pulls=1&stargazers=1&theme=Auto)
 
 # 📺 PHP-EPG-Docker-Server
 ![Docker Pulls](https://img.shields.io/docker/pulls/taksss/php-epg) ![Image Size](https://img.shields.io/docker/image-size/taksss/php-epg)
 
-PHP 实现的 EPG（电子节目指南）服务端， `Docker` 部署，自带设置界面，支持 **DIYP & 百川** 、 **超级直播** 以及 **xmltv** 格式。
+PHP 实现的 EPG（电子节目指南）服务端， `Docker` 部署，自带设置界面、台标管理，支持 **DIYP & 百川** 、 **超级直播** 以及 **xmltv** 格式。
 
 ## ℹ️ 主要功能
 - 支持返回 **`DIYP & 百川`** 、 **`超级直播`** 以及 **`xmltv`** 格式 📡
@@ -38,7 +38,7 @@ PHP 实现的 EPG（电子节目指南）服务端， `Docker` 部署，自带�
 
 ### 2024-9-19：
 
-1. 新增：台标管理，支持 `URL` 及 `上传`，模糊匹配，返回 `DIYP` 、 `超级直播` 及 `xmltv` 格式
+1. 新增：台标管理，支持 `URL` 及 `上传`，模糊匹配，返回 `DIYP` 、 `超级直播` 及 `xmltv` 格式（感谢[fanmingming/live](https://github.com/fanmingming/live)、[wanglindl/TVlogo](https://github.com/wanglindl/TVlogo)）
 2. 修复：超级直播时间戳、`showTime` 字段错误
 
 ### 2024-9-16：
@@ -222,4 +222,4 @@ PHP 实现的 EPG（电子节目指南）服务端， `Docker` 部署，自带�
 - [112114](https://diyp.112114.xyz/)
 - [EPG 51zmt](http://epg.51zmt.top:8000/)
 - [fanmingming/live](https://github.com/fanmingming/live)
-- [wanglindl/TVlogo](http://epg.51zmt.top:8000/)
+- [wanglindl/TVlogo](https://github.com/wanglindl/TVlogo)

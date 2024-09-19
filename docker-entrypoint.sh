@@ -12,6 +12,25 @@ PHP_MEMORY_LIMIT="${PHP_MEMORY_LIMIT:-512M}"
 
 echo 'Updating configurations'
 
+# Apply configurations
+cat <<EOF >> /etc/apache2/httpd.conf
+# Directory Listing Disabled
+<Directory "/htdocs">
+    Options -Indexes
+    AllowOverride All
+    Require all granted
+</Directory>
+
+# Block access to /htdocs/epg/data except for /htdocs/epg/data/icon
+<Directory "/htdocs/epg/data">
+    Require all denied
+</Directory>
+
+<Location "/epg/data/icon">
+    Require all granted
+</Location>
+EOF
+
 # Change Server Admin, Name, Document Root
 sed -i "s/ServerAdmin\ you@example.com/ServerAdmin\ ${SERVER_ADMIN}/" /etc/apache2/httpd.conf
 sed -i "s/#ServerName\ www.example.com:80/ServerName\ ${HTTP_SERVER_NAME}/" /etc/apache2/httpd.conf
