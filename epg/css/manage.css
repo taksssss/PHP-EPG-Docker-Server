@@ -205,9 +205,13 @@ input[type="text"] {
 .channel-bind-epg-modal-content {
     width: 600px;
 }
+.icon-modal-content {
+    width: 700px;
+}
 .more-setting-modal-content,
 .channel-modal-content,
 .channel-bind-epg-modal-content,
+.icon-modal-content,
 .channel-match-modal-content {
     height: 530px;
 }
@@ -229,7 +233,8 @@ input[type="text"] {
     border: 1px solid #ccc;
     border-radius: 5px;
 }
-.table-container[id="channel-table-container"] {
+.table-container[id="channel-table-container"],
+.table-container[id="icon-table-container"] {
     height: 354px;
 }
 .table-container[id="channel-bind-epg-table-container"] {
@@ -238,17 +243,18 @@ input[type="text"] {
 .table-container[id="channel-match-table-container"] {
     height: 460px;
 }
-#logTable, #channelMatchTable, #channelTable, #channelBindEPGTable {
+#logTable, #channelMatchTable, #channelTable, #iconTable, #channelBindEPGTable {
     width: 100%;
     border-collapse: separate;
     border-spacing: 0 5px; /* 调整行之间的垂直间距 */
     table-layout: fixed; /* 固定表格布局，防止内容超出 */
 }
-#channelMatchTable, #channelTable, #channelBindEPGTable {
+#channelMatchTable, #channelTable, #iconTable, #channelBindEPGTable {
     border-spacing: 0 0px; /* 调整行之间的垂直间距 */
 }
 #logTable th, #logTable td,
 #channelTable th, #channelTable td,
+#iconTable th, #iconTable td,
 #channelBindEPGTable th, #channelBindEPGTable td,
 #channelMatchTable th, #channelMatchTable td {
     border: 1px solid #ccc;
@@ -257,6 +263,7 @@ input[type="text"] {
     word-break: break-all; /* 允许单词内断行 */
 }
 #channelTable th, #channelTable td,
+#iconTable th, #iconTable td,
 #channelMatchTable th, #channelMatchTable td,
 #channelBindEPGTable th {
     text-align: center;
@@ -272,6 +279,18 @@ input[type="text"] {
 #channelTable th:nth-child(1),
 #channelTable td:nth-child(1) {
     width: 30%; /* 第一列宽度 */
+}
+#iconTable th:nth-child(1),
+#iconTable td:nth-child(1) {
+    width: 17%; /* 第一列宽度 */
+}
+#iconTable th:nth-child(2),
+#iconTable td:nth-child(2) {
+    width: 55%; /* 第二列宽度 */
+}
+#iconTable th:nth-child(3),
+#iconTable td:nth-child(3) {
+    width: 13%; /* 第三列宽度 */
 }
 #channelMatchTable th:nth-child(4),
 #channelMatchTable td:nth-child(4) {

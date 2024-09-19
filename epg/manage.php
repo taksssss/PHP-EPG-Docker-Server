@@ -7,9 +7,7 @@
  * 修复原作者一点小小的语法错误和增加一个退出按钮方便操作，使用php的session_destroy();
  * 
  * 作者: Tak
- * GitHub: https://github.com/TakcC/PHP-EPG-Docker-Server
- * 修改: mxdabc
- * Github: https://github.com/mxdabc/epgphp
+ * GitHub: https://github.com/taksssss/PHP-EPG-Docker-Server
  */
 
 // 引入公共脚本，初始化数据库
@@ -99,7 +97,7 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
         </div>
         <!-- 底部显示 -->
         <div class="footer">
-            <a href="https://github.com/TakcC/PHP-EPG-Docker-Server" style="color: #888; text-decoration: none;">https://github.com/TakcC/PHP-EPG-Docker-Server</a>
+            <a href="https://github.com/taksssss/PHP-EPG-Docker-Server" style="color: #888; text-decoration: none;">https://github.com/taksssss/PHP-EPG-Docker-Server</a>
         </div>
     
     <!-- 修改密码模态框 -->
@@ -255,144 +253,180 @@ try {
     $dbResponse = null;
 
     if ($requestMethod == 'GET') {
-        // 返回更新日志数据
+        $action = '';
+
+        // 确定操作类型
         if (isset($_GET['get_update_logs'])) {
-            $dbResponse = $db->query("SELECT * FROM update_log")->fetchAll(PDO::FETCH_ASSOC);
+            $action = 'get_update_logs';
+        } elseif (isset($_GET['get_cron_logs'])) {
+            $action = 'get_cron_logs';
+        } elseif (isset($_GET['get_channel'])) {
+            $action = 'get_channel';
+        } elseif (isset($_GET['get_icon'])) {
+            $action = 'get_icon';
+        } elseif (isset($_GET['get_channel_bind_epg'])) {
+            $action = 'get_channel_bind_epg';
+        } elseif (isset($_GET['get_channel_match'])) {
+            $action = 'get_channel_match';
+        } elseif (isset($_GET['get_gen_list'])) {
+            $action = 'get_gen_list';
+        } elseif (isset($_GET['url'])) {
+            $action = 'download_data';
         }
 
-        // 返回定时任务日志数据
-        elseif (isset($_GET['get_cron_logs'])) {
-            $dbResponse = $db->query("SELECT * FROM cron_log")->fetchAll(PDO::FETCH_ASSOC);
-        }
+        // 根据操作类型执行不同的逻辑
+        switch ($action) {
+            case 'get_update_logs':
+                // 获取更新日志
+                $dbResponse = $db->query("SELECT * FROM update_log")->fetchAll(PDO::FETCH_ASSOC);
+                break;
 
-        // 返回所有频道数据和频道数量
-        elseif (isset($_GET['get_channel'])) {
-            // 获取数据库中的频道，并转换为大写
-            $channels = array_map('strtoupper', $db->query("SELECT DISTINCT channel FROM epg_data ORDER BY channel ASC")->fetchAll(PDO::FETCH_COLUMN));
+            case 'get_cron_logs':
+                // 获取 cron 日志
+                $dbResponse = $db->query("SELECT * FROM cron_log")->fetchAll(PDO::FETCH_ASSOC);
+                break;
 
-            // 获取频道别名映射
-            $channelMappings = $Config['channel_mappings'];
-
-            // 处理映射频道，并移除匹配的原始频道
-            $mappedChannels = [];
-            foreach ($channelMappings as $mapped => $original) {
-                if (($index = array_search(strtoupper($mapped), $channels)) !== false) {
-                    $mappedChannels[] = [
-                        'original' => $mapped,
-                        'mapped' => $original
-                    ];
-                    unset($channels[$index]); // 从剩余频道中移除
+            case 'get_channel':
+                // 获取频道
+                $channels = array_map('strtoupper', $db->query("SELECT DISTINCT channel FROM epg_data ORDER BY channel ASC")->fetchAll(PDO::FETCH_COLUMN));
+                $channelMappings = $Config['channel_mappings'];
+                $mappedChannels = [];
+                foreach ($channelMappings as $mapped => $original) {
+                    if (($index = array_search(strtoupper($mapped), $channels)) !== false) {
+                        $mappedChannels[] = [
+                            'original' => $mapped,
+                            'mapped' => $original
+                        ];
+                        unset($channels[$index]); // 从剩余频道中移除
+                    }
                 }
-            }
-
-            // 添加剩余频道，映射为空
-            foreach ($channels as $channel) {
-                $mappedChannels[] = [
-                    'original' => $channel,
-                    'mapped' => ''
+                foreach ($channels as $channel) {
+                    $mappedChannels[] = [
+                        'original' => $channel,
+                        'mapped' => ''
+                    ];
+                }
+                $dbResponse = [
+                    'channels' => $mappedChannels,
+                    'count' => count($mappedChannels)
                 ];
-            }
+                break;
 
-            // 返回频道数据和数量
-            $dbResponse = [
-                'channels' => $mappedChannels,
-                'count' => count($mappedChannels)
-            ];
-        }
-        
-        // 返回频道指定 EPG 数据
-        elseif (isset($_GET['get_channel_bind_epg'])) {
-            // 从数据库中获取频道
-            $channels = $db->query("SELECT DISTINCT UPPER(channel) FROM epg_data ORDER BY UPPER(channel) ASC")->fetchAll(PDO::FETCH_COLUMN);
-
-            $channelBindEpg = $Config['channel_bind_epg'] ?? [];
-            $xmlUrls = $Config['xml_urls'];
-
-            // 过滤 xml_urls，同时重置下标
-            $filteredUrls = array_values(array_map(function($url) {
-                $url = trim($url);
-                // 如果以 # 开头，去掉第二个 # 后的内容；否则，去掉第一个 # 后的内容，并修剪空格
-                $url = (strpos($url, '#') === 0) 
-                    ? preg_replace('/^([^#]*#[^#]*)#.*$/', '$1', $url) 
-                    : preg_replace('/#.*$/', '', $url);
-                return trim($url); // 去掉多余空格
-            }, $xmlUrls));
-
-            // 生成 $dbResponse
-            $dbResponse = array_map(function($epgSrc) use ($channelBindEpg) {
-                $cleanEpgSrc = trim(preg_replace('/^\s*#\s*/', '', $epgSrc));
-                $isInactive = strpos(trim($epgSrc), '#') === 0;
-                return [
-                    'epg_src' => ($isInactive ? '【已停用】' : '') . $cleanEpgSrc,
-                    'channels' => $channelBindEpg[$cleanEpgSrc] ?? ''
+            case 'get_icon':
+                // 获取图标
+                $channels = array_map('strtoupper', $db->query("SELECT DISTINCT channel FROM epg_data ORDER BY channel ASC")->fetchAll(PDO::FETCH_COLUMN));
+                $withIcons = [];
+                $withoutIcons = [];
+                foreach ($channels as $channel) {
+                    $icon = $iconList[$channel] ?? '';
+                    $channelInfo = ['channel' => $channel, 'icon' => $icon];
+                    if ($icon) {
+                        $withIcons[] = $channelInfo;
+                    } else {
+                        $withoutIcons[] = $channelInfo;
+                    }
+                }
+                $dbResponse = [
+                    'channels' => array_merge($withIcons, $withoutIcons),
+                    'count' => count($channels)
                 ];
-            }, $filteredUrls);
+                break;
 
-            // 将已停用的放到后面
-            $dbResponse = array_merge(
-                array_filter($dbResponse, function($item) { return strpos($item['epg_src'], '【已停用】') === false; }),
-                array_filter($dbResponse, function($item) { return strpos($item['epg_src'], '【已停用】') !== false; })
-            );
-        }
+            case 'get_channel_bind_epg':
+                // 获取频道绑定的 EPG
+                $channels = $db->query("SELECT DISTINCT UPPER(channel) FROM epg_data ORDER BY UPPER(channel) ASC")->fetchAll(PDO::FETCH_COLUMN);
+                $channelBindEpg = $Config['channel_bind_epg'] ?? [];
+                $xmlUrls = $Config['xml_urls'];
+                $filteredUrls = array_values(array_map(function($url) {
+                    $url = trim($url);
+                    $url = (strpos($url, '#') === 0)
+                        ? preg_replace('/^([^#]*#[^#]*)#.*$/', '$1', $url)
+                        : preg_replace('/#.*$/', '', $url);
+                    return trim($url);
+                }, $xmlUrls));
+                $dbResponse = array_map(function($epgSrc) use ($channelBindEpg) {
+                    $cleanEpgSrc = trim(preg_replace('/^\s*#\s*/', '', $epgSrc));
+                    $isInactive = strpos(trim($epgSrc), '#') === 0;
+                    return [
+                        'epg_src' => ($isInactive ? '【已停用】' : '') . $cleanEpgSrc,
+                        'channels' => $channelBindEpg[$cleanEpgSrc] ?? ''
+                    ];
+                }, $filteredUrls);
+                $dbResponse = array_merge(
+                    array_filter($dbResponse, function($item) { return strpos($item['epg_src'], '【已停用】') === false; }),
+                    array_filter($dbResponse, function($item) { return strpos($item['epg_src'], '【已停用】') !== false; })
+                );
+                break;
 
-        // 返回频道匹配数据
-        elseif (isset($_GET['get_channel_match'])) {
-            // 从数据库中获取原始频道列表
-            $channels = $db->query("SELECT channel FROM gen_list")->fetchAll(PDO::FETCH_COLUMN);
-            if (empty($channels)){
-                echo json_encode(['ori_channels' => [], 'clean_channels' => [], 'match' => [], 'type' => []]);
-                exit;
-            }
+            case 'get_channel_match':
+                // 获取频道匹配
+                $channels = $db->query("SELECT channel FROM gen_list")->fetchAll(PDO::FETCH_COLUMN);
+                if (empty($channels)) {
+                    echo json_encode(['ori_channels' => [], 'clean_channels' => [], 'match' => [], 'type' => []]);
+                    exit;
+                }
+                $cleanChannels = explode("\n", t2s(implode("\n", array_map('cleanChannelName', $channels))));
+                $epgData = $db->query("SELECT channel FROM epg_data")->fetchAll(PDO::FETCH_COLUMN);
+                $channelMap = array_combine($cleanChannels, $channels);
+                $matches = [];
+                foreach ($cleanChannels as $cleanChannel) {
+                    $originalChannel = $channelMap[$cleanChannel];
+                    $matchResult = null;
+                    $matchType = '未匹配';
+                    if (in_array($cleanChannel, $epgData)) {
+                        $matchResult = $cleanChannel;
+                        $matchType = '精确匹配';
+                        if ($cleanChannel !== $originalChannel) {
+                            $matchType = '别名/忽略';
+                        }
+                    } else {
+                        foreach ($epgData as $epgChannel) {
+                            if (stripos($epgChannel, $cleanChannel) !== false) {
+                                if (!isset($matchResult) || strlen($epgChannel) < strlen($matchResult)) {
+                                    $matchResult = $epgChannel;
+                                    $matchType = '正向模糊';
+                                }
+                            } elseif (stripos($cleanChannel, $epgChannel) !== false) {
+                                if (!isset($matchResult) || strlen($epgChannel) > strlen($matchResult)) {
+                                    $matchResult = $epgChannel;
+                                    $matchType = '反向模糊';
+                                }
+                            }
+                        }
+                    }
+                    $matches[$cleanChannel] = [
+                        'ori_channel' => $originalChannel,
+                        'clean_channel' => $cleanChannel,
+                        'match' => $matchResult,
+                        'type' => $matchType
+                    ];
+                }
+                $dbResponse = $matches;
+                break;
 
-            // 清理频道名并获取 EPG 数据
-            $cleanChannels = explode("\n", t2s(implode("\n", array_map('cleanChannelName', $channels))));
-            $epgData = $db->query("SELECT channel FROM epg_data")->fetchAll(PDO::FETCH_COLUMN);
+            case 'get_gen_list':
+                // 获取生成列表
+                $dbResponse = $db->query("SELECT channel FROM gen_list")->fetchAll(PDO::FETCH_COLUMN);
+                break;
 
-            // 建立干净频道名和原始频道的映射
-            $channelMap = array_combine($cleanChannels, $channels);
-
-            $matches = [];
-
-            foreach ($cleanChannels as $cleanChannel) {
-                $originalChannel = $channelMap[$cleanChannel];
-                $matchResult = null;
-                $matchType = '未匹配';
-
-                // 精确匹配
-                if (in_array($cleanChannel, $epgData)) {
-                    $matchResult = $cleanChannel;
-                    $matchType = '精确匹配';
-                    if($cleanChannel !== $originalChannel) {
-                        $matchType = '别名/忽略';
+            case 'download_data':
+                // 下载数据
+                $url = filter_var($_GET['url'], FILTER_VALIDATE_URL);
+                if ($url) {
+                    $data = downloadData($url, 5);
+                    if ($data !== false) {
+                        $dbResponse = ['success' => true, 'data' => $data];
+                    } else {
+                        $dbResponse = ['success' => false, 'message' => '无法获取URL内容'];
                     }
                 } else {
-                    foreach ($epgData as $epgChannel) {
-                        if (stripos($epgChannel, $cleanChannel) !== false) {
-                            if (!isset($matchResult) || strlen($epgChannel) < strlen($matchResult)) {
-                                $matchResult = $epgChannel;
-                                $matchType = '正向模糊';
-                            }
-                        } elseif (stripos($cleanChannel, $epgChannel) !== false) {
-                            if (!isset($matchResult) || strlen($epgChannel) > strlen($matchResult)) {
-                                $matchResult = $epgChannel;
-                                $matchType = '反向模糊';
-                }}}}
+                    $dbResponse = ['success' => false, 'message' => '无效的URL'];
+                }
+                break;
 
-                $matches[$cleanChannel] = [
-                    'ori_channel' => $originalChannel,
-                    'clean_channel' => $cleanChannel,
-                    'match' => $matchResult,
-                    'type' => $matchType
-                ];
-            }
-
-            // 构建返回的响应数据
-            $dbResponse = $matches;
-        }
-
-        // 返回限定频道列表数据
-        elseif (isset($_GET['get_gen_list'])) {
-            $dbResponse = $db->query("SELECT channel FROM gen_list")->fetchAll(PDO::FETCH_COLUMN);
+            default:
+                $dbResponse = null;
+                break;
         }
 
         if ($dbResponse !== null) {
@@ -402,95 +436,128 @@ try {
         }
     }
 
-    // 将频道数据写入数据库
-    elseif ($requestMethod === 'POST' && isset($_GET['set_gen_list'])) {
-        $data = json_decode(file_get_contents("php://input"), true)['data'] ?? '';
-        try {
-            // 启动事务
-            $db->beginTransaction();
-            // 清空表中的数据
-            $db->exec("DELETE FROM gen_list");
-            // 插入新数据
-            $lines = array_filter(array_map('trim', explode("\n", $data)));
-            $stmt = $db->prepare("INSERT INTO gen_list (channel) VALUES (:channel)");
-            foreach ($lines as $line) {
-                $stmt->bindValue(':channel', $line, PDO::PARAM_STR);
-                $stmt->execute(); // 执行插入操作
-            }
-            // 提交事务
-            $db->commit();
-            echo 'success';
-        } catch (PDOException $e) {
-            // 回滚事务
-            $db->rollBack();
-            echo "数据库操作失败: " . $e->getMessage();
-        }
-        exit;
-    }
+    // 处理 POST 请求
+    if ($requestMethod === 'POST') {
+        $action = '';
 
-    // 导入配置
-    elseif (!empty($_FILES['importFile']['tmp_name'])) {
-        $zip = new ZipArchive();
-        $importFile = $_FILES['importFile']['tmp_name'];
-        $message = "";
-
-        if ($zip->open($importFile) === TRUE) {
-            if ($zip->extractTo('.')) {
-                $message = "导入成功！";
-            } else {
-                $message = "导入失败！解压过程中发生问题。";
-            }
-            $zip->close();
-        } else {
-            $message = "导入失败！无法打开压缩文件。";
+        if (isset($_GET['set_gen_list'])) {
+            $action = 'set_gen_list';
+        } elseif (!empty($_FILES['importFile']['tmp_name'])) {
+            $action = 'import_config';
+        } elseif (isset($_POST['action']) && empty($_FILES['importFile']['tmp_name'])) {
+            $action = 'export_config';
+        } elseif (isset($_FILES['iconFile'])) {
+            $action = 'upload_icon';
+        } elseif (isset($_POST['update_icon_list'])) {
+            $action = 'update_icon_list';
         }
 
-        $_SESSION['import_message'] = $message;
-        header('Location: manage.php');
-        exit;
-    }
+        switch ($action) {
+            case 'set_gen_list':
+                // 设置生成列表
+                $data = json_decode(file_get_contents("php://input"), true)['data'] ?? '';
+                try {
+                    $db->beginTransaction();
+                    $db->exec("DELETE FROM gen_list");
+                    $lines = array_filter(array_map('trim', explode("\n", $data)));
+                    foreach ($lines as $line) {
+                        $stmt = $db->prepare("INSERT INTO gen_list (channel) VALUES (:channel)");
+                        $stmt->bindValue(':channel', $line, PDO::PARAM_STR);
+                        $stmt->execute();
+                    }
+                    $db->commit();
+                    echo 'success';
+                } catch (PDOException $e) {
+                    $db->rollBack();
+                    echo "数据库操作失败: " . $e->getMessage();
+                }
+                exit;
 
-    // 导出配置
-    elseif (isset($_POST['action']) && empty($_FILES['importFile']['tmp_name'])) {
-        $zip = new ZipArchive();
-        $zipFileName = 't.gz';
+            case 'import_config':
+                // 导入配置
+                $zip = new ZipArchive();
+                $importFile = $_FILES['importFile']['tmp_name'];
+                $message = "";
+                if ($zip->open($importFile) === TRUE) {
+                    if ($zip->extractTo('.')) {
+                        $message = "导入成功！";
+                    } else {
+                        $message = "导入失败！解压过程中发生问题。";
+                    }
+                    $zip->close();
+                } else {
+                    $message = "导入失败！无法打开压缩文件。";
+                }
+                $_SESSION['import_message'] = $message;
+                header('Location: manage.php');
+                exit;
 
-        if ($zip->open($zipFileName, ZipArchive::CREATE | ZipArchive::OVERWRITE) === TRUE) {
-            $zip->addFile('data/config.json');
-            $zip->addFile('data/data.db');
-            $zip->close();
+                case 'export_config':
+                    $zip = new ZipArchive();
+                    $zipFileName = 't.gz';                
+                    if ($zip->open($zipFileName, ZipArchive::CREATE | ZipArchive::OVERWRITE) === TRUE) {
+                        $dataDir = __DIR__ . '/data';
+                        $files = new RecursiveIteratorIterator(
+                            new RecursiveDirectoryIterator($dataDir),
+                            RecursiveIteratorIterator::LEAVES_ONLY
+                        );
+                        foreach ($files as $file) {
+                            if (!$file->isDir()) {
+                                $filePath = $file->getRealPath();
+                                $relativePath = substr($filePath, strlen($dataDir) + 1);
+                                $zip->addFile($filePath, $relativePath);
+                            }
+                        }
+                        $zip->close();
+                        header('Content-Type: application/zip');
+                        header('Content-Disposition: attachment; filename=' . $zipFileName);
+                        readfile($zipFileName);
+                        unlink($zipFileName);
+                    }
+                    exit;
 
-            header('Content-Type: application/zip');
-            header('Content-Disposition: attachment; filename=' . $zipFileName);
-            readfile($zipFileName);
-            unlink($zipFileName);
+            case 'upload_icon':
+                // 上传图标
+                $file = $_FILES['iconFile'];
+                $channel = strtoupper(trim($_POST['channel']));
+                $uploadDir = __DIR__ . '/data/icon/';
+                is_dir($uploadDir) || mkdir($uploadDir, 0755, true);
+                $uploadFile = $uploadDir . $channel . '.png';
+                if ($file['type'] === 'image/png' && move_uploaded_file($file['tmp_name'], $uploadFile)) {
+                    $serverUrl = (($_SERVER['HTTPS'] ?? '') === 'on' ? 'https://' : 'http://') . $_SERVER['HTTP_HOST'];
+                    $iconUrl = $serverUrl . '/epg/data/icon/' . $channel . '.png';
+                    echo json_encode(['success' => true, 'iconUrl' => $iconUrl]);
+                } else {
+                    echo json_encode(['success' => false, 'message' => '文件上传失败']);
+                }
+                exit;
+
+            case 'update_icon_list':
+                // 更新图标
+                $updatedIcons = json_decode($_POST['updatedIcons'], true);
+                foreach ($updatedIcons as $channelData) {
+                    $channelName = strtoupper(trim($channelData['channel']));
+                    $iconList[$channelName] = $channelData['icon'];
+                }
+
+                // 过滤掉图标值为空的条目
+                $iconList = array_filter($iconList, function($icon) {
+                    return !empty($icon);
+                });
+                
+                if (file_put_contents($iconList_path, json_encode($iconList, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)) === false) {
+                    echo json_encode(['success' => false, 'message' => '更新 iconList.json 时发生错误']);
+                } else {
+                    echo json_encode(['success' => true]);
+                }
+                exit;
         }
-        exit;
     }
 } catch (Exception $e) {
     // 处理数据库连接错误
     $logData = [];
     $cronLogData = [];
     $channels = [];
-}
-
-// 根据请求下载数据
-if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
-    $url = filter_var($_GET['url'], FILTER_VALIDATE_URL);
-
-    if ($url) {
-        // 调用 downloadData 函数下载数据
-        $data = downloadData($url, 5); // 将超时时间作为参数传递
-
-        if ($data !== false) {
-            echo json_encode(['success' => true, 'data' => $data]);
-        } else {
-            echo json_encode(['success' => false, 'message' => '无法获取URL内容']);
-        }
-    } else {
-        echo json_encode(['success' => false, 'message' => '无效的URL']);
-    }
-    exit;
 }
 
 // 生成配置管理表单
@@ -547,7 +614,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
         <div class="flex-container">
             <div class="flex-item" style="width: 100%;">
                 <label for="channel_mappings">
-                    【频道别名】（数据库频道名 => 频道别名1, 频道别名2, ...）<span id="dbChannelName" onclick="showModal('channel')" style="color: blue; cursor: pointer;">（点击编辑）</span>
+                    【频道别名】（数据库频道名 => 频道别名1, 频道别名2, ...）<span id="dbChannelName" onclick="showModal('channel')" style="color: blue; cursor: pointer;">（编辑别名）</span> <span id="dbChannelName" onclick="showModal('icon')" style="color: blue; cursor: pointer;">（编辑台标）</span>
                 </label><br><br>
                 <textarea id="channel_mappings" name="channel_mappings" style="height: 142px;"><?php echo implode("\n", array_map(function($search, $replace) { return $search . ' => ' . $replace; }, array_keys($Config['channel_mappings']), $Config['channel_mappings'])); ?></textarea><br><br>
             </div>
@@ -570,7 +637,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
 
 <!-- 底部显示 -->
 <div class="footer">
-    <a href="https://github.com/TakcC/PHP-EPG-Docker-Server" style="color: #888; text-decoration: none;">https://github.com/TakcC/PHP-EPG-Docker-Server</a>
+    <a href="https://github.com/taksssss/PHP-EPG-Docker-Server" style="color: #888; text-decoration: none;">https://github.com/taksssss/PHP-EPG-Docker-Server</a>
 </div>
 
 <!-- 配置更新模态框 -->
@@ -616,7 +683,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
     <div class="modal-content channel-modal-content">
         <span class="close">&times;</span>
         <h2 id="channelModalTitle">频道列表</h2>
-        <input type="text" id="searchInput" placeholder="搜索频道名..." onkeyup="filterChannels()">
+        <input type="text" id="channelSearchInput" placeholder="搜索频道名..." onkeyup="filterChannels('channel')">
         <div class="table-container" id="channel-table-container">
             <table id="channelTable">
                 <thead style="position: sticky; top: 0; background-color: white;">
@@ -632,6 +699,32 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
         </div>
         <br>
         <button id="saveConfig" type="button" onclick="updateChannelMapping();">保存配置</button>
+    </div>
+</div>
+
+<!-- 台标列表模态框 -->
+<div id="iconModal" class="modal">
+    <div class="modal-content icon-modal-content">
+        <span class="close">&times;</span>
+        <h2 id="iconModalTitle">频道列表</h2>
+        <input type="text" id="iconSearchInput" placeholder="搜索频道名..." onkeyup="filterChannels('icon')">
+        <div class="table-container" id="icon-table-container">
+            <table id="iconTable">
+                <thead style="position: sticky; top: 0; background-color: white;">
+                    <tr>
+                        <th>数据库频道名</th>
+                        <th>台标地址</th>
+                        <th>台标</th>
+                        <th>上传</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- 数据由 JavaScript 动态生成 -->
+                </tbody>
+            </table>
+        </div>
+        <br>
+        <button id="saveConfig" type="button" onclick="saveAndUpdateConfig();">保存配置</button>
     </div>
 </div>
 
@@ -913,20 +1006,25 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
                 logSpan = document.getElementsByClassName("close")[3];
                 fetchLogs('<?php echo $_SERVER['PHP_SELF']; ?>?get_channel=true', updateChannelList);
                 break;
+            case 'icon':
+                modal = document.getElementById("iconModal");
+                logSpan = document.getElementsByClassName("close")[4];
+                fetchLogs('<?php echo $_SERVER['PHP_SELF']; ?>?get_icon=true', updateIconList);
+                break;
             case 'channelbindepg':
                 modal = document.getElementById("channelBindEPGModal");
-                logSpan = document.getElementsByClassName("close")[4];
+                logSpan = document.getElementsByClassName("close")[5];
                 fetchLogs('<?php echo $_SERVER['PHP_SELF']; ?>?get_channel_bind_epg=true', updateChannelBindEPGList);
                 break;
             case 'channelmatch':
                 modal = document.getElementById("channelMatchModal");
-                logSpan = document.getElementsByClassName("close")[5];
+                logSpan = document.getElementsByClassName("close")[6];
                 fetchLogs('<?php echo $_SERVER['PHP_SELF']; ?>?get_channel_match=true', updateChannelMatchList);
                 document.getElementById("moreSettingModal").style.display = "none";
                 break;
             case 'moresetting':
                 modal = document.getElementById("moreSettingModal");
-                logSpan = document.getElementsByClassName("close")[6];
+                logSpan = document.getElementsByClassName("close")[7];
                 fetchLogs('<?php echo $_SERVER['PHP_SELF']; ?>?get_gen_list=true', updateGenList);
                 break;
             default:
@@ -989,9 +1087,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
         const channelTitle = document.getElementById('channelModalTitle');
         channelTitle.innerHTML = `频道列表<span style="font-size: 18px;">（总数：${channelsData.count}）</span>`; // 更新频道总数
         document.getElementById('channelTable').dataset.allChannels = JSON.stringify(channelsData.channels); // 将原始频道和映射后的频道数据存储到 dataset 中
-        filterChannels(); // 生成数据
+        filterChannels('channel'); // 生成数据
     }
 
+    function updateIconList(iconsData) {
+        const channelTitle = document.getElementById('iconModalTitle');
+        channelTitle.innerHTML = `频道列表<span style="font-size: 18px;">（总数：${iconsData.count}）</span>`; // 更新频道总数
+        document.getElementById('iconTable').dataset.allIcons = JSON.stringify(iconsData.channels); // 将原始频道和映射后的频道数据存储到 dataset 中
+        filterChannels('icon'); // 生成数据
+    }
+    
     function updateChannelBindEPGList(channelBindEPGData) {
         // 创建并添加隐藏字段
         const channelBindEPGInput = document.createElement('input');
@@ -1058,31 +1163,111 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
         }
     }
 
-    function filterChannels() {
-        var input = document.getElementById('searchInput').value.toLowerCase();
-        var channelTableBody = document.querySelector("#channelTable tbody");
-        var allChannels = JSON.parse(document.getElementById('channelTable').dataset.allChannels);
+    function filterChannels(type) {
+        var input, tableBody, allData, tableId, dataAttr;
+
+        if (type === 'channel') {
+            input = document.getElementById('channelSearchInput').value.toUpperCase();
+            tableId = 'channelTable';
+            dataAttr = 'allChannels';
+        } else if (type === 'icon') {
+            input = document.getElementById('iconSearchInput').value.toUpperCase();
+            tableId = 'iconTable';
+            dataAttr = 'allIcons';
+        }
+
+        tableBody = document.querySelector(`#${tableId} tbody`);
+        allData = JSON.parse(document.getElementById(tableId).dataset[dataAttr]);
 
         // 清空现有表格
-        channelTableBody.innerHTML = '';
+        tableBody.innerHTML = '';
 
-        allChannels.forEach(channel => {
-            if (String(channel.original).toLowerCase().includes(input)) {
+        allData.forEach(item => {
+            const searchText = type === 'channel' ? item.original : item.channel;
+            if (String(searchText).toUpperCase().includes(input)) {
                 var row = document.createElement('tr');
+                const id = (item.channel || item.original).replace(/[^\w]/g, '_'); // 生成合法的ID
 
-                row.innerHTML = `
-                    <td>${String(channel.original)}</td>
-                    <td contenteditable="true">${channel.mapped}</td>
-                `;
+                if (type === 'channel') {
+                    row.innerHTML = `
+                        <td>${String(item.original)}</td>
+                        <td contenteditable="true">${item.mapped}</td>
+                    `;
 
-                row.querySelector('td[contenteditable]').addEventListener('input', function() {
-                    channel.mapped = this.textContent;
-                    document.getElementById('channelTable').dataset.allChannels = JSON.stringify(allChannels);
-                });
+                    row.querySelector('td[contenteditable]').addEventListener('input', function() {
+                        item.mapped = this.textContent;
+                        document.getElementById(tableId).dataset[dataAttr] = JSON.stringify(allData);
+                    });
+                } else if (type === 'icon') {
+                    row.innerHTML = `
+                        <td>${String(item.channel)}</td>
+                        <td contenteditable="true">${item.icon || ''}</td>
+                        <td>
+                            ${item.icon ? `
+                                <a href="${item.icon}" target="_blank">
+                                    <img src="${item.icon}" alt="${item.channel} icon" style="max-width: 80px; max-height: 50px; background-color: #ccc;">
+                                </a>
+                            ` : ''}
+                        </td>
+                        <td>
+                            <input type="file" accept="image/png" style="display:none;" id="file_${id}">
+                            <button onclick="document.getElementById('file_${id}').click()">上传</button>
+                        </td>
+                    `;
 
-                channelTableBody.appendChild(row);
+                    // 更新图标 URL
+                    row.querySelector('td[contenteditable]').addEventListener('input', function() {
+                        item.icon = this.textContent;
+                        document.getElementById(tableId).dataset[dataAttr] = JSON.stringify(allData);
+                    });
+
+                    // 上传文件
+                    row.querySelector(`#file_${id}`).addEventListener('change', function(event) {
+                        handleFileUpload(event, item, row, allData);
+                    });
+                }
+
+                tableBody.appendChild(row);
             }
         });
+    }
+
+    // 文件上传处理函数
+    function handleFileUpload(event, item, row, allData) {
+        const file = event.target.files[0];
+        if (file && file.type === 'image/png') {
+            const formData = new FormData();
+            formData.append('iconFile', file);
+            formData.append('channel', item.channel);
+
+            // 发送上传请求
+            fetch('<?php echo $_SERVER['PHP_SELF']; ?>', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const iconUrl = data.iconUrl;
+
+                    // 更新表格数据
+                    row.cells[1].innerText = iconUrl;
+                    item.icon = iconUrl;
+                    row.cells[2].innerHTML = `
+                        <a href="${iconUrl}?${new Date().getTime()}" target="_blank" rel="noopener noreferrer">
+                            <img src="${iconUrl}?${new Date().getTime()}" alt="${item.channel} icon" style="max-width: 80px; max-height: 50px; background-color: #ccc;">
+                        </a>
+                    `;
+                    // 更新内存中的 allData
+                    document.getElementById('iconTable').dataset.allIcons = JSON.stringify(allData);
+                } else {
+                    alert('上传失败：' + data.message);
+                }
+            })
+            .catch(error => alert('上传过程中发生错误：' + error));
+        } else {
+            alert('请选择PNG文件上传');
+        }
     }
 
     function updateChannelMapping() {
@@ -1157,6 +1342,21 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
 
     // 保存数据并更新配置
     function saveAndUpdateConfig($doUpdate = true) {
+        var iconTableElement = document.getElementById('iconTable');
+        var allIcons = iconTableElement && iconTableElement.dataset.allIcons ? JSON.parse(iconTableElement.dataset.allIcons) : null;
+        if(allIcons) {
+            fetch('<?php echo $_SERVER['PHP_SELF']; ?>', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    update_icon_list: true,
+                    updatedIcons: JSON.stringify(allIcons) // 传递更新后的图标数据
+                })
+            });
+        }
+
         const textAreaContent = document.getElementById('gen_list_text').value;
         fetch('<?php echo $_SERVER['PHP_SELF']; ?>?set_gen_list=true', {
             method: 'POST',

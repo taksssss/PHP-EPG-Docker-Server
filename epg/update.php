@@ -6,7 +6,7 @@
  * 该脚本用于定期从配置的 XML 源下载节目数据，并将其存入 SQLite 数据库中。
  * 
  * 作者: Tak
- * GitHub: https://github.com/TakcC/PHP-EPG-Docker-Server
+ * GitHub: https://github.com/taksssss/PHP-EPG-Docker-Server
  */
 
 // 引入公共脚本
@@ -151,8 +151,11 @@ function getChannelBindEPG() {
 }
 
 // 从 epg_data 表生成 XML 数据并逐个频道写入 t.xml 文件
-function generateXmlFromEpgData($db, $include_future_only, $gen_list_mapping) {
+function generateXmlFromEpgData($db, $include_future_only, $gen_list_mapping, &$log_messages) {
     global $Config;
+    global $iconList;
+    global $iconList_path;
+
     $currentDate = date('Y-m-d'); // 获取当前日期
     $dateCondition = $include_future_only ? "WHERE date >= '$currentDate'" : '';
 
@@ -166,7 +169,7 @@ function generateXmlFromEpgData($db, $include_future_only, $gen_list_mapping) {
     $xmlWriter->startDocument('1.0', 'UTF-8');
     $xmlWriter->startElement('tv');
     $xmlWriter->writeAttribute('info-name', 'by Tak');
-    $xmlWriter->writeAttribute('info-url', 'https://github.com/TakcC/PHP-EPG-Docker-Server');
+    $xmlWriter->writeAttribute('info-url', 'https://github.com/taksssss/PHP-EPG-Docker-Server');
     $xmlWriter->setIndent(true);
     $xmlWriter->setIndentString('	'); // 设置缩进
 
@@ -211,9 +214,37 @@ function generateXmlFromEpgData($db, $include_future_only, $gen_list_mapping) {
             $xmlWriter->endElement(); // display-name
         }
 
-        // 写入台标信息
+        $iconUrl = '';
+
+        // 精确匹配
+        if (isset($iconList[strtoupper($originalChannel)])) {
+            $iconUrl = $iconList[strtoupper($originalChannel)];
+        } else {
+            $bestMatch = null;
+            
+            // 正向模糊匹配
+            foreach ($iconList as $channelName => $icon) {
+                if (stripos($channelName, $originalChannel) !== false) {
+                    if ($bestMatch === null || strlen($channelName) < strlen($bestMatch)) {
+                        $bestMatch = $channelName;
+                        $iconUrl = $icon;
+            }}}
+            
+            if(!$iconUrl) {
+            // 反向模糊匹配
+                foreach ($iconList as $channelName => $icon) {
+                    if (stripos($originalChannel, $channelName) !== false) {
+                        if ($bestMatch === null || strlen($channelName) > strlen($bestMatch)) {
+                            $bestMatch = $channelName;
+                            $iconUrl = $icon;
+        }}}}}
+
+        if ($iconUrl) {
+            $iconList[strtoupper($originalChannel)] = $iconUrl;
+        }
+        
         $xmlWriter->startElement('icon');
-        $xmlWriter->writeAttribute('src', "https://live.fanmingming.com/tv/" . htmlspecialchars($originalChannel, ENT_XML1, 'UTF-8') . ".png");
+        $xmlWriter->writeAttribute('src', $iconUrl);
         $xmlWriter->endElement(); // icon
 
         $xmlWriter->endElement(); // channel
@@ -248,6 +279,13 @@ function generateXmlFromEpgData($db, $include_future_only, $gen_list_mapping) {
 
     // 所有频道数据写入完成后，生成 t.xml.gz 文件
     compressXmlFile('t.xml');
+
+    // 更新 iconList.json 文件中的数据
+    if (file_put_contents($iconList_path, json_encode($iconList, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)) === false) {
+        logMessage($log_messages, "【台标列表】 更新 iconList.json 时发生错误！！！");
+    } else {
+        logMessage($log_messages, "【台标列表】 已更新 iconList.json");
+    }
 }
 
 // 生成 t.xml.gz 压缩文件
@@ -338,7 +376,7 @@ function processXmlData($xml_url, $xml_data, $date, $db, $gen_list) {
         $start = getFormatTime((string)$programme['start']);
         $end = getFormatTime((string)$programme['stop']);
         $channelId = (string)$programme['channel'];
-        $channelName = $channelNamesMap[$channelId] ?? null;
+        $channelName = strtoupper($channelNamesMap[$channelId]) ?? null;
         $recordKey = $channelName . '-' . $start['date'];
 
         // 优先处理跨天数据
@@ -409,7 +447,7 @@ function insertDataToDatabase($channelsData, $db) {
             $diypContent = json_encode([
                 'channel_name' => $channelName,
                 'date' => $date,
-                'url' => 'https://github.com/TakcC/PHP-EPG-Docker-Server',
+                'url' => 'https://github.com/taksssss/PHP-EPG-Docker-Server',
                 'epg_data' => $diypProgrammes
             ], JSON_UNESCAPED_UNICODE);
 
@@ -478,7 +516,7 @@ foreach ($Config['xml_urls'] as $xml_url) {
 
 // 判断是否生成 xmltv 文件
 if ($Config['gen_xml']) {
-    generateXmlFromEpgData($db, $Config['include_future_only'], $gen_list_mapping);        
+    generateXmlFromEpgData($db, $Config['include_future_only'], $gen_list_mapping, $log_messages);        
     logMessage($log_messages, "【xmltv文件】 已生成 t.xml、t.xml.gz");
 }
 

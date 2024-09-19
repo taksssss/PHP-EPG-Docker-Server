@@ -6,18 +6,18 @@
  * 该脚本包含公共设置、公共函数。
  * 
  * 作者: Tak
- * GitHub: https://github.com/TakcC/PHP-EPG-Docker-Server
+ * GitHub: https://github.com/taksssss/PHP-EPG-Docker-Server
  */
 
 require 'opencc/vendor/autoload.php'; // 引入 Composer 自动加载器
 use Overtrue\PHPOpenCC\OpenCC; // 使用 OpenCC 库
 
-// 引入并解析 JSON 配置文件，不存在则创建默认配置文件
-$config_path = __DIR__ . '/data/config.json';
-@mkdir(dirname($config_path), 0755, true);
-file_exists($config_path) || copy(__DIR__ . '/config_default.json', $config_path);
-$Config = json_decode(file_get_contents($config_path), true) 
-    or die("配置文件解析失败: " . json_last_error_msg());
+// 检查并解析配置文件和图标列表文件
+@mkdir(__DIR__ . '/data', 0755, true);
+file_exists($config_path = __DIR__ . '/data/config.json') || copy(__DIR__ . '/config_default.json', $config_path);
+file_exists($iconList_path = __DIR__ . '/data/iconList.json') || copy(__DIR__ . '/iconList_default.json', $iconList_path);
+$Config = json_decode(file_get_contents($config_path), true) or die("配置文件解析失败: " . json_last_error_msg());
+$iconList = json_decode(file_get_contents($iconList_path), true) or die("图标列表文件解析失败: " . json_last_error_msg());
 
 // 设置时区为亚洲/上海
 date_default_timezone_set("Asia/Shanghai");

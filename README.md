@@ -12,14 +12,15 @@ PHP 实现的 EPG（电子节目指南）服务端， `Docker` 部署，自带�
 - 采用 **先构建再存数据库** 策略，减少数据冗余，提高读取速度 🚀
 - 支持 **`SQLite`** 及 **`MySQL`** 数据库 🗃️
 - 支持 **`Memcached`** ，可设置缓存时间 ⏱️
+- 支持 **台标管理** ，台标模糊匹配 🖼️
 - 支持 **繁体中文** 频道匹配 🌐
 - 支持 **双向模糊匹配** ✍🏻
 - 支持 **频道别名** ，可用 **正则表达式** 🔄
-- 内置 **定时任务** ，支持设置定时拉取数据 ⏳
+- 支持 **频道指定 EPG 源** 🈯
+- 内置 **定时任务** ⏳
 - 支持生成 **指定频道节目单** 📝
 - 支持生成 **匹配 M3U** 的 `xmltv` 格式文件 💯
 - 支持查看 **频道匹配** 结果 🪢
-- 支持 **频道指定 EPG 源** 🈯
 - 兼容多种 `xmltv` 格式 🗂️
 - 包含网页设置页面 🌐
 - 支持多个 EPG 源 📡
@@ -34,6 +35,11 @@ PHP 实现的 EPG（电子节目指南）服务端， `Docker` 部署，自带�
 >   - `CCTV$1 => regex:/^CCTV[-\s]*(\d+(\s*P(LUS)?|[K\+])?)(?![\s-]*(美洲|欧洲)).*/i` ：将 `CCTV 1综合`、`CCTV-4K频道`、`CCTV - 5+频道`、`CCTV - 5PLUS频道` 等替换成 `CCTV1`、`CCTV4K`、`CCTV5+`、`CCTV5PLUS`（排除 `CCTV4美洲` 和 `CCTV4欧洲`）
 
 ## 📝 更新日志
+
+### 2024-9-19：
+
+1. 新增：台标管理，支持 `URL` 及 `上传`，模糊匹配，返回 `DIYP` 、 `超级直播` 及 `xmltv` 格式
+2. 修复：超级直播时间戳、`showTime` 字段错误
 
 ### 2024-9-16：
 
@@ -184,17 +190,9 @@ PHP 实现的 EPG（电子节目指南）服务端， `Docker` 部署，自带�
 
 ## 📸 系统截图
 
-**设置定时任务**
+**台标管理**
 
-![设置定时任务](/pic/cronSet.png)
-
-**定时任务日志**
-
-![定时任务日志](/pic/cronLog.png)
-
-**更新日志**
-
-![更新日志](/pic/updateLog.png)
+![台标管理](/pic/iconList.png)
 
 **搜索频道、编辑映射**
 
@@ -223,3 +221,5 @@ PHP 实现的 EPG（电子节目指南）服务端， `Docker` 部署，自带�
 - [Black_crow/xmlgz](https://gitee.com/Black_crow/xmlgz)
 - [112114](https://diyp.112114.xyz/)
 - [EPG 51zmt](http://epg.51zmt.top:8000/)
+- [fanmingming/live](https://github.com/fanmingming/live)
+- [wanglindl/TVlogo](http://epg.51zmt.top:8000/)

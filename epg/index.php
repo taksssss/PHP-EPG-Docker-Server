@@ -7,7 +7,7 @@
  * 并从 SQLite 数据库中提取或返回默认数据。
  * 
  * 作者: Tak
- * GitHub: https://github.com/TakcC/PHP-EPG-Docker-Server
+ * GitHub: https://github.com/taksssss/PHP-EPG-Docker-Server
  */
 
 // 引入公共脚本
@@ -54,6 +54,7 @@ function getFormatTime($time) {
 // 从数据库读取 diyp、lovetv 数据，兼容未安装 memcached 的情况
 function readEPGData($date, $channel, $db, $type) {
     global $Config;
+    global $iconList;
 
     // 如果传入的日期小于当前日期，设置 cache_time 为 7 天
     $cache_time = ($date < date('Y-m-d')) ? 7 * 24 * 3600 : $Config['cache_time'];
@@ -113,6 +114,19 @@ function readEPGData($date, $channel, $db, $type) {
         return false;
     }
 
+    // 在解码和添加 icon 后再编码为 JSON
+    $rowArray = json_decode($row, true);
+    $iconUrl = $iconList[strtoupper($rowArray['channel_name'])] ?? "";
+    $rowArray = array_merge(
+        array_slice($rowArray, 0, array_search('url', array_keys($rowArray)) + 1),
+        ['icon' => $iconUrl],
+        array_slice($rowArray, array_search('url', array_keys($rowArray)) + 1)
+    );
+    $row = json_encode($rowArray, JSON_UNESCAPED_UNICODE);
+
+    // 将处理后的数组重新编码为 JSON，输出或返回结果
+    $row = json_encode($rowArray, JSON_UNESCAPED_UNICODE);
+
     if ($type === 'diyp') {
         // 如果 Memcached 可用，将结果存储到缓存中
         if ($memcached_enabled) {
@@ -123,22 +137,24 @@ function readEPGData($date, $channel, $db, $type) {
 
     if ($type === 'lovetv') {
         $diyp_data = json_decode($row, true);
-        $program = array_map(function($epg) {
-            $start_time = strtotime($epg['start']);
-            $end_time = strtotime($epg['end']);
+        $date = $diyp_data['date'];
+        $program = array_map(function($epg) use ($date) {
+            $start_time = strtotime($date . ' ' . $epg['start']);
+            $end_time = strtotime($date . ' ' . $epg['end']);
+            $duration = $end_time - $start_time;
             return [
                 'st' => $start_time,
                 'et' => $end_time,
                 'eventType' => '',
                 'eventId' => '',
                 't' => $epg['title'],
-                'showTime' => date('H:i', $start_time),
-                'duration' => $end_time - $start_time
+                'showTime' => gmdate('H:i', $duration),
+                'duration' => $duration
             ];
         }, $diyp_data['epg_data']);
 
         // 查找当前节目
-        $current_programme = findCurrentProgramme($program);
+        $current_programme = $date === date('Y-m-d') ? findCurrentProgramme($program) : null;
 
         // 生成 lovetv 数据
         $lovetv_data = [
@@ -147,19 +163,8 @@ function readEPGData($date, $channel, $db, $type) {
                 'liveSt' => $current_programme ? $current_programme['st'] : 0,
                 'channelName' => $diyp_data['channel_name'],
                 'lvUrl' => $diyp_data['url'],
-                'program' => array_map(function($epg) {
-                    $start_time = strtotime($epg['start']);
-                    $end_time = strtotime($epg['end']);
-                    return [
-                        'st' => $start_time,
-                        'et' => $end_time,
-                        'eventType' => '',
-                        'eventId' => '',
-                        't' => $epg['title'],
-                        'showTime' => date('H:i', $start_time),
-                        'duration' => $end_time - $start_time
-                    ];
-                }, $diyp_data['epg_data'])
+                'icon' => $diyp_data['icon'],
+                'program' => $program
             ]
         ];
 
@@ -234,7 +239,7 @@ function fetchHandler() {
                 $default_diyp_program_info = [
                     'date' => $date,
                     'channel_name' => $channel,
-                    'url' => "https://github.com/TakcC/PHP-EPG-Server",
+                    'url' => "https://github.com/taksssss/PHP-EPG-Server",
                     'epg_data' => array_map(function($hour) {
                         return [
                             'start' => sprintf('%02d:00', $hour),
@@ -252,7 +257,7 @@ function fetchHandler() {
                         'isLive' => '',
                         'liveSt' => 0,
                         'channelName' => $channel,
-                        'lvUrl' => 'https://github.com/TakcC/PHP-EPG-Docker-Server',
+                        'lvUrl' => 'https://github.com/taksssss/PHP-EPG-Docker-Server',
                         'program' => array_map(function($hour) {
                             return [
                                 'st' => strtotime(sprintf('%02d:00', $hour)),
