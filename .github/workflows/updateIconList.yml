@@ -1,0 +1,68 @@
+name: Update Icon List
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+jobs:
+  update-icon-list:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: sudo apt-get install -y jq curl
+
+      - name: Fetch PNG list and create iconList_default.json
+        run: |
+          curl -sL https://api.github.com/repos/fanmingming/live/contents/tv | jq -r '.[] | select(.name | endswith(".png")) | .name | gsub(".png$"; "")' > png_files.txt
+
+          mkdir -p epg
+          jq -R -s '
+            split("\n") | map(select(length > 0)) | map({
+              (gsub("[ _-]"; "") | ascii_upcase): "https://cdn.jsdelivr.net/gh/fanmingming/live@main/tv/\(.).png"
+            }) | add' png_files.txt > epg/iconList_default.json
+
+      - name: Clone repository
+        run: |
+          git clone --depth 1 --branch main https://github.com/wanglindl/TVlogo.git TVlogo
+
+      - name: Extract channel icons from markdown files
+        run: |
+          md_files="TVlogo/md/*.md"
+
+          for md_file in $md_files; do
+            while IFS= read -r line; do
+              echo "$line" | awk -F'|' '
+                {
+                  for (i = 2; i <= NF; i += 2) {
+                    channel_name = $i
+                    match($(i + 1), /<img src="([^"]+)"/, arr)
+                    image_url = arr[1]
+                    if (channel_name && image_url) {
+                      gsub(/raw.githubusercontent.com\/wanglindl\/TV[lL]ogo\//, "cdn.jsdelivr.net/gh/wanglindl/TVLogo@", image_url)
+                      gsub(/[ _-]/, "", channel_name)
+                      channel_name = toupper(channel_name)
+                      printf "%s:%s\n", channel_name, image_url
+                    }
+                  }
+                }
+              ' | while IFS=: read -r channel_name image_url; do
+                jq --arg key "$channel_name" --arg value "$image_url" \
+                  'if .[$key] == null then . + {($key): $value} else . end' epg/iconList_default.json > epg/iconList_default.json.tmp
+
+                mv epg/iconList_default.json.tmp epg/iconList_default.json
+              done
+            done < "$md_file"
+          done
+
+      - name: Commit and push changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add epg/iconList_default.json
+          git diff --cached --quiet || git commit -m "Update iconList_default.json"
+          git push
