@@ -155,6 +155,13 @@ input[type="text"] {
 .button-container a:hover, .button-container button:hover {
     background-color: #0b7dda;
 }
+button[id="uploadAllIcons"] {
+    width: 105px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    font-size: 14px;
+}
 .flex-container {
     display: flex;
     justify-content: space-between;

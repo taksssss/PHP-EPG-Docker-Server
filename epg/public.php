@@ -14,10 +14,14 @@ use Overtrue\PHPOpenCC\OpenCC; // 使用 OpenCC 库
 
 // 检查并解析配置文件和图标列表文件
 @mkdir(__DIR__ . '/data', 0755, true);
+$iconDir = __DIR__ . '/data/icon/'; @mkdir($iconDir, 0755, true);
 file_exists($config_path = __DIR__ . '/data/config.json') || copy(__DIR__ . '/config_default.json', $config_path);
-file_exists($iconList_path = __DIR__ . '/data/iconList.json') || copy(__DIR__ . '/iconList_default.json', $iconList_path);
+file_exists($iconList_path = __DIR__ . '/data/iconList.json') || file_put_contents($iconList_path, json_encode(new stdClass(), JSON_PRETTY_PRINT));
 $Config = json_decode(file_get_contents($config_path), true) or die("配置文件解析失败: " . json_last_error_msg());
-$iconList = json_decode(file_get_contents($iconList_path), true) or die("图标列表文件解析失败: " . json_last_error_msg());
+($iconList = json_decode(file_get_contents($iconList_path), true)) !== null || die("图标列表文件解析失败: " . json_last_error_msg());
+$iconListDefault = json_decode(file_get_contents(__DIR__ . '/iconList_default.json'), true) or die("默认图标列表文件解析失败: " . json_last_error_msg());
+
+$serverUrl = (($_SERVER['HTTPS'] ?? '') === 'on' ? 'https://' : 'http://') . $_SERVER['HTTP_HOST'];
 
 // 设置时区为亚洲/上海
 date_default_timezone_set("Asia/Shanghai");
@@ -102,7 +106,7 @@ function cleanChannelName($channel, $t2s = false) {
     // 默认忽略 - 跟 空格 
     $channel_replacements = ['-', ' '];
     $channel = str_ireplace($channel_replacements, '', $channel);
-    return $channel;
+    return strtoupper($channel);
 }
 
 // 繁体转简体

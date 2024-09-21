@@ -288,7 +288,7 @@ try {
 
             case 'get_channel':
                 // 获取频道
-                $channels = array_map('strtoupper', $db->query("SELECT DISTINCT channel FROM epg_data ORDER BY channel ASC")->fetchAll(PDO::FETCH_COLUMN));
+                $channels = $db->query("SELECT DISTINCT channel FROM epg_data ORDER BY channel ASC")->fetchAll(PDO::FETCH_COLUMN);
                 $channelMappings = $Config['channel_mappings'];
                 $mappedChannels = [];
                 foreach ($channelMappings as $mapped => $original) {
@@ -313,25 +313,23 @@ try {
                 break;
 
             case 'get_icon':
-                // 获取图标
-                $channels = array_map('strtoupper', $db->query("SELECT DISTINCT channel FROM epg_data ORDER BY channel ASC")->fetchAll(PDO::FETCH_COLUMN));
-                $withIcons = [];
-                $withoutIcons = [];
-                foreach ($channels as $channel) {
-                    $icon = $iconList[$channel] ?? '';
-                    $channelInfo = ['channel' => $channel, 'icon' => $icon];
-                    if ($icon) {
-                        $withIcons[] = $channelInfo;
-                    } else {
-                        $withoutIcons[] = $channelInfo;
-                    }
-                }
+                // 获取并合并数据库中的频道和 $iconList 中的频道，去重后按字母排序
+                $allChannels = array_unique(array_merge(
+                    $db->query("SELECT DISTINCT channel FROM epg_data ORDER BY channel ASC")->fetchAll(PDO::FETCH_COLUMN),
+                    array_keys($iconList)
+                ));
+                sort($allChannels);
+                $channelsInfo = array_map(function($channel) use ($iconList) {
+                    return ['channel' => $channel, 'icon' => $iconList[$channel] ?? ''];
+                }, $allChannels);
+                $withIcons = array_filter($channelsInfo, function($c) { return !empty($c['icon']);});
+                $withoutIcons = array_filter($channelsInfo, function($c) { return empty($c['icon']);});
                 $dbResponse = [
                     'channels' => array_merge($withIcons, $withoutIcons),
-                    'count' => count($channels)
+                    'count' => count($allChannels)
                 ];
                 break;
-
+                
             case 'get_channel_bind_epg':
                 // 获取频道绑定的 EPG
                 $channels = $db->query("SELECT DISTINCT UPPER(channel) FROM epg_data ORDER BY UPPER(channel) ASC")->fetchAll(PDO::FETCH_COLUMN);
@@ -492,40 +490,37 @@ try {
                 header('Location: manage.php');
                 exit;
 
-                case 'export_config':
-                    $zip = new ZipArchive();
-                    $zipFileName = 't.gz';                
-                    if ($zip->open($zipFileName, ZipArchive::CREATE | ZipArchive::OVERWRITE) === TRUE) {
-                        $dataDir = __DIR__ . '/data';
-                        $files = new RecursiveIteratorIterator(
-                            new RecursiveDirectoryIterator($dataDir),
-                            RecursiveIteratorIterator::LEAVES_ONLY
-                        );
-                        foreach ($files as $file) {
-                            if (!$file->isDir()) {
-                                $filePath = $file->getRealPath();
-                                $relativePath = substr($filePath, strlen($dataDir) + 1);
-                                $zip->addFile($filePath, $relativePath);
-                            }
+            case 'export_config':
+                $zip = new ZipArchive();
+                $zipFileName = 't.gz';                
+                if ($zip->open($zipFileName, ZipArchive::CREATE | ZipArchive::OVERWRITE) === TRUE) {
+                    $dataDir = __DIR__ . '/data';
+                    $files = new RecursiveIteratorIterator(
+                        new RecursiveDirectoryIterator($dataDir),
+                        RecursiveIteratorIterator::LEAVES_ONLY
+                    );
+                    foreach ($files as $file) {
+                        if (!$file->isDir()) {
+                            $filePath = $file->getRealPath();
+                            $relativePath = substr($filePath, strlen($dataDir) + 1);
+                            $zip->addFile($filePath, $relativePath);
                         }
-                        $zip->close();
-                        header('Content-Type: application/zip');
-                        header('Content-Disposition: attachment; filename=' . $zipFileName);
-                        readfile($zipFileName);
-                        unlink($zipFileName);
                     }
-                    exit;
+                    $zip->close();
+                    header('Content-Type: application/zip');
+                    header('Content-Disposition: attachment; filename=' . $zipFileName);
+                    readfile($zipFileName);
+                    unlink($zipFileName);
+                }
+                exit;
 
             case 'upload_icon':
                 // 上传图标
                 $file = $_FILES['iconFile'];
-                $channel = strtoupper(trim($_POST['channel']));
-                $uploadDir = __DIR__ . '/data/icon/';
-                is_dir($uploadDir) || mkdir($uploadDir, 0755, true);
-                $uploadFile = $uploadDir . $channel . '.png';
+                $fileName = $file['name'];
+                $uploadFile = $iconDir . $fileName;
                 if ($file['type'] === 'image/png' && move_uploaded_file($file['tmp_name'], $uploadFile)) {
-                    $serverUrl = (($_SERVER['HTTPS'] ?? '') === 'on' ? 'https://' : 'http://') . $_SERVER['HTTP_HOST'];
-                    $iconUrl = $serverUrl . '/epg/data/icon/' . $channel . '.png';
+                    $iconUrl = $serverUrl . '/epg/data/icon/' . $fileName;
                     echo json_encode(['success' => true, 'iconUrl' => $iconUrl]);
                 } else {
                     echo json_encode(['success' => false, 'message' => '文件上传失败']);
@@ -540,17 +535,17 @@ try {
                     $iconList[$channelName] = $channelData['icon'];
                 }
 
-                // 过滤掉图标值为空的条目
-                $iconList = array_filter($iconList, function($icon) {
-                    return !empty($icon);
-                });
+                // 过滤掉图标值为空和频道名为空的条目
+                $iconList = array_filter($iconList, function($icon, $channel) {
+                    return !empty($icon) && !empty($channel);
+                }, ARRAY_FILTER_USE_BOTH);
                 
                 if (file_put_contents($iconList_path, json_encode($iconList, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)) === false) {
                     echo json_encode(['success' => false, 'message' => '更新 iconList.json 时发生错误']);
                 } else {
                     echo json_encode(['success' => true]);
                 }
-                exit;
+                exit;                
         }
     }
 } catch (Exception $e) {
@@ -707,7 +702,10 @@ try {
     <div class="modal-content icon-modal-content">
         <span class="close">&times;</span>
         <h2 id="iconModalTitle">频道列表</h2>
-        <input type="text" id="iconSearchInput" placeholder="搜索频道名..." onkeyup="filterChannels('icon')">
+        <div style="display: flex;">
+            <input type="text" id="iconSearchInput" placeholder="搜索频道名..." onkeyup="filterChannels('icon')" style="flex: 1; margin-right: 10px;">
+            <button id="uploadAllIcons" type="button" onclick="uploadAllIcons();">上传所有台标</button>
+        </div>
         <div class="table-container" id="icon-table-container">
             <table id="iconTable">
                 <thead style="position: sticky; top: 0; background-color: white;">
@@ -843,15 +841,10 @@ try {
     document.addEventListener('DOMContentLoaded', function() {
         // 页面加载时执行，预加载数据，减少等待时间
         showModal('channelbindepg', $popup = false); // 这一行必须有，否则保存时丢失数据
+        showModal('moresetting', $popup = false); // 这一行必须有，否则保存时丢失数据
         showModal('update', $popup = false);
         showModal('cron', $popup = false);
         showModal('channel', $popup = false);
-        showModal('channelmatch', $popup = false);
-        showModal('moresetting', $popup = false);
-        
-        // 设置 MySQL 相关输入框状态
-        updateMySQLFields();
-        document.getElementById('db_type').addEventListener('change', updateMySQLFields);
     });
 
     function handleDbManagement() {
@@ -994,38 +987,41 @@ try {
             case 'update':
                 modal = document.getElementById("updatelogModal");
                 logSpan = document.getElementsByClassName("close")[1];
-                fetchLogs('<?php echo $_SERVER['PHP_SELF']; ?>?get_update_logs=true', updateLogTable);
+                fetchLogs('manage.php?get_update_logs=true', updateLogTable);
                 break;
             case 'cron':
                 modal = document.getElementById("cronlogModal");
                 logSpan = document.getElementsByClassName("close")[2];
-                fetchLogs('<?php echo $_SERVER['PHP_SELF']; ?>?get_cron_logs=true', updateCronLogContent);
+                fetchLogs('manage.php?get_cron_logs=true', updateCronLogContent);
                 break;
             case 'channel':
                 modal = document.getElementById("channelModal");
                 logSpan = document.getElementsByClassName("close")[3];
-                fetchLogs('<?php echo $_SERVER['PHP_SELF']; ?>?get_channel=true', updateChannelList);
+                fetchLogs('manage.php?get_channel=true', updateChannelList);
                 break;
             case 'icon':
                 modal = document.getElementById("iconModal");
                 logSpan = document.getElementsByClassName("close")[4];
-                fetchLogs('<?php echo $_SERVER['PHP_SELF']; ?>?get_icon=true', updateIconList);
+                fetchLogs('manage.php?get_icon=true', updateIconList);
                 break;
             case 'channelbindepg':
                 modal = document.getElementById("channelBindEPGModal");
                 logSpan = document.getElementsByClassName("close")[5];
-                fetchLogs('<?php echo $_SERVER['PHP_SELF']; ?>?get_channel_bind_epg=true', updateChannelBindEPGList);
+                fetchLogs('manage.php?get_channel_bind_epg=true', updateChannelBindEPGList);
                 break;
             case 'channelmatch':
                 modal = document.getElementById("channelMatchModal");
                 logSpan = document.getElementsByClassName("close")[6];
-                fetchLogs('<?php echo $_SERVER['PHP_SELF']; ?>?get_channel_match=true', updateChannelMatchList);
+                fetchLogs('manage.php?get_channel_match=true', updateChannelMatchList);
                 document.getElementById("moreSettingModal").style.display = "none";
                 break;
             case 'moresetting':
+                // 设置 MySQL 相关输入框状态
+                updateMySQLFields();
+                document.getElementById('db_type').addEventListener('change', updateMySQLFields);
                 modal = document.getElementById("moreSettingModal");
                 logSpan = document.getElementsByClassName("close")[7];
-                fetchLogs('<?php echo $_SERVER['PHP_SELF']; ?>?get_gen_list=true', updateGenList);
+                fetchLogs('manage.php?get_gen_list=true', updateGenList);
                 break;
             default:
                 console.error('Unknown type:', type);
@@ -1093,7 +1089,7 @@ try {
     function updateIconList(iconsData) {
         const channelTitle = document.getElementById('iconModalTitle');
         channelTitle.innerHTML = `频道列表<span style="font-size: 18px;">（总数：${iconsData.count}）</span>`; // 更新频道总数
-        document.getElementById('iconTable').dataset.allIcons = JSON.stringify(iconsData.channels); // 将原始频道和映射后的频道数据存储到 dataset 中
+        document.getElementById('iconTable').dataset.allIcons = JSON.stringify(iconsData.channels); // 将频道名和台标地址存储到 dataset 中
         filterChannels('icon'); // 生成数据
     }
     
@@ -1164,110 +1160,161 @@ try {
     }
 
     function filterChannels(type) {
-        var input, tableBody, allData, tableId, dataAttr;
+        const tableId = type === 'channel' ? 'channelTable' : 'iconTable';
+        const dataAttr = type === 'channel' ? 'allChannels' : 'allIcons';
+        const input = document.getElementById(type === 'channel' ? 'channelSearchInput' : 'iconSearchInput').value.toUpperCase();
+        const tableBody = document.querySelector(`#${tableId} tbody`);
+        const allData = JSON.parse(document.getElementById(tableId).dataset[dataAttr]);
 
-        if (type === 'channel') {
-            input = document.getElementById('channelSearchInput').value.toUpperCase();
-            tableId = 'channelTable';
-            dataAttr = 'allChannels';
-        } else if (type === 'icon') {
-            input = document.getElementById('iconSearchInput').value.toUpperCase();
-            tableId = 'iconTable';
-            dataAttr = 'allIcons';
+        tableBody.innerHTML = ''; // 清空表格
+
+        // 创建行的通用函数
+        function createEditableRow(item, itemIndex, insertAfterRow = null) {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td name="channel" contenteditable="true">${item.channel || ''}</td>
+                <td name="icon" contenteditable="true">${item.icon || ''}</td>
+                <td></td>
+                <td>
+                    <input type="file" accept="image/png" style="display:none;" id="icon_new_${itemIndex}">
+                    <button onclick="document.getElementById('icon_new_${itemIndex}').click()" style="font-size: 14px; width: 50px;">上传</button>
+                </td>
+            `;
+            
+            // 动态更新 allData
+            row.querySelectorAll('td[contenteditable]').forEach(cell => {
+                cell.addEventListener('input', () => {
+                    allData[itemIndex][cell.getAttribute('name')] = cell.textContent.trim();
+                    document.getElementById(tableId).dataset[dataAttr] = JSON.stringify(allData);
+                    if (cell.getAttribute('name') === 'channel' && item.channel && !allData.some(e => !e.channel)) {
+                        allData.push({ channel: '', icon: '' });
+                        createEditableRow(allData[allData.length - 1], allData.length - 1, row); // 插入新行到当前行后
+                    }
+                });
+            });
+
+            // 上传文件
+            row.querySelector(`#icon_new_${itemIndex}`).addEventListener('change', event => handleFileUpload(event, item, row, allData));
+
+            // 如果指定了插入位置，则插入到该行之后，否则追加到表格末尾
+            if (insertAfterRow) {
+                insertAfterRow.insertAdjacentElement('afterend', row);
+            } else {
+                tableBody.appendChild(row);
+            }
         }
 
-        tableBody = document.querySelector(`#${tableId} tbody`);
-        allData = JSON.parse(document.getElementById(tableId).dataset[dataAttr]);
+        // 创建初始空行（仅用于 icon）
+        if (!input && type === 'icon') {
+            allData.push({ channel: '', icon: '' });
+            createEditableRow(allData[allData.length - 1], allData.length - 1);
+        }
 
-        // 清空现有表格
-        tableBody.innerHTML = '';
-
+        // 筛选并显示行的逻辑
         allData.forEach((item, index) => {
             const searchText = type === 'channel' ? item.original : item.channel;
             if (String(searchText).toUpperCase().includes(input)) {
-                var row = document.createElement('tr');
-                const id = index; // 生成唯一ID
-
+                const row = document.createElement('tr');
                 if (type === 'channel') {
-                    row.innerHTML = `
-                        <td>${String(item.original)}</td>
-                        <td contenteditable="true">${item.mapped}</td>
-                    `;
-
+                    row.innerHTML = `<td>${item.original}</td><td contenteditable="true">${item.mapped || ''}</td>`;
                     row.querySelector('td[contenteditable]').addEventListener('input', function() {
-                        item.mapped = this.textContent;
+                        item.mapped = this.textContent.trim();
                         document.getElementById(tableId).dataset[dataAttr] = JSON.stringify(allData);
                     });
-                } else if (type === 'icon') {
+                } else if (type === 'icon' && searchText) {
                     row.innerHTML = `
-                        <td>${String(item.channel)}</td>
+                        <td>${item.channel}</td>
                         <td contenteditable="true">${item.icon || ''}</td>
+                        <td>${item.icon ? `<a href="${item.icon}" target="_blank"><img src="${item.icon}" style="max-width: 80px; max-height: 50px; background-color: #ccc;"></a>` : ''}</td>
                         <td>
-                            ${item.icon ? `
-                                <a href="${item.icon}" target="_blank">
-                                    <img src="${item.icon}" alt="${item.channel} icon" style="max-width: 80px; max-height: 50px; background-color: #ccc;">
-                                </a>
-                            ` : ''}
-                        </td>
-                        <td>
-                            <input type="file" accept="image/png" style="display:none;" id="file_${id}">
-                            <button onclick="document.getElementById('file_${id}').click()">上传</button>
+                            <input type="file" accept="image/png" style="display:none;" id="file_${index}">
+                            <button onclick="document.getElementById('file_${index}').click()" style="font-size: 14px; width: 50px;">上传</button>
                         </td>
                     `;
-
-                    // 更新图标 URL
                     row.querySelector('td[contenteditable]').addEventListener('input', function() {
-                        item.icon = this.textContent;
+                        item.icon = this.textContent.trim();
                         document.getElementById(tableId).dataset[dataAttr] = JSON.stringify(allData);
                     });
-
-                    // 上传文件
-                    row.querySelector(`#file_${id}`).addEventListener('change', function(event) {
-                        handleFileUpload(event, item, row, allData);
-                    });
+                    row.querySelector(`#file_${index}`).addEventListener('change', event => handleFileUpload(event, item, row, allData));
                 }
-
                 tableBody.appendChild(row);
             }
         });
     }
 
-    // 文件上传处理函数
     function handleFileUpload(event, item, row, allData) {
         const file = event.target.files[0];
         if (file && file.type === 'image/png') {
             const formData = new FormData();
             formData.append('iconFile', file);
-            formData.append('channel', item.channel);
 
-            // 发送上传请求
-            fetch('<?php echo $_SERVER['PHP_SELF']; ?>', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    const iconUrl = data.iconUrl;
-
-                    // 更新表格数据
-                    row.cells[1].innerText = iconUrl;
-                    item.icon = iconUrl;
-                    row.cells[2].innerHTML = `
-                        <a href="${iconUrl}?${new Date().getTime()}" target="_blank" rel="noopener noreferrer">
-                            <img src="${iconUrl}?${new Date().getTime()}" alt="${item.channel} icon" style="max-width: 80px; max-height: 50px; background-color: #ccc;">
-                        </a>
-                    `;
-                    // 更新内存中的 allData
-                    document.getElementById('iconTable').dataset.allIcons = JSON.stringify(allData);
-                } else {
-                    alert('上传失败：' + data.message);
-                }
-            })
-            .catch(error => alert('上传过程中发生错误：' + error));
+            fetch('manage.php', { method: 'POST', body: formData })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        const iconUrl = data.iconUrl;
+                        row.cells[1].innerText = iconUrl;
+                        item.icon = iconUrl;
+                        row.cells[2].innerHTML = `
+                            <a href="${iconUrl}?${new Date().getTime()}" target="_blank">
+                                <img src="${iconUrl}?${new Date().getTime()}" style="max-width: 80px; max-height: 50px; background-color: #ccc;">
+                            </a>
+                        `;
+                        document.getElementById('iconTable').dataset.allIcons = JSON.stringify(allData);
+                    } else {
+                        alert('上传失败：' + data.message);
+                    }
+                })
+                .catch(error => alert('上传过程中发生错误：' + error));
         } else {
             alert('请选择PNG文件上传');
         }
+    }
+
+    function uploadAllIcons() {
+        const serverUrl = window.location.protocol + '//' + window.location.host;
+        const iconTable = document.getElementById('iconTable');
+        const allIcons = JSON.parse(iconTable.dataset.allIcons);
+
+        document.querySelectorAll('#iconTable tbody tr').forEach(row => {
+            const [channelCell, iconCell, previewCell] = row.cells;
+            const iconUrl = iconCell?.innerText.trim() || '';
+
+            if (!iconUrl || iconUrl.startsWith(serverUrl)) return;
+
+            const fileName = decodeURIComponent(iconUrl.split('/').pop().split('?')[0]);
+
+            fetch(iconUrl, { cache: 'default' })
+                .then(res => res.blob())
+                .then(blob => {
+                    const formData = new FormData();
+                    formData.append('iconFile', new File([blob], fileName, { type: 'image/png' }));
+                    return fetch('manage.php', { method: 'POST', body: formData });
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        const iconUrl = data.iconUrl;
+                        const channelName = channelCell.innerText.trim();
+
+                        iconCell.innerText = iconUrl;
+                        previewCell.innerHTML = `
+                            <a href="${iconUrl}?${Date.now()}" target="_blank">
+                                <img src="${iconUrl}?${Date.now()}" style="max-width: 80px; max-height: 50px; background-color: #ccc;">
+                            </a>
+                        `;
+
+                        // 更新 iconTable 的 dataset
+                        allIcons.forEach(item => {
+                            if (item.channel === channelName) item.icon = iconUrl;
+                        });
+                        iconTable.dataset.allIcons = JSON.stringify(allIcons);
+                    } else {
+                        console.error('上传失败：' + data.message);
+                    }
+                })
+                .catch(console.error);
+        });
     }
 
     function updateChannelMapping() {
@@ -1345,7 +1392,7 @@ try {
         var iconTableElement = document.getElementById('iconTable');
         var allIcons = iconTableElement && iconTableElement.dataset.allIcons ? JSON.parse(iconTableElement.dataset.allIcons) : null;
         if(allIcons) {
-            fetch('<?php echo $_SERVER['PHP_SELF']; ?>', {
+            fetch('manage.php', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
@@ -1358,7 +1405,7 @@ try {
         }
 
         const textAreaContent = document.getElementById('gen_list_text').value;
-        fetch('<?php echo $_SERVER['PHP_SELF']; ?>?set_gen_list=true', {
+        fetch('manage.php?set_gen_list=true', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'

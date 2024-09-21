@@ -25,7 +25,20 @@ function logMessage(&$log_messages, $message) {
 
 // 删除过期数据和日志
 function deleteOldData($db, $keep_days, &$log_messages) {
-    global $Config;
+    global $Config, $iconList, $serverUrl;
+
+    // 清除未在使用的台标
+    $iconUrls = array_values($iconList);
+    $iconPath = __DIR__ . '/data/icon';
+    foreach (scandir($iconPath) as $file) {
+        if ($file === '.' || $file === '..') { continue; }
+        $fileUrl = $serverUrl . '/epg/data/icon/' . $file;
+        if (!in_array($fileUrl, $iconUrls)) {
+            $filePath = $iconPath . '/' . $file;
+            @unlink($filePath);
+            logMessage($log_messages, "【清理台标】 {$file}");
+        }
+    }
 
     // 删除 t.xml 和 t.xml.gz 文件
     @unlink('./t.xml');
@@ -81,19 +94,6 @@ function processData($xml_url, $db, &$log_messages, $gen_list) {
     } else {
         logMessage($log_messages, "【下载】 失败！！！");
     }
-}
-
-function loadHashesFromJson($json_file) {
-    if (file_exists($json_file)) {
-        $json_data = file_get_contents($json_file);
-        return json_decode($json_data, true);
-    }
-    return [];
-}
-
-function saveHashesToJson($json_file, $hashes) {
-    $json_data = json_encode($hashes, JSON_PRETTY_PRINT);
-    file_put_contents($json_file, $json_data);
 }
 
 // 获取限定频道列表及映射关系
@@ -153,6 +153,7 @@ function getChannelBindEPG() {
 // 从 epg_data 表生成 XML 数据并逐个频道写入 t.xml 文件
 function generateXmlFromEpgData($db, $include_future_only, $gen_list_mapping, &$log_messages) {
     global $Config;
+    global $iconListDefault;
     global $iconList;
     global $iconList_path;
 
@@ -213,17 +214,18 @@ function generateXmlFromEpgData($db, $include_future_only, $gen_list_mapping, &$
             $xmlWriter->text(htmlspecialchars($displayName, ENT_XML1, 'UTF-8'));
             $xmlWriter->endElement(); // display-name
         }
-
+        
+        $iconListMerged = array_merge($iconListDefault, $iconList); // 同一个键，以 iconList 的为准
         $iconUrl = '';
 
         // 精确匹配
-        if (isset($iconList[strtoupper($originalChannel)])) {
-            $iconUrl = $iconList[strtoupper($originalChannel)];
+        if (isset($iconListMerged[$originalChannel])) {
+            $iconUrl = $iconListMerged[$originalChannel];
         } else {
             $bestMatch = null;
             
             // 正向模糊匹配
-            foreach ($iconList as $channelName => $icon) {
+            foreach ($iconListMerged as $channelName => $icon) {
                 if (stripos($channelName, $originalChannel) !== false) {
                     if ($bestMatch === null || strlen($channelName) < strlen($bestMatch)) {
                         $bestMatch = $channelName;
@@ -232,7 +234,7 @@ function generateXmlFromEpgData($db, $include_future_only, $gen_list_mapping, &$
             
             if(!$iconUrl) {
             // 反向模糊匹配
-                foreach ($iconList as $channelName => $icon) {
+                foreach ($iconListMerged as $channelName => $icon) {
                     if (stripos($originalChannel, $channelName) !== false) {
                         if ($bestMatch === null || strlen($channelName) > strlen($bestMatch)) {
                             $bestMatch = $channelName;
@@ -376,7 +378,7 @@ function processXmlData($xml_url, $xml_data, $date, $db, $gen_list) {
         $start = getFormatTime((string)$programme['start']);
         $end = getFormatTime((string)$programme['stop']);
         $channelId = (string)$programme['channel'];
-        $channelName = strtoupper($channelNamesMap[$channelId]) ?? null;
+        $channelName = $channelNamesMap[$channelId] ?? null;
         $recordKey = $channelName . '-' . $start['date'];
 
         // 优先处理跨天数据

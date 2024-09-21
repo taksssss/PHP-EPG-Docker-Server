@@ -116,7 +116,7 @@ function readEPGData($date, $channel, $db, $type) {
 
     // 在解码和添加 icon 后再编码为 JSON
     $rowArray = json_decode($row, true);
-    $iconUrl = $iconList[strtoupper($rowArray['channel_name'])] ?? "";
+    $iconUrl = $iconList[$rowArray['channel_name']] ?? "";
     $rowArray = array_merge(
         array_slice($rowArray, 0, array_search('url', array_keys($rowArray)) + 1),
         ['icon' => $iconUrl],
@@ -199,7 +199,7 @@ function findCurrentProgramme($programmes) {
 
 // 处理请求
 function fetchHandler() {
-    global $init, $db, $Config;
+    global $init, $db, $Config, $iconList, $iconListDefault;
 
     $uri = parse_url($_SERVER['REQUEST_URI']);
     $query_params = [];
@@ -233,14 +233,17 @@ function fetchHandler() {
     
         if ($response) {
             makeRes($response, $init['status'], $init['headers']);
-        } else if(!isset($Config['ret_default']) || $Config['ret_default']) {
+        } else {
+            $ret_default = !isset($Config['ret_default']) || $Config['ret_default'];
+            $icon = $iconList[$channel] ?? $iconListDefault[$channel] ?? '';
             if ($type === 'diyp') {
                 // 无法获取到数据时返回默认 diyp 数据
                 $default_diyp_program_info = [
                     'date' => $date,
                     'channel_name' => $channel,
                     'url' => "https://github.com/taksssss/PHP-EPG-Server",
-                    'epg_data' => array_map(function($hour) {
+                    'icon' => $icon,
+                    'epg_data' => !$ret_default ? '' : array_map(function($hour) {
                         return [
                             'start' => sprintf('%02d:00', $hour),
                             'end' => sprintf('%02d:00', ($hour + 1) % 24),
@@ -258,7 +261,8 @@ function fetchHandler() {
                         'liveSt' => 0,
                         'channelName' => $channel,
                         'lvUrl' => 'https://github.com/taksssss/PHP-EPG-Docker-Server',
-                        'program' => array_map(function($hour) {
+                        'icon' => $icon,
+                        'program' => !$ret_default ? '' : array_map(function($hour) {
                             return [
                                 'st' => strtotime(sprintf('%02d:00', $hour)),
                                 'et' => strtotime(sprintf('%02d:00', ($hour + 1) % 24)),
