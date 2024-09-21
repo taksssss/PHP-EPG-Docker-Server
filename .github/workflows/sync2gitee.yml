@@ -23,7 +23,7 @@ jobs:
         uses: Yikun/hub-mirror-action@master
         with:
           src: github/taksssss
-          dst: gitee/takcheung
+          dst: gitee/taksssss
           dst_key: ${{ secrets.GITEE_PRIVATE_KEY }}
           dst_token: ${{ secrets.GITEE_TOKEN }}
           static_list: '${{ steps.info.outputs.result }}'
