@@ -440,9 +440,9 @@ try {
 
         if (isset($_GET['set_gen_list'])) {
             $action = 'set_gen_list';
-        } elseif (!empty($_FILES['importFile']['tmp_name'])) {
+        } elseif (isset($_POST['importExport']) && !empty($_FILES['importFile']['tmp_name'])) {
             $action = 'import_config';
-        } elseif (isset($_POST['action']) && empty($_FILES['importFile']['tmp_name'])) {
+        } elseif (isset($_POST['importExport']) && empty($_FILES['importFile']['tmp_name'])) {
             $action = 'export_config';
         } elseif (isset($_FILES['iconFile'])) {
             $action = 'upload_icon';
@@ -492,7 +492,7 @@ try {
 
             case 'export_config':
                 $zip = new ZipArchive();
-                $zipFileName = 't.gz';                
+                $zipFileName = 't.gz';
                 if ($zip->open($zipFileName, ZipArchive::CREATE | ZipArchive::OVERWRITE) === TRUE) {
                     $dataDir = __DIR__ . '/data';
                     $files = new RecursiveIteratorIterator(
@@ -502,7 +502,7 @@ try {
                     foreach ($files as $file) {
                         if (!$file->isDir()) {
                             $filePath = $file->getRealPath();
-                            $relativePath = substr($filePath, strlen($dataDir) + 1);
+                            $relativePath = 'data/' . substr($filePath, strlen($dataDir) + 1);
                             $zip->addFile($filePath, $relativePath);
                         }
                     }
@@ -795,7 +795,7 @@ try {
         </select>
         <form id="importForm" method="post" enctype="multipart/form-data" style="display: inline-block;">
             <input type="file" name="importFile" id="importFile" style="display: none;" accept=".gz" onchange="document.getElementById('importForm').submit();">
-            <input type="hidden" name="action" id="formAction" value="">
+            <input type="hidden" name="importExport" id="formImportExport" value="">
             <span id="import" onclick="document.getElementById('importFile').click()" style="color: blue; cursor: pointer; margin-right: 20px;">数据导入</span>
             <span id="export" onclick="document.getElementById('importForm').submit()" style="color: blue; cursor: pointer;">数据导出</span>
         </form>
