@@ -52,7 +52,7 @@ function getFormatTime($time) {
 }
 
 // 从数据库读取 diyp、lovetv 数据，兼容未安装 memcached 的情况
-function readEPGData($date, $channel, $db, $type) {
+function readEPGData($date, $oriChName, $cleanChName, $db, $type) {
     global $Config;
     global $iconList;
 
@@ -61,7 +61,7 @@ function readEPGData($date, $channel, $db, $type) {
     
     // 检查是否开启缓存并安装了 Memcached 类
     $memcached_enabled = $Config['cache_time'] && class_exists('Memcached');
-    $cache_key = base64_encode("{$date}_{$channel}_{$type}");
+    $cache_key = base64_encode("{$date}_{$cleanChName}_{$type}");
     
     if ($memcached_enabled) {
         // 初始化 Memcached
@@ -77,8 +77,8 @@ function readEPGData($date, $channel, $db, $type) {
 
     // 获取数据库类型（mysql 或 sqlite）
     $concat = $db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql' 
-        ? "CONCAT('%', LOWER(channel), '%')" 
-        : "'%' || LOWER(channel) || '%'";
+        ? "CONCAT('%', UPPER(channel), '%')" 
+        : "'%' || UPPER(channel) || '%'";
 
     // 优先精准匹配，其次正向模糊匹配，最后反向模糊匹配
     $stmt = $db->prepare("
@@ -86,27 +86,27 @@ function readEPGData($date, $channel, $db, $type) {
         FROM epg_data 
         WHERE date = :date 
         AND (
-            LOWER(channel) = LOWER(:channel)
-            OR LOWER(channel) LIKE LOWER(:like_channel)
-            OR LOWER(:channel) LIKE $concat
+            UPPER(channel) = UPPER(:channel)
+            OR UPPER(channel) LIKE UPPER(:like_channel)
+            OR UPPER(:channel) LIKE $concat
         )
         ORDER BY 
             CASE 
-                WHEN LOWER(channel) = LOWER(:channel) THEN 1 
-                WHEN LOWER(channel) LIKE LOWER(:like_channel) THEN 2 
+                WHEN UPPER(channel) = UPPER(:channel) THEN 1 
+                WHEN UPPER(channel) LIKE UPPER(:like_channel) THEN 2 
                 ELSE 3 
             END, 
             CASE 
-                WHEN LOWER(channel) = LOWER(:channel) THEN NULL
-                WHEN LOWER(channel) LIKE LOWER(:like_channel) THEN LENGTH(channel)
+                WHEN UPPER(channel) = UPPER(:channel) THEN NULL
+                WHEN UPPER(channel) LIKE UPPER(:like_channel) THEN LENGTH(channel)
                 ELSE -LENGTH(channel)
             END
         LIMIT 1
     ");
     $stmt->execute([
         ':date' => $date, 
-        ':channel' => $channel, 
-        ':like_channel' => $channel . '%'
+        ':channel' => $cleanChName, 
+        ':like_channel' => $cleanChName . '%'
     ]);
     $row = $stmt->fetchColumn();
 
@@ -158,7 +158,7 @@ function readEPGData($date, $channel, $db, $type) {
 
         // 生成 lovetv 数据
         $lovetv_data = [
-            $channel => [
+            $oriChName => [
                 'isLive' => $current_programme ? $current_programme['t'] : '',
                 'liveSt' => $current_programme ? $current_programme['st'] : 0,
                 'channelName' => $diyp_data['channel_name'],
@@ -208,12 +208,13 @@ function fetchHandler() {
     }
 
     // 获取并清理频道名称，繁体转换成简体
-    $channel = cleanChannelName($query_params['ch'] ?? $query_params['channel'] ?? '', $t2s = true);
+    $oriChName = $query_params['ch'] ?? $query_params['channel'] ?? '';
+    $cleanChName = cleanChannelName($oriChName, $t2s = true);
 
     $date = isset($query_params['date']) ? getFormatTime(preg_replace('/\D+/', '', $query_params['date']))['date'] : getNowDate();
 
     // 频道参数为空时，直接重定向到 t.xml 文件
-    if (empty($channel)) {
+    if (empty($cleanChName)) {
         if ($Config['gen_xml'] == 1) {
             header('Content-Type: application/xml');
             header('Content-Disposition: attachment; filename="t.xml"');
@@ -229,18 +230,18 @@ function fetchHandler() {
     // 返回 diyp、lovetv 数据
     if (isset($query_params['ch']) || isset($query_params['channel'])) {
         $type = isset($query_params['ch']) ? 'diyp' : 'lovetv';
-        $response = readEPGData($date, $channel, $db, $type);
+        $response = readEPGData($date, $oriChName, $cleanChName, $db, $type);
     
         if ($response) {
             makeRes($response, $init['status'], $init['headers']);
         } else {
             $ret_default = !isset($Config['ret_default']) || $Config['ret_default'];
-            $icon = $iconList[$channel] ?? $iconListDefault[$channel] ?? '';
+            $icon = $iconList[$cleanChName] ?? $iconListDefault[$cleanChName] ?? '';
             if ($type === 'diyp') {
                 // 无法获取到数据时返回默认 diyp 数据
                 $default_diyp_program_info = [
                     'date' => $date,
-                    'channel_name' => $channel,
+                    'channel_name' => $cleanChName,
                     'url' => "https://github.com/taksssss/PHP-EPG-Server",
                     'icon' => $icon,
                     'epg_data' => !$ret_default ? '' : array_map(function($hour) {
@@ -256,10 +257,10 @@ function fetchHandler() {
             } else {
                 // 无法获取到数据时返回默认 lovetv 数据
                 $default_lovetv_program_info = [
-                    $channel => [
+                    $cleanChName => [
                         'isLive' => '',
                         'liveSt' => 0,
-                        'channelName' => $channel,
+                        'channelName' => $cleanChName,
                         'lvUrl' => 'https://github.com/taksssss/PHP-EPG-Docker-Server',
                         'icon' => $icon,
                         'program' => !$ret_default ? '' : array_map(function($hour) {

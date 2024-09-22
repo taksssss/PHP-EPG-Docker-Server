@@ -28,14 +28,16 @@ function deleteOldData($db, $keep_days, &$log_messages) {
     global $Config, $iconList, $serverUrl;
 
     // 清除未在使用的台标
-    $iconUrls = array_values($iconList);
+    $iconUrls = array_map(function($url) {
+        return parse_url($url, PHP_URL_PATH);
+    }, array_values($iconList));
     $iconPath = __DIR__ . '/data/icon';
+    $parentRltPath = '/' . basename(__DIR__) . '/data/icon/';
     foreach (scandir($iconPath) as $file) {
-        if ($file === '.' || $file === '..') { continue; }
-        $fileUrl = $serverUrl . '/epg/data/icon/' . $file;
-        if (!in_array($fileUrl, $iconUrls)) {
-            $filePath = $iconPath . '/' . $file;
-            @unlink($filePath);
+        if ($file === '.' || $file === '..') continue;
+        $iconRltPath = $parentRltPath . $file;
+        if (!in_array($iconRltPath, $iconUrls)) {
+            @unlink($iconPath . '/' . $file);
             logMessage($log_messages, "【清理台标】 {$file}");
         }
     }
