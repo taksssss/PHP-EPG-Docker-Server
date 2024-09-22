@@ -23,7 +23,7 @@ jobs:
           mkdir -p epg
           jq -R -s '
             split("\n") | map(select(length > 0)) | map({
-              (gsub("[ _-]"; "") | ascii_upcase): "https://cdn.jsdelivr.net/gh/fanmingming/live@main/tv/\(.).png"
+              (gsub("[ _-]"; "") | ascii_upcase): "https://gcore.jsdelivr.net/gh/taksssss/tv@main/icon/\(.).png"
             }) | add' png_files.txt > epg/iconList_default.json
 
       - name: Clone repository
@@ -43,7 +43,7 @@ jobs:
                     match($(i + 1), /<img src="([^"]+)"/, arr)
                     image_url = arr[1]
                     if (channel_name && image_url) {
-                      gsub(/raw.githubusercontent.com\/wanglindl\/TV[lL]ogo\//, "cdn.jsdelivr.net/gh/wanglindl/TVLogo@", image_url)
+                      gsub(/https:\/\/raw.githubusercontent.com\/wanglindl\/TV[lL]ogo\/.*\/img\//, "https://gcore.jsdelivr.net/gh/taksssss/tv@main/icon/", image_url)
                       gsub(/[ _-]/, "", channel_name)
                       channel_name = toupper(channel_name)
                       printf "%s:%s\n", channel_name, image_url
