@@ -704,7 +704,10 @@ try {
         <h2 id="iconModalTitle">频道列表</h2>
         <div style="display: flex;">
             <input type="text" id="iconSearchInput" placeholder="搜索频道名..." onkeyup="filterChannels('icon')" style="flex: 1; margin-right: 10px;">
-            <button id="uploadAllIcons" type="button" onclick="uploadAllIcons();">上传所有台标</button>
+            <div class="tooltip" style="width:105px">
+                <button id="uploadAllIcons" type="button" onclick="uploadAllIcons();">转存所有台标</button>
+                <span class="tooltiptext">将远程台标转存到服务器</span>
+            </div>
         </div>
         <div class="table-container" id="icon-table-container">
             <table id="iconTable">
@@ -1079,6 +1082,7 @@ try {
         logContent.scrollTop = logContent.scrollHeight;
     }
 
+    // 显示频道别名列表
     function updateChannelList(channelsData) {
         const channelTitle = document.getElementById('channelModalTitle');
         channelTitle.innerHTML = `频道列表<span style="font-size: 18px;">（总数：${channelsData.count}）</span>`; // 更新频道总数
@@ -1086,6 +1090,7 @@ try {
         filterChannels('channel'); // 生成数据
     }
 
+    // 显示台标列表
     function updateIconList(iconsData) {
         const channelTitle = document.getElementById('iconModalTitle');
         channelTitle.innerHTML = `频道列表<span style="font-size: 18px;">（总数：${iconsData.count}）</span>`; // 更新频道总数
@@ -1093,6 +1098,7 @@ try {
         filterChannels('icon'); // 生成数据
     }
     
+    // 显示频道绑定 EPG 列表
     function updateChannelBindEPGList(channelBindEPGData) {
         // 创建并添加隐藏字段
         const channelBindEPGInput = document.createElement('input');
@@ -1125,6 +1131,7 @@ try {
         });
     }
 
+    // 显示频道匹配结果
     function updateChannelMatchList(channelMatchdata) {
         const channelMatchTableBody = document.querySelector("#channelMatchTable tbody");
         channelMatchTableBody.innerHTML = '';
@@ -1159,6 +1166,7 @@ try {
         }
     }
 
+    // 搜索频道
     function filterChannels(type) {
         const tableId = type === 'channel' ? 'channelTable' : 'iconTable';
         const dataAttr = type === 'channel' ? 'allChannels' : 'allIcons';
@@ -1172,7 +1180,7 @@ try {
         function createEditableRow(item, itemIndex, insertAfterRow = null) {
             const row = document.createElement('tr');
             row.innerHTML = `
-                <td name="channel" contenteditable="true">${item.channel || ''}</td>
+                <td name="channel" contenteditable="true" onclick="this.innerText='';"><span style="color: #aaa;">创建自定义频道</span>${item.channel || ''}</td>
                 <td name="icon" contenteditable="true">${item.icon || ''}</td>
                 <td></td>
                 <td>
@@ -1242,6 +1250,7 @@ try {
         });
     }
 
+    // 台标上传
     function handleFileUpload(event, item, row, allData) {
         const file = event.target.files[0];
         if (file && file.type === 'image/png') {
@@ -1271,24 +1280,39 @@ try {
         }
     }
 
+    // 转存所有台标到服务器
     function uploadAllIcons() {
-        const serverUrl = window.location.protocol + '//' + window.location.host;
+        const serverUrl = window.location.origin;
         const iconTable = document.getElementById('iconTable');
         const allIcons = JSON.parse(iconTable.dataset.allIcons);
+        const rows = Array.from(document.querySelectorAll('#iconTable tbody tr'));
 
-        document.querySelectorAll('#iconTable tbody tr').forEach(row => {
+        // 过滤掉空的和已经在服务器上的图标
+        const rowsToUpload = rows.filter(row => {
+            const iconUrl = row.cells[1]?.innerText.trim();
+            return iconUrl && !iconUrl.startsWith(serverUrl);
+        });
+
+        const totalIcons = rowsToUpload.length;
+        let uploadedIcons = 0;
+
+        const progressDisplay = document.getElementById('progressDisplay') || document.createElement('div');
+        progressDisplay.id = 'progressDisplay';
+        progressDisplay.style.cssText = 'margin: 10px 0; text-align: right;';
+        progressDisplay.textContent = `已转存 ${uploadedIcons}/${totalIcons}`;
+        iconTable.before(progressDisplay);
+
+        rowsToUpload.forEach(row => {
             const [channelCell, iconCell, previewCell] = row.cells;
-            const iconUrl = iconCell?.innerText.trim() || '';
-
-            if (!iconUrl || iconUrl.startsWith(serverUrl)) return;
-
+            const iconUrl = iconCell?.innerText.trim();
             const fileName = decodeURIComponent(iconUrl.split('/').pop().split('?')[0]);
 
-            fetch(iconUrl, { cache: 'default' })
+            fetch(iconUrl)
                 .then(res => res.blob())
                 .then(blob => {
                     const formData = new FormData();
                     formData.append('iconFile', new File([blob], fileName, { type: 'image/png' }));
+
                     return fetch('manage.php', { method: 'POST', body: formData });
                 })
                 .then(res => res.json())
@@ -1296,7 +1320,6 @@ try {
                     if (data.success) {
                         const iconUrl = data.iconUrl;
                         const channelName = channelCell.innerText.trim();
-
                         iconCell.innerText = iconUrl;
                         previewCell.innerHTML = `
                             <a href="${iconUrl}?${Date.now()}" target="_blank">
@@ -1304,19 +1327,23 @@ try {
                             </a>
                         `;
 
-                        // 更新 iconTable 的 dataset
                         allIcons.forEach(item => {
                             if (item.channel === channelName) item.icon = iconUrl;
                         });
                         iconTable.dataset.allIcons = JSON.stringify(allIcons);
+                        uploadedIcons++;
+                        progressDisplay.textContent = `已转存 ${uploadedIcons}/${totalIcons}`;
                     } else {
-                        console.error('上传失败：' + data.message);
+                        previewCell.innerHTML = `上传失败: ${data.message}`;
                     }
                 })
-                .catch(console.error);
+                .catch(() => {
+                    previewCell.innerHTML = '上传出错';
+                });
         });
     }
 
+    // 更新频道别名
     function updateChannelMapping() {
         var allChannels = JSON.parse(document.getElementById('channelTable').dataset.allChannels);
         var existingMappings = document.getElementById('channel_mappings').value.split('\n');
