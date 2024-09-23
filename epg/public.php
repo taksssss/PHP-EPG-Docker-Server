@@ -114,6 +114,32 @@ function t2s($channel) {
     return OpenCC::convert($channel, 'TRADITIONAL_TO_SIMPLIFIED');
 }
 
+// 台标模糊匹配
+function iconUrlMatch($originalChannel, $iconListMerged) {    
+    $iconUrl = '';
+    // 精确匹配
+    if (isset($iconListMerged[$originalChannel])) {
+        $iconUrl = $iconListMerged[$originalChannel];
+    } else {
+        $bestMatch = null;
+        // 正向模糊匹配
+        foreach ($iconListMerged as $channelName => $icon) {
+            if (stripos($channelName, $originalChannel) !== false) {
+                if ($bestMatch === null || strlen($channelName) < strlen($bestMatch)) {
+                    $bestMatch = $channelName;
+                    $iconUrl = $icon;
+        }}}
+        if(!$iconUrl) {
+        // 反向模糊匹配
+            foreach ($iconListMerged as $channelName => $icon) {
+                if (stripos($originalChannel, $channelName) !== false) {
+                    if ($bestMatch === null || strlen($channelName) > strlen($bestMatch)) {
+                        $bestMatch = $channelName;
+                        $iconUrl = $icon;
+    }}}}}
+    return $iconUrl;
+}
+
 // 下载文件
 function downloadData($url, $timeout = 30, $connectTimeout = 10, $retry = 3) {
     $ch = curl_init($url);

@@ -39,6 +39,10 @@ PHP 实现的 EPG（电子节目指南）服务端， `Docker` 部署，自带�
 
 ## 📝 更新日志
 
+### 2024-9-23
+
+1. 新增：无节目表频道的台标模糊匹配
+
 ### 2024-9-22
 
 1. 优化：更改台标 `CDN` 源，并替换为裁切版本
@@ -57,17 +61,6 @@ PHP 实现的 EPG（电子节目指南）服务端， `Docker` 部署，自带�
 
 1. 新增：台标管理，支持 `URL` 及 `上传`，模糊匹配，返回 `DIYP` 、 `超级直播` 及 `xmltv` 格式（感谢[fanmingming/live](https://github.com/fanmingming/live)、[wanglindl/TVlogo](https://github.com/wanglindl/TVlogo)）
 2. 修复：超级直播时间戳、`showTime` 字段错误
-
-### 2024-9-16：
-
-1. 新增：支持 `Memcached` ，可设置缓存时间
-2. 新增：`xmltv` 生成 `icon` 台标字段（感谢 https://www.fanmingming.com/ ）
-
-### 2024-9-15：
-
-1. 新增：生成 `xmltv` 文件时，使用多个 `display-name` 标记频道别名，减少数据冗余（感谢[snowie2000](https://github.com/snowie2000)）
-2. 优化：精简界面，删除频道忽略字符串
-3. 优化：`频道映射` 更名为 `频道别名` **（⚠️ 老用户注意，数据顺序更变）**
 
 ### 历史更新记录见[CHANGELOG.md](./CHANGELOG.md)
 

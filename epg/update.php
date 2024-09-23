@@ -218,30 +218,8 @@ function generateXmlFromEpgData($db, $include_future_only, $gen_list_mapping, &$
         }
         
         $iconListMerged = array_merge($iconListDefault, $iconList); // 同一个键，以 iconList 的为准
-        $iconUrl = '';
 
-        // 精确匹配
-        if (isset($iconListMerged[$originalChannel])) {
-            $iconUrl = $iconListMerged[$originalChannel];
-        } else {
-            $bestMatch = null;
-            
-            // 正向模糊匹配
-            foreach ($iconListMerged as $channelName => $icon) {
-                if (stripos($channelName, $originalChannel) !== false) {
-                    if ($bestMatch === null || strlen($channelName) < strlen($bestMatch)) {
-                        $bestMatch = $channelName;
-                        $iconUrl = $icon;
-            }}}
-            
-            if(!$iconUrl) {
-            // 反向模糊匹配
-                foreach ($iconListMerged as $channelName => $icon) {
-                    if (stripos($originalChannel, $channelName) !== false) {
-                        if ($bestMatch === null || strlen($channelName) > strlen($bestMatch)) {
-                            $bestMatch = $channelName;
-                            $iconUrl = $icon;
-        }}}}}
+        $iconUrl = iconUrlMatch($originalChannel, $iconListMerged);
 
         if ($iconUrl) {
             $iconList[strtoupper($originalChannel)] = $iconUrl;

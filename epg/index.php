@@ -236,14 +236,15 @@ function fetchHandler() {
             makeRes($response, $init['status'], $init['headers']);
         } else {
             $ret_default = !isset($Config['ret_default']) || $Config['ret_default'];
-            $icon = $iconList[$cleanChName] ?? $iconListDefault[$cleanChName] ?? '';
+            $iconListMerged = array_merge($iconListDefault, $iconList); // 同一个键，以 iconList 的为准
+            $iconUrl = iconUrlMatch($cleanChName, $iconListMerged);
             if ($type === 'diyp') {
                 // 无法获取到数据时返回默认 diyp 数据
                 $default_diyp_program_info = [
                     'date' => $date,
                     'channel_name' => $cleanChName,
                     'url' => "https://github.com/taksssss/PHP-EPG-Server",
-                    'icon' => $icon,
+                    'icon' => $iconUrl,
                     'epg_data' => !$ret_default ? '' : array_map(function($hour) {
                         return [
                             'start' => sprintf('%02d:00', $hour),
@@ -262,7 +263,7 @@ function fetchHandler() {
                         'liveSt' => 0,
                         'channelName' => $cleanChName,
                         'lvUrl' => 'https://github.com/taksssss/PHP-EPG-Docker-Server',
-                        'icon' => $icon,
+                        'icon' => $iconUrl,
                         'program' => !$ret_default ? '' : array_map(function($hour) {
                             return [
                                 'st' => strtotime(sprintf('%02d:00', $hour)),
