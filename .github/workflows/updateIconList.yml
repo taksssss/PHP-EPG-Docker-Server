@@ -28,7 +28,7 @@ jobs:
 
       - name: Clone repository
         run: |
-          git clone --depth 1 --branch main https://github.com/wanglindl/TVlogo.git TVlogo
+          git clone --depth 1 --branch main https://github.com/taksssss/TVlogo.git TVlogo
 
       - name: Extract channel icons from markdown files
         run: |
@@ -43,7 +43,7 @@ jobs:
                     match($(i + 1), /<img src="([^"]+)"/, arr)
                     image_url = arr[1]
                     if (channel_name && image_url) {
-                      gsub(/https:\/\/raw.githubusercontent.com\/wanglindl\/TV[lL]ogo\/.*\/img\//, "https://gcore.jsdelivr.net/gh/taksssss/tv@main/icon/", image_url)
+                      gsub(/https:\/\/raw.githubusercontent.com\/taksssss\/TV[lL]ogo\/.*\/img\//, "https://gcore.jsdelivr.net/gh/taksssss/tv@main/icon/", image_url)
                       gsub(/[ _-]/, "", channel_name)
                       channel_name = toupper(channel_name)
                       printf "%s:%s\n", channel_name, image_url
@@ -52,7 +52,7 @@ jobs:
                 }
               ' | while IFS=: read -r channel_name image_url; do
                 jq --arg key "$channel_name" --arg value "$image_url" \
-                  'if .[$key] == null then . + {($key): $value} else . end' epg/iconList_default.json > epg/iconList_default.json.tmp
+                  '.[$key] = $value' epg/iconList_default.json > epg/iconList_default.json.tmp
 
                 mv epg/iconList_default.json.tmp epg/iconList_default.json
               done
