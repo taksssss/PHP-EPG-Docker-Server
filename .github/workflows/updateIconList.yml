@@ -46,6 +46,7 @@ jobs:
                       gsub(/https:\/\/raw.githubusercontent.com\/taksssss\/TV[lL]ogo\/.*\/img\//, "https://gcore.jsdelivr.net/gh/taksssss/tv@main/icon/", image_url)
                       gsub(/[ _-]/, "", channel_name)
                       channel_name = toupper(channel_name)
+                      sub(/频道$/, "", channel_name)
                       printf "%s:%s\n", channel_name, image_url
                     }
                   }
