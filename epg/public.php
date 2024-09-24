@@ -20,6 +20,7 @@ file_exists($iconList_path = __DIR__ . '/data/iconList.json') || file_put_conten
 $Config = json_decode(file_get_contents($config_path), true) or die("配置文件解析失败: " . json_last_error_msg());
 ($iconList = json_decode(file_get_contents($iconList_path), true)) !== null || die("图标列表文件解析失败: " . json_last_error_msg());
 $iconListDefault = json_decode(file_get_contents(__DIR__ . '/iconList_default.json'), true) or die("默认图标列表文件解析失败: " . json_last_error_msg());
+$iconListMerged = array_merge($iconListDefault, $iconList); // 同一个键，以 iconList 的为准
 
 $serverUrl = (($_SERVER['HTTPS'] ?? '') === 'on' ? 'https://' : 'http://') . $_SERVER['HTTP_HOST'];
 
@@ -115,8 +116,10 @@ function t2s($channel) {
 }
 
 // 台标模糊匹配
-function iconUrlMatch($originalChannel, $iconListMerged) {    
-    $iconUrl = '';
+function iconUrlMatch($originalChannel) {    
+    global $iconListMerged;
+    
+    $iconUrl = null;
     // 精确匹配
     if (isset($iconListMerged[$originalChannel])) {
         $iconUrl = $iconListMerged[$originalChannel];

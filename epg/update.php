@@ -154,10 +154,7 @@ function getChannelBindEPG() {
 
 // 从 epg_data 表生成 XML 数据并逐个频道写入 t.xml 文件
 function generateXmlFromEpgData($db, $include_future_only, $gen_list_mapping, &$log_messages) {
-    global $Config;
-    global $iconListDefault;
-    global $iconList;
-    global $iconList_path;
+    global $Config, $iconList, $iconList_path;
 
     $currentDate = date('Y-m-d'); // 获取当前日期
     $dateCondition = $include_future_only ? "WHERE date >= '$currentDate'" : '';
@@ -216,10 +213,8 @@ function generateXmlFromEpgData($db, $include_future_only, $gen_list_mapping, &$
             $xmlWriter->text(htmlspecialchars($displayName, ENT_XML1, 'UTF-8'));
             $xmlWriter->endElement(); // display-name
         }
-        
-        $iconListMerged = array_merge($iconListDefault, $iconList); // 同一个键，以 iconList 的为准
 
-        $iconUrl = iconUrlMatch($originalChannel, $iconListMerged);
+        $iconUrl = iconUrlMatch($originalChannel);
 
         if ($iconUrl) {
             $iconList[strtoupper($originalChannel)] = $iconUrl;
