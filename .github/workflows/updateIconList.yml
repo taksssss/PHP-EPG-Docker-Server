@@ -52,10 +52,17 @@ jobs:
                   }
                 }
               ' | while IFS=: read -r channel_name image_url; do
-                jq --arg key "$channel_name" --arg value "$image_url" \
-                  '.[$key] = $value' epg/iconList_default.json > epg/iconList_default.json.tmp
-
-                mv epg/iconList_default.json.tmp epg/iconList_default.json
+                if jq -e "has(\"$channel_name\")" epg/iconList_default.json > /dev/null; then
+                  if [[ "$channel_name" == *"NEWTV"* ]]; then
+                    jq --arg key "$channel_name" --arg value "$image_url" \
+                      '.[$key] = $value' epg/iconList_default.json > epg/iconList_default.json.tmp
+                    mv epg/iconList_default.json.tmp epg/iconList_default.json
+                  fi
+                else
+                  jq --arg key "$channel_name" --arg value "$image_url" \
+                    '.[$key] = $value' epg/iconList_default.json > epg/iconList_default.json.tmp
+                  mv epg/iconList_default.json.tmp epg/iconList_default.json
+                fi
               done
             done < "$md_file"
           done
