@@ -313,6 +313,10 @@ try {
                 break;
 
             case 'get_icon':
+                // 是否显示无节目表的内置台标
+                if(isset($_GET['get_all_icon'])) {
+                    $iconList = $iconListMerged;
+                }
                 // 获取并合并数据库中的频道和 $iconList 中的频道，去重后按字母排序
                 $allChannels = array_unique(array_merge(
                     $db->query("SELECT DISTINCT channel FROM epg_data ORDER BY channel ASC")->fetchAll(PDO::FETCH_COLUMN),
@@ -608,8 +612,8 @@ try {
         
         <div class="flex-container">
             <div class="flex-item" style="width: 100%;">
-                <label for="channel_mappings">
-                    【频道别名】（数据库频道名 => 频道别名1, 频道别名2, ...）<span id="dbChannelName" onclick="showModal('channel')" style="color: blue; cursor: pointer;">（编辑别名）</span> <span id="dbChannelName" onclick="showModal('icon')" style="color: blue; cursor: pointer;">（编辑台标）</span>
+                <label>
+                    【频道别名】（数据库频道名 => 频道别名1, 频道别名2, ...）<span id="dbChannelName" onclick="showModal('channel')" style="color: blue; cursor: pointer;">（编辑别名）</span><span id="dbChannelName" onclick="showModal('icon')" style="color: blue; cursor: pointer;">（编辑台标）</span>
                 </label><br><br>
                 <textarea id="channel_mappings" name="channel_mappings" style="height: 142px;"><?php echo implode("\n", array_map(function($search, $replace) { return $search . ' => ' . $replace; }, array_keys($Config['channel_mappings']), $Config['channel_mappings'])); ?></textarea><br><br>
             </div>
@@ -704,8 +708,12 @@ try {
         <h2 id="iconModalTitle">频道列表</h2>
         <div style="display: flex;">
             <input type="text" id="iconSearchInput" placeholder="搜索频道名..." onkeyup="filterChannels('icon')" style="flex: 1; margin-right: 10px;">
-            <div class="tooltip" style="width:105px">
-                <button id="uploadAllIcons" type="button" onclick="uploadAllIcons();">转存所有台标</button>
+            <div class="tooltip" style="width:auto; margin-right: 10px;">
+                <button id="showAllIcons" type="button" onclick="showModal('allicon')">显示所有台标</button>
+                <span class="tooltiptext">同时显示无节目表的内置台标</span>
+            </div>
+            <div class="tooltip" style="width:auto;">
+                <button id="uploadAllIcons" type="button" onclick="uploadAllIcons();">转存列表台标</button>
                 <span class="tooltiptext">将远程台标转存到服务器</span>
             </div>
         </div>
@@ -990,32 +998,37 @@ try {
             case 'update':
                 modal = document.getElementById("updatelogModal");
                 logSpan = document.getElementsByClassName("close")[1];
-                fetchLogs('manage.php?get_update_logs=true', updateLogTable);
+                fetchData('manage.php?get_update_logs=true', updateLogTable);
                 break;
             case 'cron':
                 modal = document.getElementById("cronlogModal");
                 logSpan = document.getElementsByClassName("close")[2];
-                fetchLogs('manage.php?get_cron_logs=true', updateCronLogContent);
+                fetchData('manage.php?get_cron_logs=true', updateCronLogContent);
                 break;
             case 'channel':
                 modal = document.getElementById("channelModal");
                 logSpan = document.getElementsByClassName("close")[3];
-                fetchLogs('manage.php?get_channel=true', updateChannelList);
+                fetchData('manage.php?get_channel=true', updateChannelList);
                 break;
             case 'icon':
                 modal = document.getElementById("iconModal");
                 logSpan = document.getElementsByClassName("close")[4];
-                fetchLogs('manage.php?get_icon=true', updateIconList);
+                fetchData('manage.php?get_icon=true', updateIconList);
+                break;
+            case 'allicon':
+                modal = document.getElementById("iconModal");
+                logSpan = document.getElementsByClassName("close")[4];
+                fetchData('manage.php?get_icon=true&get_all_icon=true', updateIconList);
                 break;
             case 'channelbindepg':
                 modal = document.getElementById("channelBindEPGModal");
                 logSpan = document.getElementsByClassName("close")[5];
-                fetchLogs('manage.php?get_channel_bind_epg=true', updateChannelBindEPGList);
+                fetchData('manage.php?get_channel_bind_epg=true', updateChannelBindEPGList);
                 break;
             case 'channelmatch':
                 modal = document.getElementById("channelMatchModal");
                 logSpan = document.getElementsByClassName("close")[6];
-                fetchLogs('manage.php?get_channel_match=true', updateChannelMatchList);
+                fetchData('manage.php?get_channel_match=true', updateChannelMatchList);
                 document.getElementById("moreSettingModal").style.display = "none";
                 break;
             case 'moresetting':
@@ -1024,7 +1037,7 @@ try {
                 document.getElementById('db_type').addEventListener('change', updateMySQLFields);
                 modal = document.getElementById("moreSettingModal");
                 logSpan = document.getElementsByClassName("close")[7];
-                fetchLogs('manage.php?get_gen_list=true', updateGenList);
+                fetchData('manage.php?get_gen_list=true', updateGenList);
                 break;
             default:
                 console.error('Unknown type:', type);
@@ -1050,7 +1063,7 @@ try {
         }
     }
 
-    function fetchLogs(endpoint, callback) {
+    function fetchData(endpoint, callback) {
         fetch(endpoint)
             .then(response => response.json())
             .then(data => callback(data))
@@ -1287,14 +1300,20 @@ try {
         const allIcons = JSON.parse(iconTable.dataset.allIcons);
         const rows = Array.from(document.querySelectorAll('#iconTable tbody tr'));
 
-        // 过滤掉空的和已经在服务器上的图标
+        let totalIcons = 0;
+        let uploadedIcons = 0;
         const rowsToUpload = rows.filter(row => {
             const iconUrl = row.cells[1]?.innerText.trim();
-            return iconUrl && !iconUrl.startsWith(serverUrl);
+            if (iconUrl) {
+                totalIcons++;
+                if (!iconUrl.startsWith(serverUrl)) {
+                    return true;
+                } else {
+                    uploadedIcons++;
+                }
+            }
+            return false;
         });
-
-        const totalIcons = rowsToUpload.length;
-        let uploadedIcons = 0;
 
         const progressDisplay = document.getElementById('progressDisplay') || document.createElement('div');
         progressDisplay.id = 'progressDisplay';
@@ -1302,12 +1321,12 @@ try {
         progressDisplay.textContent = `已转存 ${uploadedIcons}/${totalIcons}`;
         iconTable.before(progressDisplay);
 
-        rowsToUpload.forEach(row => {
+        const uploadPromises = rowsToUpload.map(row => {
             const [channelCell, iconCell, previewCell] = row.cells;
             const iconUrl = iconCell?.innerText.trim();
             const fileName = decodeURIComponent(iconUrl.split('/').pop().split('?')[0]);
 
-            fetch(iconUrl)
+            return fetch(iconUrl)
                 .then(res => res.blob())
                 .then(blob => {
                     const formData = new FormData();
@@ -1340,6 +1359,15 @@ try {
                 .catch(() => {
                     previewCell.innerHTML = '上传出错';
                 });
+        });
+
+        Promise.all(uploadPromises).then(() => {
+            if (uploadedIcons !== totalIcons) {
+                uploadAllIcons(); // 继续上传
+            }
+            else {
+                progressDisplay.textContent = "全部转存成功，点击“保存配置”！";
+            }
         });
     }
 

@@ -199,7 +199,7 @@ function findCurrentProgramme($programmes) {
 
 // 处理请求
 function fetchHandler() {
-    global $init, $db, $Config, $iconList, $iconListDefault;
+    global $init, $db, $Config;
 
     $uri = parse_url($_SERVER['REQUEST_URI']);
     $query_params = [];
