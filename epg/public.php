@@ -84,7 +84,8 @@ function initialDB() {
 
 // 获取处理后的频道名：$t2s参数表示繁简转换，默认false
 function cleanChannelName($channel, $t2s = false) {
-    global $Config;    
+    global $Config;
+    $channel_ori = $channel;
     // 默认忽略 - 跟 空格 
     $channel_replacements = ['-', ' '];
     $channel = str_replace($channel_replacements, '', $channel);
@@ -92,11 +93,11 @@ function cleanChannelName($channel, $t2s = false) {
     foreach ($Config['channel_mappings'] as $replace => $search) {
         if (strpos($search, 'regex:') === 0) {
             $pattern = substr($search, 6);
-            if (preg_match($pattern, $channel)) {
-                return preg_replace($pattern, $replace, $channel);
+            if (preg_match($pattern, $channel_ori)) {
+                return preg_replace($pattern, $replace, $channel_ori);
             }
         } else {
-            // 普通映射，可能为多对一，忽略所有空格和大小写
+            // 普通映射，可能为多对一
             $channels = array_map('trim', explode(',', $search));
             foreach ($channels as $singleChannel) {
                 if (strcasecmp($channel, str_replace($channel_replacements, '', $singleChannel)) === 0) {

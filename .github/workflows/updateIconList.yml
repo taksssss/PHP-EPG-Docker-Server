@@ -23,7 +23,7 @@ jobs:
           mkdir -p epg
           jq -R -s '
             split("\n") | map(select(length > 0)) | map({
-              (gsub("[ _-]"; "") | ascii_upcase): "https://gcore.jsdelivr.net/gh/taksssss/tv@main/icon/\(.).png"
+              (gsub("[ _-]"; "") | ascii_upcase): "https://gcore.jsdelivr.net/gh/taksssss/tv/icon/\(.).png"
             }) | add' png_files.txt > epg/iconList_default.json
 
       - name: Clone repository
@@ -32,8 +32,10 @@ jobs:
 
       - name: Extract channel icons from markdown files
         run: |
-          md_files="TVlogo/md/*.md"
+          filter_keywords=("NEWTV" "CBN" "IHOT" "汕头")
+          ignore_keywords=("CCTV")
 
+          md_files="TVlogo/md/*.md"
           for md_file in $md_files; do
             while IFS= read -r line; do
               echo "$line" | awk -F'|' '
@@ -43,7 +45,7 @@ jobs:
                     match($(i + 1), /<img src="([^"]+)"/, arr)
                     image_url = arr[1]
                     if (channel_name && image_url) {
-                      gsub(/https:\/\/raw.githubusercontent.com\/taksssss\/TV[lL]ogo\/.*\/img\//, "https://gcore.jsdelivr.net/gh/taksssss/tv@main/icon/", image_url)
+                      gsub(/https:\/\/raw.githubusercontent.com\/taksssss\/TV[lL]ogo\/.*\/img\//, "https://gcore.jsdelivr.net/gh/taksssss/tv/icon/", image_url)
                       gsub(/[ _-]/, "", channel_name)
                       channel_name = toupper(channel_name)
                       sub(/频道$/, "", channel_name)
@@ -52,14 +54,32 @@ jobs:
                   }
                 }
               ' | while IFS=: read -r channel_name image_url; do
-                if jq -e "has(\"$channel_name\")" epg/iconList_default.json > /dev/null; then
-                  if [[ "$channel_name" == *"NEWTV"* ]]; then
-                    jq --arg key "$channel_name" --arg value "$image_url" \
-                      '.[$key] = $value' epg/iconList_default.json > epg/iconList_default.json.tmp
-                    mv epg/iconList_default.json.tmp epg/iconList_default.json
+                uppercase_channel_name=$(echo "$channel_name" | tr '[:lower:]' '[:upper:]')
+                
+                should_ignore=false
+                for ignore_keyword in "${ignore_keywords[@]}"; do
+                  uppercase_ignore_keyword=$(echo "$ignore_keyword" | tr '[:lower:]' '[:upper:]')
+                  if [[ "$uppercase_channel_name" == *"$uppercase_ignore_keyword"* ]]; then
+                    should_ignore=true
+                    break
                   fi
+                done
+                
+                if [ "$should_ignore" = true ]; then
+                  continue
+                fi
+
+                if jq -e "has(\"$uppercase_channel_name\")" epg/iconList_default.json > /dev/null; then
+                  for keyword in "${filter_keywords[@]}"; do
+                    uppercase_keyword=$(echo "$keyword" | tr '[:lower:]' '[:upper:]')
+                    if [[ "$uppercase_channel_name" == *"$uppercase_keyword"* ]]; then
+                      jq --arg key "$uppercase_channel_name" --arg value "$image_url" \
+                        '.[$key] = $value' epg/iconList_default.json > epg/iconList_default.json.tmp
+                      mv epg/iconList_default.json.tmp epg/iconList_default.json
+                    fi
+                  done
                 else
-                  jq --arg key "$channel_name" --arg value "$image_url" \
+                  jq --arg key "$uppercase_channel_name" --arg value "$image_url" \
                     '.[$key] = $value' epg/iconList_default.json > epg/iconList_default.json.tmp
                   mv epg/iconList_default.json.tmp epg/iconList_default.json
                 fi
