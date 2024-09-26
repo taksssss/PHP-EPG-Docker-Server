@@ -22,8 +22,6 @@ $Config = json_decode(file_get_contents($config_path), true) or die("配置文�
 $iconListDefault = json_decode(file_get_contents(__DIR__ . '/iconList_default.json'), true) or die("默认图标列表文件解析失败: " . json_last_error_msg());
 $iconListMerged = array_merge($iconListDefault, $iconList); // 同一个键，以 iconList 的为准
 
-$serverUrl = (($_SERVER['HTTPS'] ?? '') === 'on' ? 'https://' : 'http://') . $_SERVER['HTTP_HOST'];
-
 // 设置时区为亚洲/上海
 date_default_timezone_set("Asia/Shanghai");
 

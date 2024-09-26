@@ -25,7 +25,7 @@ function logMessage(&$log_messages, $message) {
 
 // 删除过期数据和日志
 function deleteOldData($db, $keep_days, &$log_messages) {
-    global $Config, $iconList, $serverUrl;
+    global $Config, $iconList;
 
     // 清除未在使用的台标
     $iconUrls = array_map(function($url) {
