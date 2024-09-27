@@ -116,7 +116,7 @@ function readEPGData($date, $oriChName, $cleanChName, $db, $type) {
 
     // 在解码和添加 icon 后再编码为 JSON
     $rowArray = json_decode($row, true);
-    $iconUrl = iconUrlMatch($rowArray['channel_name']) ?? iconUrlMatch($cleanChName);
+    $iconUrl = iconUrlMatch($rowArray['channel_name']) ?? iconUrlMatch($cleanChName) ?? iconUrlMatch($oriChName);
     $rowArray = array_merge(
         array_slice($rowArray, 0, array_search('url', array_keys($rowArray)) + 1),
         ['icon' => $iconUrl],
