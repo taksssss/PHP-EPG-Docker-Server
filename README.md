@@ -29,6 +29,7 @@ PHP 实现的 EPG（电子节目指南）服务端， `Docker` 部署，自带�
 
 > [!TIP]  
 > 台标匹配需搭配 [酷9APP](https://www.right.com.cn/forum/thread-8388801-1-1.html) 使用。
+>
 > `xmltv` 用户搭配 [【一键生成】匹配 M3U 文件的 XML 节目表](https://www.right.com.cn/forum/thread-8392662-1-1.html) 使用。
 
 ![设置页面](/pic/management.png)
