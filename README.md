@@ -29,6 +29,7 @@ PHP 实现的 EPG（电子节目指南）服务端， `Docker` 部署，自带�
 
 > [!TIP]  
 > 台标匹配需搭配 [酷9APP](https://www.right.com.cn/forum/thread-8388801-1-1.html) 使用。
+> `xmltv` 用户搭配 [【一键生成】匹配 M3U 文件的 XML 节目表](https://www.right.com.cn/forum/thread-8392662-1-1.html) 使用。
 
 ![设置页面](/pic/management.png)
 
@@ -38,6 +39,12 @@ PHP 实现的 EPG（电子节目指南）服务端， `Docker` 部署，自带�
 >   - `CCTV$1 => regex:/^CCTV[-\s]*(\d+(\s*P(LUS)?|[K\+])?)(?![\s-]*(美洲|欧洲)).*/i` ：将 `CCTV 1综合`、`CCTV-4K频道`、`CCTV - 5+频道`、`CCTV - 5PLUS频道` 等替换成 `CCTV1`、`CCTV4K`、`CCTV5+`、`CCTV5PLUS`（排除 `CCTV4美洲` 和 `CCTV4欧洲`）
 
 ## 📝 更新日志
+### 2024-9-29
+
+1. 修复：导入文件大于2M时异常
+2. 优化：台标上传路径
+3. 优化：频道别名台标匹配逻辑
+4. 优化：内置台标列表
 
 ### 2024-9-26
 
