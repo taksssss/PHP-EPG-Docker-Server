@@ -43,23 +43,6 @@
 //
 // Please see https://bitbucket.org/phpliteadmin/public/wiki/Configuration for more details
 
-// 检查是否有权限访问 phpliteadmin.php
-session_start();
-if (!isset($_SESSION['can_access_phpliteadmin']) || $_SESSION['can_access_phpliteadmin'] !== true) {
-    // 显示错误信息并跳转到 manage.php
-    echo "请通过管理页面访问。<br>正在跳转……";
-    
-    // 设置跳转延迟，给用户时间看到消息
-    echo "<script>
-            setTimeout(function() {
-                window.location.href = 'manage.php';
-            }, 2000); // 2秒后跳转
-          </script>";
-    
-    exit;
-}
-session_abort();
-
 //password to gain access
 $password = '';
 
@@ -462,6 +445,22 @@ if (isset($_GET['resource']))
 // don't mess with this - required for the login session
 ini_set('session.cookie_httponly', '1');
 session_start();
+
+// 检查是否有权限访问 phpliteadmin.php
+if (!isset($_SESSION['can_access_phpliteadmin']) || $_SESSION['can_access_phpliteadmin'] !== true) {
+    // 显示错误信息并跳转到 manage.php
+    echo "请通过管理页面访问。<br>正在跳转……";
+    
+    // 设置跳转延迟，给用户时间看到消息
+    echo "<script>
+            setTimeout(function() {
+                window.location.href = 'manage.php';
+            }, 2000); // 2秒后跳转
+          </script>";
+    
+    exit;
+}
+
 // generate CSRF token 
 if (empty($_SESSION['token']))
 {

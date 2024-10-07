@@ -534,6 +534,7 @@ try {
 
             case 'update_icon_list':
                 // 更新图标
+                $iconList = [];
                 $updatedIcons = json_decode($_POST['updatedIcons'], true);
                 foreach ($updatedIcons as $channelData) {
                     $channelName = strtoupper(trim($channelData['channel']));
@@ -883,7 +884,7 @@ try {
         document.cookie.split(";").forEach(function(cookie) {
             var name = cookie.split("=")[0].trim();
             document.cookie = name + '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/';
-        });        
+        });
         // 清除本地存储
         sessionStorage.clear();
         // 重定向到登录页面
@@ -1245,7 +1246,7 @@ try {
                     });
                 } else if (type === 'icon' && searchText) {
                     row.innerHTML = `
-                        <td>${item.channel}</td>
+                        <td contenteditable="true">${item.channel}</td>
                         <td contenteditable="true">${item.icon || ''}</td>
                         <td>${item.icon ? `<a href="${item.icon}" target="_blank"><img src="${item.icon}" style="max-width: 80px; max-height: 50px; background-color: #ccc;"></a>` : ''}</td>
                         <td>
@@ -1253,9 +1254,12 @@ try {
                             <button onclick="document.getElementById('file_${index}').click()" style="font-size: 14px; width: 50px;">上传</button>
                         </td>
                     `;
-                    row.querySelector('td[contenteditable]').addEventListener('input', function() {
-                        item.icon = this.textContent.trim();
-                        document.getElementById(tableId).dataset[dataAttr] = JSON.stringify(allData);
+                    row.querySelectorAll('td[contenteditable]').forEach((cell, idx) => {
+                        cell.addEventListener('input', function() {
+                            if (idx === 0) item.channel = this.textContent.trim();  // 第一个可编辑单元格更新 channel
+                            else item.icon = this.textContent.trim();  // 第二个可编辑单元格更新 icon
+                            document.getElementById(tableId).dataset[dataAttr] = JSON.stringify(allData);
+                        });
                     });
                     row.querySelector(`#file_${index}`).addEventListener('change', event => handleFileUpload(event, item, row, allData));
                 }
