@@ -25,23 +25,6 @@ function logMessage(&$log_messages, $message) {
 
 // 删除过期数据和日志
 function deleteOldData($db, $keep_days, &$log_messages) {
-    global $Config, $iconList;
-
-    // 清除未在使用的台标
-    $iconUrls = array_map(function($url) {
-        return parse_url($url, PHP_URL_PATH);
-    }, array_values($iconList));
-    $iconPath = __DIR__ . '/data/icon';
-    $parentRltPath = '/' . basename(__DIR__) . '/data/icon/';
-    foreach (scandir($iconPath) as $file) {
-        if ($file === '.' || $file === '..') continue;
-        $iconRltPath = $parentRltPath . $file;
-        if (!in_array($iconRltPath, $iconUrls)) {
-            @unlink($iconPath . '/' . $file);
-            logMessage($log_messages, "【清理台标】 {$file}");
-        }
-    }
-
     // 删除 t.xml 和 t.xml.gz 文件
     @unlink('./t.xml');
     @unlink('./t.xml.gz');
@@ -72,8 +55,8 @@ function getFormatTime($time) {
     ];
 }
 
-// 下载数据并存入数据库
-function processData($xml_url, $db, &$log_messages, $gen_list) {
+// 下载 XML 数据并存入数据库
+function downloadXmlData($xml_url, $db, &$log_messages, $gen_list) {
     $xml_data = downloadData($xml_url);
     if ($xml_data !== false && stripos($xml_data, 'not found') === false) {
         logMessage($log_messages, "【下载】 成功");
@@ -86,7 +69,7 @@ function processData($xml_url, $db, &$log_messages, $gen_list) {
         }
         $db->beginTransaction();
         try {
-            processXmlData($xml_url, $xml_data, date('Y-m-d'), $db, $gen_list);
+            processXmlData($xml_url, $xml_data, $db, $gen_list);
             $db->commit();
             logMessage($log_messages, "【更新】 成功");
         } catch (Exception $e) {
@@ -95,6 +78,24 @@ function processData($xml_url, $db, &$log_messages, $gen_list) {
         }
     } else {
         logMessage($log_messages, "【下载】 失败！！！");
+    }
+}
+
+// 下载 JSON 数据并存入数据库
+function downloadJSONData($json_url, $db, &$log_messages, $channel_name, $date) {  
+    $json_data = downloadData($json_url);
+    if ($json_data !== false && stripos($json_data, '"status":"-1"') === false) {
+        $db->beginTransaction();
+        try {
+            processJsonData($json_data, $db, $channel_name, $date);
+            $db->commit();
+            logMessage($log_messages, "【tvmao】 $channel_name $date 更新成功");
+        } catch (Exception $e) {
+            $db->rollBack();
+            logMessage($log_messages, "【tvmao】 " . $e->getMessage());
+        }
+    } else {
+        logMessage($log_messages, "【tvmao】 $channel_name $date 下载失败！！！");
     }
 }
 
@@ -144,9 +145,12 @@ function getChannelBindEPG() {
     global $Config;
     $channelBindEPG = [];
     foreach ($Config['channel_bind_epg'] ?? [] as $epg_src => $channels) {
-        $channelList = array_map('trim', explode(',', $channels));
-        foreach ($channelList as $channel) {
-            $channelBindEPG[$channel][] = $epg_src;
+        if ($epg_src === 'tvmao') {
+            $channelBindEPG[$epg_src] = $channels;
+        } else {
+            foreach (array_map('trim', explode(',', $channels)) as $channel) {
+                $channelBindEPG[$channel][] = $epg_src;
+            }
         }
     }
     return $channelBindEPG;
@@ -289,7 +293,7 @@ function formatTime($date, $time) {
 }
 
 // 处理 XML 数据并逐步存入数据库
-function processXmlData($xml_url, $xml_data, $date, $db, $gen_list) {
+function processXmlData($xml_url, $xml_data, $db, $gen_list) {
     global $Config;
     global $processedRecords;
     global $channel_bind_epg;
@@ -407,6 +411,38 @@ function processXmlData($xml_url, $xml_data, $date, $db, $gen_list) {
     $reader->close();
 }
 
+// 处理 JSON 数据并逐步存入数据库
+function processJsonData($json_data, $db, $channel_name, $date) {
+    $data = json_decode($json_data, true);
+
+    // 校验数据有效性
+    if (!isset($data[2]) || empty($data[2]['pro'])) {
+        throw new Exception("获取 $channel_name $date 数据失败");
+    }
+
+    $channelProgrammes = [];
+
+    // 处理 tvmao 数据格式
+    $channelId = $data[2]['epgCode'];
+    foreach ($data[2]['pro'] as $epg) {
+        $programtime = explode('-', $epg['time']);
+        $starttime = $programtime[0];
+        $endtime = $programtime[1];
+        $programme = [
+            'title' => $epg['name'],
+            'desc' => '' // tvmao 没有明确的描述字段
+        ];
+
+        $channelProgrammes[$channelId]['diyp_data'][$date][] = array_merge($programme, [
+            'start' => $starttime,
+            'end' => $endtime
+        ]);
+    }
+    $channelProgrammes[$channelId]['channel_name'] = $channel_name;
+
+    insertDataToDatabase($channelProgrammes, $db);
+}
+
 // 插入数据到数据库
 function insertDataToDatabase($channelsData, $db) {
     global $processedRecords;
@@ -482,13 +518,42 @@ foreach ($Config['xml_urls'] as $xml_url) {
     $xml_url = trim($xml_url);
     if (empty($xml_url) || strpos($xml_url, '#') === 0) {
         continue;
+    } elseif (strpos($xml_url, 'tvmao') === 0) {
+        // 更新 tvmao 数据
+        $tvmaostr = str_replace('tvmao,', '', $xml_url);
+        $startOffset = 0; // 默认从今天开始
+        $endOffset = 1;   // 默认到明天结束
+        foreach (explode(',', $tvmaostr) as $tvmaoinfo) {
+            // 处理日期区间
+            if (preg_match('/(\-?\d+)~(\d+)/', $tvmaoinfo, $matches)) {
+                $startOffset = (int)$matches[1]; // 从几天前开始
+                $endOffset = (int)$matches[2];     // 到几天后结束
+                continue;
+            }
+            if (strpos($tvmaoinfo, ':') !== false) {
+                list($channel_name, $channelID) = array_map('trim', explode(':', $tvmaoinfo));
+            } else {
+                logMessage($log_messages, "【tvmao】 格式异常：{$tvmaoinfo}，应为 频道名:频道ID");
+                continue;
+            }
+            // 获取指定日期范围的数据
+            for ($day_offset = $startOffset; $day_offset <= $endOffset; $day_offset++) {
+                $date = date('Y-m-d', strtotime("$day_offset day"));
+                // 基于当前星期计算偏移
+                $day_of_week = $day_offset + date('w');
+                $json_url = "https://lighttv.tvmao.com/qa/qachannelschedule?epgCode=" . $channelID . "&op=getProgramByChnid&day=" . $day_of_week;
+                downloadJSONData($json_url, $db, $log_messages, $channel_name, $date);
+            }
+        }
+        continue;
     }
-    // 去除 URL 后的注释部分
+
+    // 更新 XML 数据
     $url_parts = explode('#', $xml_url);
     $cleaned_url = trim($url_parts[0]);
 
     logMessage($log_messages, "【更新地址】 $cleaned_url");
-    processData($cleaned_url, $db, $log_messages, $gen_list);
+    downloadXmlData($cleaned_url, $db, $log_messages, $gen_list);
 }
 
 // 判断是否生成 xmltv 文件

@@ -147,7 +147,7 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update'])) {
 
     // 获取表单数据并去除每个 URL 末尾的换行符
-    $xml_urls = array_map('trim', explode("\n", trim($_POST['xml_urls'])));
+    $xml_urls = array_map('trim', explode("\n", str_replace(["，", "："], [",", ":"], trim($_POST['xml_urls']))));
 
     // 过滤和规范化 xml_urls
     $xml_urls = array_values(array_map(function($url) {
@@ -179,7 +179,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update'])) {
     if ($mappings = trim($_POST['channel_mappings'] ?? '')) {
         foreach (array_filter(array_map('trim', explode("\n", $mappings))) as $line) {
             list($search, $replace) = preg_split('/=》|=>/', $line);
-            $channel_mappings[trim(str_replace("，", ",", trim($search)), '[]')] = trim($replace);
+            $channel_mappings[trim($search)] = trim(str_replace("，", ",", trim($replace)), '[]');
         }
     }
 
@@ -189,7 +189,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update'])) {
             array_reduce(json_decode($_POST['channel_bind_epg'], true), function($result, $item) {
                 $epgSrc = preg_replace('/^【已停用】/', '', $item['epg_src']);
                 if (!empty($item['channels'])) {
-                    $result[$epgSrc] = $item['channels'];
+                    $result[$epgSrc] = trim(str_replace("，", ",", trim($item['channels'])), '[]');
                 }
                 return $result;
             }, [])
@@ -272,6 +272,8 @@ try {
             $action = 'get_gen_list';
         } elseif (isset($_GET['url'])) {
             $action = 'download_data';
+        } elseif (isset($_GET['delete_unused_icons'])) {
+            $action = 'delete_unused_icons';
         }
 
         // 根据操作类型执行不同的逻辑
@@ -339,13 +341,14 @@ try {
                 $channels = $db->query("SELECT DISTINCT UPPER(channel) FROM epg_data ORDER BY UPPER(channel) ASC")->fetchAll(PDO::FETCH_COLUMN);
                 $channelBindEpg = $Config['channel_bind_epg'] ?? [];
                 $xmlUrls = $Config['xml_urls'];
-                $filteredUrls = array_values(array_map(function($url) {
+                $filteredUrls = array_values(array_filter(array_map(function($url) {
                     $url = trim($url);
+                    if (preg_match('/^#?\s*tvmao/', $url)) { return '';}
                     $url = (strpos($url, '#') === 0)
                         ? preg_replace('/^([^#]*#[^#]*)#.*$/', '$1', $url)
                         : preg_replace('/#.*$/', '', $url);
                     return trim($url);
-                }, $xmlUrls));
+                }, $xmlUrls)));
                 $dbResponse = array_map(function($epgSrc) use ($channelBindEpg) {
                     $cleanEpgSrc = trim(preg_replace('/^\s*#\s*/', '', $epgSrc));
                     $isInactive = strpos(trim($epgSrc), '#') === 0;
@@ -424,6 +427,26 @@ try {
                 } else {
                     $dbResponse = ['success' => false, 'message' => '无效的URL'];
                 }
+                break;
+
+            case 'delete_unused_icons':
+                // 清除未在使用的台标
+                $iconUrls = array_map(function($url) {
+                    return parse_url($url, PHP_URL_PATH);
+                }, array_values($iconList));
+                $iconPath = __DIR__ . '/data/icon';
+                $parentRltPath = '/' . basename(__DIR__) . '/data/icon/';
+                $deletedCount = 0;
+                foreach (scandir($iconPath) as $file) {
+                    if ($file === '.' || $file === '..') continue;
+                    $iconRltPath = $parentRltPath . $file;
+                    if (!in_array($iconRltPath, $iconUrls)) {
+                        if (@unlink($iconPath . '/' . $file)) {
+                            $deletedCount++;
+                        }
+                    }
+                }
+                $dbResponse = ['success' => true, 'message' => "共清理了 $deletedCount 个台标"];
                 break;
 
             default:
@@ -551,7 +574,7 @@ try {
                 } else {
                     echo json_encode(['success' => true]);
                 }
-                exit;                
+                exit;
         }
     }
 } catch (Exception $e) {
@@ -574,8 +597,9 @@ try {
     <h2>管理配置</h2>
     <form method="POST" id="settingsForm">
 
-        <label for="xml_urls">【EPG源地址】（支持 xml 跟 .xml.gz 格式， # 为注释）</label><span id="channelbind" onclick="showModal('channelbindepg')" style="color: blue; cursor: pointer;">（频道指定EPG源）</span><br><br>
-        <textarea placeholder="一行一个，地址前面加 # 可以临时停用，后面加 # 可以备注。快捷键： Ctrl+/  。" id="xml_urls" name="xml_urls" style="height: 122px;"><?php echo implode("\n", array_map('trim', $Config['xml_urls'])); ?></textarea><br><br>
+        <label for="xml_urls">【EPG源地址】（支持 xml 跟 .xml.gz 格式， # 为注释，支持获取 猫 数据）</label><span id="channelbind" onclick="showModal('channelbindepg')" style="color: blue; cursor: pointer;">（频道指定EPG源）</span><br><br>
+        <textarea placeholder="一行一个，地址前面加 # 可以临时停用，后面加 # 可以备注。快捷键： Ctrl+/  。
+猫示例：tvmao, -1~1, 广东卫视:GDTV1, 珠江频道:GDTV2 （-1~1 表示 昨天~明天）" id="xml_urls" name="xml_urls" style="height: 122px;"><?php echo implode("\n", array_map('trim', $Config['xml_urls'])); ?></textarea><br><br>
 
         <div class="form-row">
             <label for="days_to_keep" class="label-days-to-keep">数据保存天数</label>
@@ -710,6 +734,10 @@ try {
         <h2 id="iconModalTitle">频道列表</h2>
         <div style="display: flex;">
             <input type="text" id="iconSearchInput" placeholder="搜索频道名..." onkeyup="filterChannels('icon')" style="flex: 1; margin-right: 10px;">
+            <div class="tooltip" style="width:auto; margin-right: 10px;">
+                <button id="deleteUnusedIcons" type="button" onclick="deleteUnusedIcons()">清理台标文件</button>
+                <span class="tooltiptext">清理未在列表中使用的台标文件</span>
+            </div>
             <div class="tooltip" style="width:auto; margin-right: 10px;">
                 <button id="showAllIcons" type="button" onclick="showModal('allicon')">显示所有台标</button>
                 <span class="tooltiptext">同时显示无节目表的内置台标</span>
@@ -1373,6 +1401,22 @@ try {
             else {
                 progressDisplay.textContent = "全部转存成功，点击“保存配置”！";
             }
+        });
+    }
+
+    // 清理未使用的台标文件
+    function deleteUnusedIcons() {
+        fetch('manage.php?delete_unused_icons=true')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(data.message);
+            } else {
+                alert('清理失败');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
         });
     }
 
