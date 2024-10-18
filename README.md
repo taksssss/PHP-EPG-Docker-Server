@@ -237,3 +237,6 @@ PHP 实现的 EPG（电子节目指南）服务端， `Docker` 部署，自带�
 - [EPG 51zmt](http://epg.51zmt.top:8000/)
 - [fanmingming/live](https://github.com/fanmingming/live)
 - [wanglindl/TVlogo](https://github.com/wanglindl/TVlogo)
+
+## Star History
+[![Star History Chart](https://api.star-history.com/svg?repos=taksssss/PHP-EPG-Docker-Server&type=Date)](https://star-history.com/#taksssss/PHP-EPG-Docker-Server&Date)
