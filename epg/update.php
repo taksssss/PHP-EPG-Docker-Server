@@ -18,11 +18,6 @@ set_time_limit(20*60);
 // 设置时间格式
 define('TIME_FORMAT', "[y-m-d H:i:s]");
 
-// 日志记录函数
-function logMessage(&$log_messages, $message) {
-    $log_messages[] = date(TIME_FORMAT) . " " . $message;
-}
-
 // 删除过期数据和日志
 function deleteOldData($db, $keep_days, &$log_messages) {
     // 删除 t.xml 和 t.xml.gz 文件
@@ -81,24 +76,6 @@ function downloadXmlData($xml_url, $db, &$log_messages, $gen_list) {
     }
 }
 
-// 下载 JSON 数据并存入数据库
-function downloadJSONData($json_url, $db, &$log_messages, $channel_name, $date) {  
-    $json_data = downloadData($json_url);
-    if ($json_data !== false && stripos($json_data, '"status":"-1"') === false) {
-        $db->beginTransaction();
-        try {
-            processJsonData($json_data, $db, $channel_name, $date);
-            $db->commit();
-            logMessage($log_messages, "【tvmao】 $channel_name $date 更新成功");
-        } catch (Exception $e) {
-            $db->rollBack();
-            logMessage($log_messages, "【tvmao】 " . $e->getMessage());
-        }
-    } else {
-        logMessage($log_messages, "【tvmao】 $channel_name $date 下载失败！！！");
-    }
-}
-
 // 获取限定频道列表及映射关系
 function getGenList($db) {
     $channels = $db->query("SELECT channel FROM gen_list")->fetchAll(PDO::FETCH_COLUMN);
@@ -145,12 +122,8 @@ function getChannelBindEPG() {
     global $Config;
     $channelBindEPG = [];
     foreach ($Config['channel_bind_epg'] ?? [] as $epg_src => $channels) {
-        if ($epg_src === 'tvmao') {
-            $channelBindEPG[$epg_src] = $channels;
-        } else {
-            foreach (array_map('trim', explode(',', $channels)) as $channel) {
-                $channelBindEPG[$channel][] = $epg_src;
-            }
+        foreach (array_map('trim', explode(',', $channels)) as $channel) {
+            $channelBindEPG[$channel][] = $epg_src;
         }
     }
     return $channelBindEPG;
@@ -374,7 +347,7 @@ function processXmlData($xml_url, $xml_data, $db, $gen_list) {
             $programmeData = [
                 'title' => (string)$programme->title,
                 'start' => $start['time'],
-                'end' => $start['date'] === $end['date'] ? $end['time'] : '23:59',
+                'end' => $start['date'] === $end['date'] ? $end['time'] : '00:00',
                 'desc' => isset($programme->desc) && (string)$programme->desc !== (string)$programme->title ? (string)$programme->desc : ''
             ];
     
@@ -411,87 +384,6 @@ function processXmlData($xml_url, $xml_data, $db, $gen_list) {
     $reader->close();
 }
 
-// 处理 JSON 数据并逐步存入数据库
-function processJsonData($json_data, $db, $channel_name, $date) {
-    $data = json_decode($json_data, true);
-
-    // 校验数据有效性
-    if (!isset($data[2]) || empty($data[2]['pro'])) {
-        throw new Exception("获取 $channel_name $date 数据失败");
-    }
-
-    $channelProgrammes = [];
-
-    // 处理 tvmao 数据格式
-    $channelId = $data[2]['epgCode'];
-    foreach ($data[2]['pro'] as $epg) {
-        $programtime = explode('-', $epg['time']);
-        $starttime = $programtime[0];
-        $endtime = $programtime[1];
-        $programme = [
-            'title' => $epg['name'],
-            'desc' => '' // tvmao 没有明确的描述字段
-        ];
-
-        $channelProgrammes[$channelId]['diyp_data'][$date][] = array_merge($programme, [
-            'start' => $starttime,
-            'end' => $endtime
-        ]);
-    }
-    $channelProgrammes[$channelId]['channel_name'] = $channel_name;
-
-    insertDataToDatabase($channelProgrammes, $db);
-}
-
-// 插入数据到数据库
-function insertDataToDatabase($channelsData, $db) {
-    global $processedRecords;
-    global $Config;
-
-    foreach ($channelsData as $channelId => $channelData) {
-        $channelName = $channelData['channel_name'];
-        foreach ($channelData['diyp_data'] as $date => $diypProgrammes) {
-            // 检查是否全天只有一个节目
-            if (count(array_unique(array_column($diypProgrammes, 'title'))) === 1) {
-                continue; // 跳过后续处理
-            }
-
-            // 生成 epg_diyp 数据内容
-            $diypContent = json_encode([
-                'channel_name' => $channelName,
-                'date' => $date,
-                'url' => 'https://github.com/taksssss/PHP-EPG-Docker-Server',
-                'epg_data' => $diypProgrammes
-            ], JSON_UNESCAPED_UNICODE);
-
-            // 当天及未来数据覆盖，其他日期数据忽略
-            $action = $date >= date('Y-m-d') ? 'REPLACE' : 'IGNORE';
-            
-            // 检测数据库类型
-            $is_sqlite = $Config['db_type'] === 'sqlite';
-
-            // 选择 SQL 语句
-            $sql = $is_sqlite 
-                ? "INSERT OR $action INTO epg_data (date, channel, epg_diyp) VALUES (:date, :channel, :epg_diyp)"
-                : ($date >= date('Y-m-d') 
-                    ? "REPLACE INTO epg_data (date, channel, epg_diyp) VALUES (:date, :channel, :epg_diyp)" 
-                    : "INSERT IGNORE INTO epg_data (date, channel, epg_diyp) VALUES (:date, :channel, :epg_diyp)"
-                );
-
-            // 准备并执行 SQL 语句
-            $stmt = $db->prepare($sql);
-            $stmt->bindValue(':date', $date, PDO::PARAM_STR);
-            $stmt->bindValue(':channel', $channelName, PDO::PARAM_STR);
-            $stmt->bindValue(':epg_diyp', $diypContent, PDO::PARAM_STR);
-            $stmt->execute();
-            if ($action == 'REPLACE' || $stmt->rowCount() > 0){
-                $recordKey = $channelName . '-' . $date;
-                $processedRecords[$recordKey] = true;
-            }
-        }
-    }
-}
-
 // 记录开始时间
 $startTime = microtime(true);
 
@@ -521,29 +413,10 @@ foreach ($Config['xml_urls'] as $xml_url) {
     } elseif (strpos($xml_url, 'tvmao') === 0) {
         // 更新 tvmao 数据
         $tvmaostr = str_replace('tvmao,', '', $xml_url);
-        $startOffset = 0; // 默认从今天开始
-        $endOffset = 1;   // 默认到明天结束
-        foreach (explode(',', $tvmaostr) as $tvmaoinfo) {
-            // 处理日期区间
-            if (preg_match('/(\-?\d+)~(\d+)/', $tvmaoinfo, $matches)) {
-                $startOffset = (int)$matches[1]; // 从几天前开始
-                $endOffset = (int)$matches[2];     // 到几天后结束
-                continue;
-            }
-            if (strpos($tvmaoinfo, ':') !== false) {
-                list($channel_name, $channelID) = array_map('trim', explode(':', $tvmaoinfo));
-            } else {
-                logMessage($log_messages, "【tvmao】 格式异常：{$tvmaoinfo}，应为 频道名:频道ID");
-                continue;
-            }
-            // 获取指定日期范围的数据
-            for ($day_offset = $startOffset; $day_offset <= $endOffset; $day_offset++) {
-                $date = date('Y-m-d', strtotime("$day_offset day"));
-                // 基于当前星期计算偏移
-                $day_of_week = $day_offset + date('w');
-                $json_url = "https://lighttv.tvmao.com/qa/qachannelschedule?epgCode=" . $channelID . "&op=getProgramByChnid&day=" . $day_of_week;
-                downloadJSONData($json_url, $db, $log_messages, $channel_name, $date);
-            }
+        foreach (explode(',', $tvmaostr) as $channel_name) {
+            $channel_name = trim($channel_name);
+            $json_url = "https://sp0.baidu.com/8aQDcjqpAAV3otqbppnN2DJv/api.php?query=" . $channel_name . "&resource_id=12520&format=json";
+            downloadJSONData($json_url, $db, $log_messages, $channel_name);
         }
         continue;
     }

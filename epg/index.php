@@ -77,28 +77,31 @@ function readEPGData($date, $oriChName, $cleanChName, $db, $type) {
 
     // 获取数据库类型（mysql 或 sqlite）
     $concat = $db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql' 
-        ? "CONCAT('%', UPPER(channel), '%')" 
-        : "'%' || UPPER(channel) || '%'";
+        ? "CONCAT('%', channel, '%')" 
+        : "'%' || channel || '%'";
 
     // 优先精准匹配，其次正向模糊匹配，最后反向模糊匹配
     $stmt = $db->prepare("
-        SELECT DISTINCT epg_diyp, channel
+        SELECT epg_diyp
         FROM epg_data 
-        WHERE date = :date 
-        AND (
-            UPPER(channel) = UPPER(:channel)
-            OR UPPER(channel) LIKE UPPER(:like_channel)
-            OR UPPER(:channel) LIKE $concat
+        WHERE (
+            channel = :channel
+            OR channel LIKE :like_channel
+            OR :channel LIKE $concat
         )
         ORDER BY 
             CASE 
-                WHEN UPPER(channel) = UPPER(:channel) THEN 1 
-                WHEN UPPER(channel) LIKE UPPER(:like_channel) THEN 2 
+                WHEN date = :date THEN 1 
+                ELSE 2 
+            END, 
+            CASE 
+                WHEN channel = :channel THEN 1 
+                WHEN channel LIKE :like_channel THEN 2 
                 ELSE 3 
             END, 
             CASE 
-                WHEN UPPER(channel) = UPPER(:channel) THEN NULL
-                WHEN UPPER(channel) LIKE UPPER(:like_channel) THEN LENGTH(channel)
+                WHEN channel = :channel THEN NULL
+                WHEN channel LIKE :like_channel THEN LENGTH(channel)
                 ELSE -LENGTH(channel)
             END
         LIMIT 1
@@ -113,7 +116,7 @@ function readEPGData($date, $oriChName, $cleanChName, $db, $type) {
     if (!$row) {
         return false;
     }
-
+    
     // 在解码和添加 icon 后再编码为 JSON
     $rowArray = json_decode($row, true);
     $iconUrl = iconUrlMatch($rowArray['channel_name']) ?? iconUrlMatch($cleanChName) ?? iconUrlMatch($oriChName);
@@ -122,9 +125,6 @@ function readEPGData($date, $oriChName, $cleanChName, $db, $type) {
         ['icon' => $iconUrl],
         array_slice($rowArray, array_search('url', array_keys($rowArray)) + 1)
     );
-    $row = json_encode($rowArray, JSON_UNESCAPED_UNICODE);
-
-    // 将处理后的数组重新编码为 JSON，输出或返回结果
     $row = json_encode($rowArray, JSON_UNESCAPED_UNICODE);
 
     if ($type === 'diyp') {
@@ -136,7 +136,7 @@ function readEPGData($date, $oriChName, $cleanChName, $db, $type) {
     }
 
     if ($type === 'lovetv') {
-        $diyp_data = json_decode($row, true);
+        $diyp_data = $rowArray;
         $date = $diyp_data['date'];
         $program = array_map(function($epg) use ($date) {
             $start_time = strtotime($date . ' ' . $epg['start']);
@@ -229,58 +229,71 @@ function fetchHandler() {
 
     // 返回 diyp、lovetv 数据
     if (isset($query_params['ch']) || isset($query_params['channel'])) {
+        function processResponse($response, $oriChName, $date, $type, $init) {
+            $responseData = json_decode($response, true);
+            $resDate = ($type === 'diyp') ? $responseData['date'] : date('Y-m-d', $responseData[$oriChName]['program'][0]['st']);
+            if ($resDate === $date) {
+                makeRes($response, $init['status'], $init['headers']);
+                exit;
+            }
+            return false;
+        }
+        
         $type = isset($query_params['ch']) ? 'diyp' : 'lovetv';
         $response = readEPGData($date, $oriChName, $cleanChName, $db, $type);
-    
-        if ($response) {
-            makeRes($response, $init['status'], $init['headers']);
+        
+        // 频道在列表中但无当天数据，尝试通过 tvmao 接口获取数据
+        if ($response && !processResponse($response, $oriChName, $date, $type, $init) && $date >= date('Y-m-d')) {
+            $matchChannelName = json_decode($response, true)['channel_name'] ?? $oriChName;
+            $json_url = "https://sp0.baidu.com/8aQDcjqpAAV3otqbppnN2DJv/api.php?query=$matchChannelName&resource_id=12520&format=json";
+            downloadJSONData($json_url, $db, $log_messages, $matchChannelName);
+            $newResponse = readEPGData($date, $oriChName, $matchChannelName, $db, $type);
+            processResponse($newResponse, $oriChName, $date, $type, $init);
+        }
+
+        // 返回默认数据
+        $ret_default = !isset($Config['ret_default']) || $Config['ret_default'];
+        $iconUrl = iconUrlMatch($cleanChName);
+        if ($type === 'diyp') {
+            // 无法获取到数据时返回默认 diyp 数据
+            $default_diyp_program_info = [
+                'date' => $date,
+                'channel_name' => $cleanChName,
+                'url' => "https://github.com/taksssss/PHP-EPG-Server",
+                'icon' => $iconUrl,
+                'epg_data' => !$ret_default ? '' : array_map(function($hour) {
+                    return [
+                        'start' => sprintf('%02d:00', $hour),
+                        'end' => sprintf('%02d:00', ($hour + 1) % 24),
+                        'title' => '精彩节目',
+                        'desc' => ''
+                    ];
+                }, range(0, 23, 1))
+            ];
+            $response = json_encode($default_diyp_program_info, JSON_UNESCAPED_UNICODE);
         } else {
-            $ret_default = !isset($Config['ret_default']) || $Config['ret_default'];
-            $iconUrl = iconUrlMatch($cleanChName);
-            if ($type === 'diyp') {
-                // 无法获取到数据时返回默认 diyp 数据
-                $default_diyp_program_info = [
-                    'date' => $date,
-                    'channel_name' => $cleanChName,
-                    'url' => "https://github.com/taksssss/PHP-EPG-Server",
+            // 无法获取到数据时返回默认 lovetv 数据
+            $default_lovetv_program_info = [
+                $cleanChName => [
+                    'isLive' => '',
+                    'liveSt' => 0,
+                    'channelName' => $cleanChName,
+                    'lvUrl' => 'https://github.com/taksssss/PHP-EPG-Docker-Server',
                     'icon' => $iconUrl,
-                    'epg_data' => !$ret_default ? '' : array_map(function($hour) {
+                    'program' => !$ret_default ? '' : array_map(function($hour) {
                         return [
-                            'start' => sprintf('%02d:00', $hour),
-                            'end' => sprintf('%02d:00', ($hour + 1) % 24),
-                            'title' => '精彩节目',
-                            'desc' => ''
+                            'st' => strtotime(sprintf('%02d:00', $hour)),
+                            'et' => strtotime(sprintf('%02d:00', ($hour + 1) % 24)),
+                            't' => '精彩节目',
+                            'd' => ''
                         ];
                     }, range(0, 23, 1))
-                ];
-                $response = json_encode($default_diyp_program_info, JSON_UNESCAPED_UNICODE);
-            } else {
-                // 无法获取到数据时返回默认 lovetv 数据
-                $default_lovetv_program_info = [
-                    $cleanChName => [
-                        'isLive' => '',
-                        'liveSt' => 0,
-                        'channelName' => $cleanChName,
-                        'lvUrl' => 'https://github.com/taksssss/PHP-EPG-Docker-Server',
-                        'icon' => $iconUrl,
-                        'program' => !$ret_default ? '' : array_map(function($hour) {
-                            return [
-                                'st' => strtotime(sprintf('%02d:00', $hour)),
-                                'et' => strtotime(sprintf('%02d:00', ($hour + 1) % 24)),
-                                't' => '精彩节目',
-                                'd' => ''
-                            ];
-                        }, range(0, 23, 1))
-                    ]
-                ];
-                $response = json_encode($default_lovetv_program_info, JSON_UNESCAPED_UNICODE);
-            }
-            makeRes($response, $init['status'], $init['headers']);
+                ]
+            ];
+            $response = json_encode($default_lovetv_program_info, JSON_UNESCAPED_UNICODE);
         }
+        makeRes($response, $init['status'], $init['headers']);
     }
-
-    // 默认响应
-    makeRes('', $init['status'], $init['headers']);
 }
 
 // 执行请求处理

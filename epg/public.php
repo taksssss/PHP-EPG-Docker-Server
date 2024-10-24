@@ -21,6 +21,7 @@ $Config = json_decode(file_get_contents($config_path), true) or die("配置文�
 ($iconList = json_decode(file_get_contents($iconList_path), true)) !== null || die("图标列表文件解析失败: " . json_last_error_msg());
 $iconListDefault = json_decode(file_get_contents(__DIR__ . '/iconList_default.json'), true) or die("默认图标列表文件解析失败: " . json_last_error_msg());
 $iconListMerged = array_merge($iconListDefault, $iconList); // 同一个键，以 iconList 的为准
+$serverUrl = (($_SERVER['HTTPS'] ?? '') === 'on' ? 'https://' : 'http://') . $_SERVER['HTTP_HOST'];
 
 // 设置时区为亚洲/上海
 date_default_timezone_set("Asia/Shanghai");
@@ -114,7 +115,7 @@ function t2s($channel) {
 }
 
 // 台标模糊匹配
-function iconUrlMatch($originalChannel) {    
+function iconUrlMatch($originalChannel) {
     global $iconListMerged;
     
     $iconUrl = null;
@@ -161,5 +162,108 @@ function downloadData($url, $timeout = 30, $connectTimeout = 10, $retry = 3) {
     }
     curl_close($ch);
     return $data ?: false;
+}
+
+// 日志记录函数
+function logMessage(&$log_messages, $message) {
+    $log_messages[] = date(TIME_FORMAT) . " " . $message;
+}
+
+// 下载 JSON 数据并存入数据库
+function downloadJSONData($json_url, $db, &$log_messages, $channel_name) {
+    $json_data = downloadData($json_url);
+    $json_data = mb_convert_encoding($json_data, 'UTF-8', 'GBK');
+    if ($json_data !== false && stripos($json_data, '"data":[]') === false) {
+        $db->beginTransaction();
+        try {
+            processJsonData($json_data, $db, $channel_name);
+            $db->commit();
+            logMessage($log_messages, "【tvmao】 $channel_name 更新成功");
+        } catch (Exception $e) {
+            $db->rollBack();
+            logMessage($log_messages, "【tvmao】 " . $e->getMessage());
+        }
+    } else {
+        logMessage($log_messages, "【tvmao】 $channel_name 下载失败！！！");
+    }
+}
+
+// 处理 JSON 数据并逐步存入数据库
+function processJsonData($json_data, $db, $channel_name) {
+    $data = json_decode($json_data, true);
+    $data = $data['data'][0]['data'];
+    $channelProgrammes = [];
+    // 处理 tvmao 数据格式
+    $channelId = $channel_name;
+    $dt = new DateTime();
+    foreach ($data as $epg) {
+        $title = trim($epg['title']);
+        $time_str = $epg['times'] ?? '';    
+        if ($time_str) {
+            $starttime = DateTime::createFromFormat('Y/m/d H:i', $time_str);
+            $date = $starttime->format('Y-m-d');            
+            // 跳过早于当前日期的节目
+            if ($date < $dt->format('Y-m-d')) continue;    
+            $channelProgrammes[$channelId]['diyp_data'][$date][] = [
+                'title' => $title,
+                'start' => $starttime->format('H:i'),
+                'end' => '',  // 初始为空
+                'desc' => ''  // 没有明确描述字段
+            ];
+        }
+    }    
+    // 填充 'end' 字段
+    foreach ($channelProgrammes[$channelId]['diyp_data'] as &$programmes) {
+        foreach ($programmes as $i => &$programme) {
+            $nextStart = $programmes[$i + 1]['start'] ?? '00:00';  // 下一个节目开始时间或 00:00
+            $programme['end'] = $programme['end'] ?: $nextStart;   // 如果'end'为空，填充下一个节目的 'start'
+        }
+    }
+    $channelProgrammes[$channelId]['channel_name'] = $channel_name;
+    insertDataToDatabase($channelProgrammes, $db);
+}
+
+// 插入数据到数据库
+function insertDataToDatabase($channelsData, $db) {
+    global $processedRecords;
+    global $Config;
+
+    foreach ($channelsData as $channelId => $channelData) {
+        $channelName = $channelData['channel_name'];
+        foreach ($channelData['diyp_data'] as $date => $diypProgrammes) {
+            // 检查是否全天只有一个节目
+            if (count(array_unique(array_column($diypProgrammes, 'title'))) === 1) {
+                continue; // 跳过后续处理
+            }
+            // 生成 epg_diyp 数据内容
+            $diypContent = json_encode([
+                'channel_name' => $channelName,
+                'date' => $date,
+                'url' => 'https://github.com/taksssss/PHP-EPG-Docker-Server',
+                'epg_data' => $diypProgrammes
+            ], JSON_UNESCAPED_UNICODE);
+            // 当天及未来数据覆盖，其他日期数据忽略
+            $action = $date >= date('Y-m-d') ? 'REPLACE' : 'IGNORE';            
+            // 检测数据库类型
+            $is_sqlite = $Config['db_type'] === 'sqlite';
+            // 选择 SQL 语句
+            $sql = $is_sqlite 
+                ? "INSERT OR $action INTO epg_data (date, channel, epg_diyp) VALUES (:date, :channel, :epg_diyp)"
+                : ($date >= date('Y-m-d') 
+                    ? "REPLACE INTO epg_data (date, channel, epg_diyp) VALUES (:date, :channel, :epg_diyp)" 
+                    : "INSERT IGNORE INTO epg_data (date, channel, epg_diyp) VALUES (:date, :channel, :epg_diyp)"
+                );
+            // 准备并执行 SQL 语句
+            $stmt = $db->prepare($sql);
+            $stmt->bindValue(':date', $date, PDO::PARAM_STR);
+            $stmt->bindValue(':channel', $channelName, PDO::PARAM_STR);
+            $stmt->bindValue(':epg_diyp', $diypContent, PDO::PARAM_STR);
+            $stmt->execute();
+            if ($action == 'REPLACE' || $stmt->rowCount() > 0){
+                $recordKey = $channelName . '-' . $date;
+                $processedRecords[$recordKey] = true;
+            }
+        }
+    }
 }
 ?>

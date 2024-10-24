@@ -21,7 +21,7 @@ if (php_sapi_name() !== 'cli') {
 }
 
 // 日志记录函数
-function logMessage($message) {
+function logCronMessage($message) {
     global $db;
     try {
         $timestamp = date('Y-m-d H:i:s'); // 使用设定的时区时间
@@ -42,16 +42,16 @@ exec("pgrep -f '{$processName}'", $oldPids);
 foreach ($oldPids as $pid) {
     if ($pid != $currentPid && posix_kill($pid, 0)) {
         if (posix_kill($pid, 9)) {
-            logMessage("【终止旧进程】 {$pid}");
+            logCronMessage("【终止旧进程】 {$pid}");
         } else {
-            logMessage("无法终止旧的进程 {$pid}");
+            logCronMessage("无法终止旧的进程 {$pid}");
         }
     }
 }
 
 // 检查配置中是否存在 interval_time
 if (!isset($Config['interval_time'])) {
-    logMessage("不存在间隔时间。退出...");
+    logCronMessage("不存在间隔时间。退出...");
     exit;
 }
 
@@ -60,18 +60,18 @@ $interval_time = $Config['interval_time'];
 
 // 如果间隔时间为0，则不执行
 if ($interval_time == 0) {
-    logMessage("间隔时间设置为0。退出...");
+    logCronMessage("间隔时间设置为0。退出...");
     exit;
 }
 
 // 检查配置中是否存在首次执行时间和结束时间
 if (!isset($Config['start_time'])) {
-    logMessage("不存在start_time。退出...");
+    logCronMessage("不存在start_time。退出...");
     exit;
 }
 
 if (!isset($Config['end_time'])) {
-    logMessage("不存在end_time。退出...");
+    logCronMessage("不存在end_time。退出...");
     exit;
 }
 
@@ -119,8 +119,8 @@ if ($next_execution_time >= $end_time_today) {
 $initial_sleep = $next_execution_time - $current_time;
 
 // 汇总所有日志信息
-logMessage("【开始时间】 " . date('H:i', $first_run_today));
-logMessage("【结束时间】 " . date('H:i', $end_time_today));
+logCronMessage("【开始时间】 " . date('H:i', $first_run_today));
+logCronMessage("【结束时间】 " . date('H:i', $end_time_today));
 $logContent = "【间隔时间】 " . gmdate('H小时i分钟', $interval_time) . "\n";
 $logContent .= "\t\t  -------运行时间表-------\n";
 
@@ -131,10 +131,10 @@ while ($current_execution_time < $end_time_today) {
     $current_execution_time += $interval_time;
 }
 $logContent .= "\t\t  ------------------------";
-logMessage($logContent);
+logCronMessage($logContent);
 
-logMessage("【下次执行】 " . date('m/d H:i', $next_execution_time));
-logMessage("【等待时间】 " . gmdate('H小时i分钟', $initial_sleep));
+logCronMessage("【下次执行】 " . date('m/d H:i', $next_execution_time));
+logCronMessage("【等待时间】 " . gmdate('H小时i分钟', $initial_sleep));
 
 // 提交事务
 $db->commit();
@@ -146,7 +146,7 @@ sleep($initial_sleep);
 while (true) {
     // 执行update.php
     exec('php ' . __DIR__ . '/update.php');
-    logMessage("【成功执行】 update.php");
+    logCronMessage("【成功执行】 update.php");
 
     // 计算下一个执行时间
     $current_time = time();
@@ -163,7 +163,7 @@ while (true) {
     $sleep_time = $next_execution_time - $current_time;
 
     // 记录下次执行时间
-    logMessage("【下次执行】 " . date('m/d H:i', $next_execution_time));
+    logCronMessage("【下次执行】 " . date('m/d H:i', $next_execution_time));
 
     // 等待到下一个执行时间
     sleep($sleep_time);
