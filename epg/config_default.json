@@ -4,6 +4,7 @@
     "gen_xml": 1,
     "include_future_only": 1,
     "ret_default": 0,
+    "tvmao_default": 0,
     "gen_list_enable": 0,
     "cache_time": 21600,
     "db_type": "sqlite",

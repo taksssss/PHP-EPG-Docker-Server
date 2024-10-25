@@ -2,10 +2,10 @@
 /**
  * @file index.php
  * @brief 主页处理脚本
- * 
+ *
  * 该脚本处理来自客户端的请求，根据查询参数获取指定日期和频道的节目信息，
  * 并从 SQLite 数据库中提取或返回默认数据。
- * 
+ *
  * 作者: Tak
  * GitHub: https://github.com/taksssss/PHP-EPG-Docker-Server
  */
@@ -58,11 +58,11 @@ function readEPGData($date, $oriChName, $cleanChName, $db, $type) {
 
     // 如果传入的日期小于当前日期，设置 cache_time 为 7 天
     $cache_time = ($date < date('Y-m-d')) ? 7 * 24 * 3600 : $Config['cache_time'];
-    
+
     // 检查是否开启缓存并安装了 Memcached 类
     $memcached_enabled = $Config['cache_time'] && class_exists('Memcached');
     $cache_key = base64_encode("{$date}_{$cleanChName}_{$type}");
-    
+
     if ($memcached_enabled) {
         // 初始化 Memcached
         $memcached = new Memcached();
@@ -76,30 +76,30 @@ function readEPGData($date, $oriChName, $cleanChName, $db, $type) {
     }
 
     // 获取数据库类型（mysql 或 sqlite）
-    $concat = $db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql' 
-        ? "CONCAT('%', channel, '%')" 
+    $concat = $db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql'
+        ? "CONCAT('%', channel, '%')"
         : "'%' || channel || '%'";
 
     // 优先精准匹配，其次正向模糊匹配，最后反向模糊匹配
     $stmt = $db->prepare("
         SELECT epg_diyp
-        FROM epg_data 
+        FROM epg_data
         WHERE (
             channel = :channel
             OR channel LIKE :like_channel
             OR :channel LIKE $concat
         )
-        ORDER BY 
-            CASE 
-                WHEN date = :date THEN 1 
-                ELSE 2 
-            END, 
-            CASE 
-                WHEN channel = :channel THEN 1 
-                WHEN channel LIKE :like_channel THEN 2 
-                ELSE 3 
-            END, 
-            CASE 
+        ORDER BY
+            CASE
+                WHEN date = :date THEN 1
+                ELSE 2
+            END,
+            CASE
+                WHEN channel = :channel THEN 1
+                WHEN channel LIKE :like_channel THEN 2
+                ELSE 3
+            END,
+            CASE
                 WHEN channel = :channel THEN NULL
                 WHEN channel LIKE :like_channel THEN LENGTH(channel)
                 ELSE -LENGTH(channel)
@@ -107,8 +107,8 @@ function readEPGData($date, $oriChName, $cleanChName, $db, $type) {
         LIMIT 1
     ");
     $stmt->execute([
-        ':date' => $date, 
-        ':channel' => $cleanChName, 
+        ':date' => $date,
+        ':channel' => $cleanChName,
         ':like_channel' => $cleanChName . '%'
     ]);
     $row = $stmt->fetchColumn();
@@ -116,7 +116,7 @@ function readEPGData($date, $oriChName, $cleanChName, $db, $type) {
     if (!$row) {
         return false;
     }
-    
+
     // 在解码和添加 icon 后再编码为 JSON
     $rowArray = json_decode($row, true);
     $iconUrl = iconUrlMatch($rowArray['channel_name']) ?? iconUrlMatch($cleanChName) ?? iconUrlMatch($oriChName);
@@ -215,7 +215,7 @@ function fetchHandler() {
 
     // 频道参数为空时，直接重定向到 t.xml 文件
     if (empty($cleanChName)) {
-        if ($Config['gen_xml'] == 1) {
+        if ($Config['gen_xml'] === 1) {
             header('Content-Type: application/xml');
             header('Content-Disposition: attachment; filename="t.xml"');
             readfile('./t.xml');
@@ -238,12 +238,13 @@ function fetchHandler() {
             }
             return false;
         }
-        
+
         $type = isset($query_params['ch']) ? 'diyp' : 'lovetv';
         $response = readEPGData($date, $oriChName, $cleanChName, $db, $type);
-        
+
         // 频道在列表中但无当天数据，尝试通过 tvmao 接口获取数据
-        if ($response && !processResponse($response, $oriChName, $date, $type, $init) && $date >= date('Y-m-d')) {
+        $retry = $response && !processResponse($response, $oriChName, $date, $type, $init);
+        if ($retry && $Config['tvmao_default'] === 1 && $date > date('Y-m-d')) {
             $matchChannelName = json_decode($response, true)['channel_name'] ?? $oriChName;
             $json_url = "https://sp0.baidu.com/8aQDcjqpAAV3otqbppnN2DJv/api.php?query=$matchChannelName&resource_id=12520&format=json";
             downloadJSONData($json_url, $db, $log_messages, $matchChannelName);
@@ -257,9 +258,9 @@ function fetchHandler() {
         if ($type === 'diyp') {
             // 无法获取到数据时返回默认 diyp 数据
             $default_diyp_program_info = [
-                'date' => $date,
                 'channel_name' => $cleanChName,
-                'url' => "https://github.com/taksssss/PHP-EPG-Server",
+                'date' => $date,
+                'url' => "https://github.com/taksssss/PHP-EPG-Docker-Server",
                 'icon' => $iconUrl,
                 'epg_data' => !$ret_default ? '' : array_map(function($hour) {
                     return [

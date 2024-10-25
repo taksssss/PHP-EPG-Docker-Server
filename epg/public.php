@@ -2,9 +2,9 @@
 /**
  * @file public.php
  * @brief 公共脚本
- * 
+ *
  * 该脚本包含公共设置、公共函数。
- * 
+ *
  * 作者: Tak
  * GitHub: https://github.com/taksssss/PHP-EPG-Docker-Server
  */
@@ -30,10 +30,10 @@ date_default_timezone_set("Asia/Shanghai");
 try {
     // 检测数据库类型
     $is_sqlite = $Config['db_type'] === 'sqlite';
-    
-    $dsn = $is_sqlite ? 'sqlite:' . __DIR__ . '/data/data.db' 
+
+    $dsn = $is_sqlite ? 'sqlite:' . __DIR__ . '/data/data.db'
         : "mysql:host={$Config['mysql']['host']};dbname={$Config['mysql']['dbname']};charset=utf8mb4";
-    
+
     $db = new PDO($dsn, $Config['mysql']['username'] ?? null, $Config['mysql']['password'] ?? null);
     $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 } catch (PDOException $e) {
@@ -42,7 +42,7 @@ try {
         // 如果是 MySQL 连接失败，则修改配置为 SQLite 并提示用户
         $Config['db_type'] = 'sqlite';
         file_put_contents($config_path, json_encode($Config, JSON_PRETTY_PRINT));
-        
+
         echo '<p>MySQL 配置错误，已修改为 SQLite。<br>5 秒后自动刷新...</p>';
         echo '<meta http-equiv="refresh" content="5">';
     }
@@ -59,7 +59,7 @@ function initialDB() {
             channel " . ($is_sqlite ? 'TEXT' : 'VARCHAR(255)') . " NOT NULL,
             epg_diyp TEXT,
             PRIMARY KEY (date, channel)
-        )",        
+        )",
         "CREATE TABLE IF NOT EXISTS gen_list (
             id " . ($is_sqlite ? 'INTEGER PRIMARY KEY AUTOINCREMENT' : 'INT PRIMARY KEY AUTO_INCREMENT') . ",
             channel " . ($is_sqlite ? 'TEXT' : 'VARCHAR(255)') . " NOT NULL
@@ -85,7 +85,7 @@ function initialDB() {
 function cleanChannelName($channel, $t2s = false) {
     global $Config;
     $channel_ori = $channel;
-    // 默认忽略 - 跟 空格 
+    // 默认忽略 - 跟 空格
     $channel_replacements = ['-', ' '];
     $channel = str_replace($channel_replacements, '', $channel);
     // 频道映射，优先级最高，支持正则表达式和多对一映射
@@ -117,7 +117,7 @@ function t2s($channel) {
 // 台标模糊匹配
 function iconUrlMatch($originalChannel) {
     global $iconListMerged;
-    
+
     $iconUrl = null;
     // 精确匹配
     if (isset($iconListMerged[$originalChannel])) {
@@ -196,29 +196,43 @@ function processJsonData($json_data, $db, $channel_name) {
     // 处理 tvmao 数据格式
     $channelId = $channel_name;
     $dt = new DateTime();
+    $skipTime = null;
     foreach ($data as $epg) {
-        $title = trim($epg['title']);
-        $time_str = $epg['times'] ?? '';    
-        if ($time_str) {
+        if ($time_str = $epg['times'] ?? '') {
             $starttime = DateTime::createFromFormat('Y/m/d H:i', $time_str);
-            $date = $starttime->format('Y-m-d');            
-            // 跳过早于当前日期的节目
-            if ($date < $dt->format('Y-m-d')) continue;    
+            $date = $starttime->format('Y-m-d');
+            // 如果第一条数据早于今天 01:00，则认为今天的数据是齐全的
+            if (is_null($skipTime)) {
+                $skipTime = $starttime < new DateTime("today 01:00") ? 
+                            new DateTime("today 00:00") : new DateTime("tomorrow 00:00");
+            }
+            if ($starttime < $skipTime) continue;
             $channelProgrammes[$channelId]['diyp_data'][$date][] = [
-                'title' => $title,
                 'start' => $starttime->format('H:i'),
                 'end' => '',  // 初始为空
+                'title' => trim($epg['title']),
                 'desc' => ''  // 没有明确描述字段
             ];
         }
-    }    
+    }
     // 填充 'end' 字段
-    foreach ($channelProgrammes[$channelId]['diyp_data'] as &$programmes) {
+    foreach ($channelProgrammes[$channelId]['diyp_data'] as $date => &$programmes) {
         foreach ($programmes as $i => &$programme) {
             $nextStart = $programmes[$i + 1]['start'] ?? '00:00';  // 下一个节目开始时间或 00:00
-            $programme['end'] = $programme['end'] ?: $nextStart;   // 如果'end'为空，填充下一个节目的 'start'
-        }
-    }
+            $programme['end'] = $nextStart;  // 填充下一个节目的 'start'
+            if ($nextStart === '00:00') {
+                // 尝试获取第二天数据并补充
+                $nextDate = (new DateTime($date))->modify('+1 day')->format('Y-m-d');
+                $nextDayProgrammes = $channelProgrammes[$channelId]['diyp_data'][$nextDate] ?? [];
+                if (!empty($nextDayProgrammes)) {
+                    if ($nextDayProgrammes[0]['start'] !== '00:00') {
+                        array_unshift($channelProgrammes[$channelId]['diyp_data'][$nextDate], [
+                            'start' => '00:00',
+                            'end' => '',
+                            'title' => $programme['title'],
+                            'desc' => $programme['desc']
+                        ]);
+    }}}}}
     $channelProgrammes[$channelId]['channel_name'] = $channel_name;
     insertDataToDatabase($channelProgrammes, $db);
 }
@@ -243,14 +257,14 @@ function insertDataToDatabase($channelsData, $db) {
                 'epg_data' => $diypProgrammes
             ], JSON_UNESCAPED_UNICODE);
             // 当天及未来数据覆盖，其他日期数据忽略
-            $action = $date >= date('Y-m-d') ? 'REPLACE' : 'IGNORE';            
+            $action = $date >= date('Y-m-d') ? 'REPLACE' : 'IGNORE';
             // 检测数据库类型
             $is_sqlite = $Config['db_type'] === 'sqlite';
             // 选择 SQL 语句
-            $sql = $is_sqlite 
+            $sql = $is_sqlite
                 ? "INSERT OR $action INTO epg_data (date, channel, epg_diyp) VALUES (:date, :channel, :epg_diyp)"
-                : ($date >= date('Y-m-d') 
-                    ? "REPLACE INTO epg_data (date, channel, epg_diyp) VALUES (:date, :channel, :epg_diyp)" 
+                : ($date >= date('Y-m-d')
+                    ? "REPLACE INTO epg_data (date, channel, epg_diyp) VALUES (:date, :channel, :epg_diyp)"
                     : "INSERT IGNORE INTO epg_data (date, channel, epg_diyp) VALUES (:date, :channel, :epg_diyp)"
                 );
             // 准备并执行 SQL 语句

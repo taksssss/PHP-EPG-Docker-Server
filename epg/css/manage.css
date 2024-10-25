@@ -46,14 +46,14 @@ textarea[id="mysql_username"], textarea[id="mysql_password"] {
 }
 .modal-content select[id="db_type"], textarea[id="mysql_username"] {
     width: 85px;
-    margin-right: 5px;
+    margin-right: 11px;
 }
 textarea[id="mysql_host"], textarea[id="mysql_password"] {
     width: 118px;
 }
 textarea[id="mysql_dbname"] {
     width: 88px;
-    margin-right: 18px;
+    margin-right: 12px;
 }
 .form-row {
     display: flex;
@@ -305,19 +305,23 @@ button[id="uploadAllIcons"], button[id="showAllIcons"] {
     width: 15%; /* 第四列宽度 */
 }
 .modal-content select[id="include_future_only"] {
-    width: 160px;
-    margin-right: 0px;
+    width: 102px;
+    margin-right: 20px;
 }
 .modal-content select[id="gen_xml"] {
-    width: 100px;
-    margin-right: 50px;
+    width: 54px;
+    margin-right: 12px;
 }
 .modal-content select[id="ret_default"] {
-    width: 72px;
-    margin-right: 50px;
+    width: 56px;
+    margin-right: 12px;
+}
+.modal-content select[id="tvmao_default"] {
+    width: 70px;
+    margin-right: 0px;
 }
 .modal-content select[id="cache_time"] {
-    width: 50px;
+    width: 52px;
     margin-right: 0px;
 }
 /* 工具提示容器 */
