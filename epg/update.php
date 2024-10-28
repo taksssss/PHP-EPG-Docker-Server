@@ -23,7 +23,7 @@ function deleteOldData($db, $keep_days, &$log_messages) {
     global $Config;
 
     // 删除 t.xml 和 t.xml.gz 文件
-    if ($Config['gen_xml'] === 0) {
+    if (!$Config['gen_xml']) {
         @unlink('./t.xml');
         @unlink('./t.xml.gz');
     }
@@ -349,9 +349,9 @@ function processXmlData($xml_url, $xml_data, $db, $gen_list) {
     
         if ($channelName && !isset($processedRecords[$recordKey])) {
             $programmeData = [
-                'title' => (string)$programme->title,
                 'start' => $start['time'],
                 'end' => $start['date'] === $end['date'] ? $end['time'] : '00:00',
+                'title' => (string)$programme->title,
                 'desc' => isset($programme->desc) && (string)$programme->desc !== (string)$programme->title ? (string)$programme->desc : ''
             ];
     
@@ -360,9 +360,9 @@ function processXmlData($xml_url, $xml_data, $db, $gen_list) {
             // 保存跨天的节目数据
             if ($start['date'] !== $end['date'] && $end['time'] !== '00:00') {
                 $crossDayProgrammes[$channelId][$end['date']][] = [
-                    'title' => $programmeData['title'],
                     'start' => '00:00',
                     'end' => $end['time'],
+                    'title' => $programmeData['title'],
                     'desc' => $programmeData['desc']
                 ];
             }

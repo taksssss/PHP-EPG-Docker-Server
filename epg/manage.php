@@ -418,7 +418,7 @@ try {
 
             case 'download_data':
                 // 下载数据
-                $url = filter_var($_GET['url'], FILTER_VALIDATE_URL);
+                $url = validateUrl($_GET['url']);
                 if ($url) {
                     $data = downloadData($url, 5);
                     if ($data !== false) {
@@ -658,7 +658,7 @@ try {
                                                 (!empty($groupTitle) ? " group-title=\"$groupTitle\"" : "") .
                                                 ",$originalChannelName\n";
                         }
-                    } elseif (filter_var($line, FILTER_VALIDATE_URL)) {
+                    } elseif (validateUrl($line)) {
                         $newFileContent .= "$line\n";
                     } else {
                         // 处理 TXT 格式
@@ -672,7 +672,7 @@ try {
                                 $channelName = dbChNameMatch($cleanChName) ?: $originalChannelName;
                                 $streamUrl = $parts[1];
 
-                                if (filter_var($streamUrl, FILTER_VALIDATE_URL)) {
+                                if (validateUrl($streamUrl)) {
                                     // 模糊匹配台标
                                     $iconUrl = iconUrlMatch($channelName);
                                     $newFileContent .= "#EXTINF:-1,tvg-id=\"$channelName\" tvg-name=\"$channelName\"" .
@@ -712,7 +712,7 @@ try {
 
         <label for="xml_urls">【EPG源地址】（支持 xml 跟 .xml.gz 格式， # 为注释，支持获取 猫 数据）</label><span id="channelbind" onclick="showModal('channelbindepg')" style="color: blue; cursor: pointer;">（频道指定EPG源）</span><br><br>
         <textarea placeholder="一行一个，地址前面加 # 可以临时停用，后面加 # 可以备注。快捷键： Ctrl+/  。
-猫示例：tvmao, 广东卫视, 自定义名称:珠江频道" id="xml_urls" name="xml_urls" style="height: 122px;"><?php echo implode("\n", array_map('trim', $Config['xml_urls'])); ?></textarea><br><br>
+猫示例：tvmao, 猫频道名1, 自定义频道名:猫频道名2, ..." id="xml_urls" name="xml_urls" style="height: 122px;"><?php echo implode("\n", array_map('trim', $Config['xml_urls'])); ?></textarea><br><br>
 
         <div class="form-row">
             <label for="days_to_keep" class="label-days-to-keep">数据保存天数</label>

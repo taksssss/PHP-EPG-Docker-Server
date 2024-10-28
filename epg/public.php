@@ -114,6 +114,11 @@ function t2s($channel) {
     return OpenCC::convert($channel, 'TRADITIONAL_TO_SIMPLIFIED');
 }
 
+// 验证 URL 有效性，包括 IPv6 地址
+function validateUrl($url) {
+    return filter_var($url, FILTER_VALIDATE_URL) || filter_var($url, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6);
+}
+
 // 台标模糊匹配
 function iconUrlMatch($originalChannel) {
     global $iconListMerged;
@@ -170,13 +175,13 @@ function logMessage(&$log_messages, $message) {
 }
 
 // 下载 JSON 数据并存入数据库
-function downloadJSONData($json_url, $db, &$log_messages, $channel_name) {
+function downloadJSONData($json_url, $db, &$log_messages, $channel_name, $replaceFlag = true) {
     $json_data = downloadData($json_url);
     $json_data = mb_convert_encoding($json_data, 'UTF-8', 'GBK');
     if ($json_data !== false && stripos($json_data, '"data":[]') === false) {
         $db->beginTransaction();
         try {
-            processJsonData($json_data, $db, $channel_name);
+            processJsonData($json_data, $db, $channel_name, $replaceFlag);
             $db->commit();
             logMessage($log_messages, "【tvmao】 $channel_name 更新成功");
         } catch (Exception $e) {
@@ -189,7 +194,7 @@ function downloadJSONData($json_url, $db, &$log_messages, $channel_name) {
 }
 
 // 处理 JSON 数据并逐步存入数据库
-function processJsonData($json_data, $db, $channel_name) {
+function processJsonData($json_data, $db, $channel_name, $replaceFlag) {
     $data = json_decode($json_data, true);
     $data = $data['data'][0]['data'];
     $channelProgrammes = [];
@@ -234,11 +239,11 @@ function processJsonData($json_data, $db, $channel_name) {
                         ]);
     }}}}}
     $channelProgrammes[$channelId]['channel_name'] = $channel_name;
-    insertDataToDatabase($channelProgrammes, $db);
+    insertDataToDatabase($channelProgrammes, $db, $replaceFlag);
 }
 
 // 插入数据到数据库
-function insertDataToDatabase($channelsData, $db) {
+function insertDataToDatabase($channelsData, $db, $replaceFlag = true) {
     global $processedRecords;
     global $Config;
 
@@ -257,7 +262,7 @@ function insertDataToDatabase($channelsData, $db) {
                 'epg_data' => $diypProgrammes
             ], JSON_UNESCAPED_UNICODE);
             // 当天及未来数据覆盖，其他日期数据忽略
-            $action = $date >= date('Y-m-d') ? 'REPLACE' : 'IGNORE';
+            $action = $date >= date('Y-m-d') && $replaceFlag ? 'REPLACE' : 'IGNORE';
             // 检测数据库类型
             $is_sqlite = $Config['db_type'] === 'sqlite';
             // 选择 SQL 语句
