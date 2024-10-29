@@ -114,11 +114,6 @@ function t2s($channel) {
     return OpenCC::convert($channel, 'TRADITIONAL_TO_SIMPLIFIED');
 }
 
-// 验证 URL 有效性，包括 IPv6 地址
-function validateUrl($url) {
-    return filter_var($url, FILTER_VALIDATE_URL) || filter_var($url, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6);
-}
-
 // 台标模糊匹配
 function iconUrlMatch($originalChannel) {
     global $iconListMerged;

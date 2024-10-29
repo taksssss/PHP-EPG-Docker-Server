@@ -418,7 +418,7 @@ try {
 
             case 'download_data':
                 // 下载数据
-                $url = validateUrl($_GET['url']);
+                $url = filter_var(($_GET['url']), FILTER_VALIDATE_URL);
                 if ($url) {
                     $data = downloadData($url, 5);
                     if ($data !== false) {
@@ -616,6 +616,7 @@ try {
 
                 $fileTmpPath = $_FILES['m3utxtFile']['tmp_name'];
                 $fileContent = file_get_contents($fileTmpPath);
+                $m3uFileType = stripos($fileContent, '#EXTM3U') !== false;
                 $epgUrl = $serverUrl . dirname($_SERVER['SCRIPT_NAME']) . "/t.xml.gz";
                 $newFileContent = "#EXTM3U x-tvg-url=\"{$epgUrl}\"\n";
                 $lines = explode("\n", $fileContent);
@@ -623,43 +624,46 @@ try {
 
                 foreach ($lines as $line) {
                     $line = trim($line);
-
-                    if (strpos($line, '#EXTM3U') === 0) {
-                        $line = preg_replace('/x-tvg-url="[^"]+"/', 'x-tvg-url="' . $epgUrl . '"', $line);
-                        $newFileContent = "$line" . (strpos($line, 'x-tvg-url=') === false ? ' x-tvg-url="' . $epgUrl . '"' : '') . "\n";
-                        continue;
-                    }
-
-                    if (strpos($line, '#EXTINF') !== false) {
-                        if (preg_match('/#EXTINF:-1(.*),(.+)/', $line, $matches)) {
-                            $channelInfo = $matches[1]; // 提取 tvg-id, tvg-name 等信息
-                            $originalChannelName = trim($matches[2]); // 提取频道名称
-
-                            // 尝试从数据库中匹配频道
-                            $cleanChName = cleanChannelName($originalChannelName);
-                            $channelName = dbChNameMatch($cleanChName) ?: $originalChannelName;
-                            $tvgId = $tvgName = $channelName;
-
-                            // 从 EXTINF 提取额外信息
-                            if (preg_match('/tvg-id="([^"]+)"/', $channelInfo, $tvgIdMatch)) {
-                                $tvgId = $tvgName = $tvgIdMatch[1];
-                            }
-                            if (preg_match('/tvg-name="([^"]+)"/', $channelInfo, $tvgNameMatch)) {
-                                $tvgId = $tvgName = $tvgNameMatch[1];
-                            }
-                            if (preg_match('/group-title="([^"]+)"/', $channelInfo, $groupTitleMatch)) {
-                                $groupTitle = $groupTitleMatch[1];
-                            }
-
-                            // 模糊匹配台标
-                            $iconUrl = iconUrlMatch($channelName);
-                            $newFileContent .= "#EXTINF:-1,tvg-id=\"$tvgId\" tvg-name=\"$tvgName\"" .
-                                                (!empty($iconUrl) ? " tvg-logo=\"$iconUrl\"" : "") .
-                                                (!empty($groupTitle) ? " group-title=\"$groupTitle\"" : "") .
-                                                ",$originalChannelName\n";
+                    
+                    if ($m3uFileType) {
+                        // 处理 M3U 格式
+                        if (strpos($line, '#EXTM3U') === 0) {
+                            $line = preg_replace('/x-tvg-url="[^"]+"/', 'x-tvg-url="' . $epgUrl . '"', $line);
+                            $newFileContent = "$line" . (strpos($line, 'x-tvg-url=') === false ? ' x-tvg-url="' . $epgUrl . '"' : '') . "\n";
+                            continue;
                         }
-                    } elseif (validateUrl($line)) {
-                        $newFileContent .= "$line\n";
+
+                        if (strpos($line, '#EXTINF') !== false) {
+                            if (preg_match('/#EXTINF:-1(.*),(.+)/', $line, $matches)) {
+                                $channelInfo = $matches[1]; // 提取 tvg-id, tvg-name 等信息
+                                $originalChannelName = trim($matches[2]); // 提取频道名称
+
+                                // 尝试从数据库中匹配频道
+                                $cleanChName = cleanChannelName($originalChannelName);
+                                $channelName = dbChNameMatch($cleanChName) ?: $originalChannelName;
+                                $tvgId = $tvgName = $channelName;
+
+                                // 从 EXTINF 提取额外信息
+                                if (preg_match('/tvg-id="([^"]+)"/', $channelInfo, $tvgIdMatch)) {
+                                    $tvgId = $tvgName = $tvgIdMatch[1];
+                                }
+                                if (preg_match('/tvg-name="([^"]+)"/', $channelInfo, $tvgNameMatch)) {
+                                    $tvgId = $tvgName = $tvgNameMatch[1];
+                                }
+                                if (preg_match('/group-title="([^"]+)"/', $channelInfo, $groupTitleMatch)) {
+                                    $groupTitle = $groupTitleMatch[1];
+                                }
+
+                                // 模糊匹配台标
+                                $iconUrl = iconUrlMatch($channelName);
+                                $newFileContent .= "#EXTINF:-1,tvg-id=\"$tvgId\" tvg-name=\"$tvgName\"" .
+                                                    (!empty($iconUrl) ? " tvg-logo=\"$iconUrl\"" : "") .
+                                                    (!empty($groupTitle) ? " group-title=\"$groupTitle\"" : "") .
+                                                    ",$originalChannelName\n";
+                            }
+                        } else {
+                            $newFileContent .= "$line\n";
+                        }
                     } else {
                         // 处理 TXT 格式
                         $parts = explode(',', $line);
@@ -672,15 +676,13 @@ try {
                                 $channelName = dbChNameMatch($cleanChName) ?: $originalChannelName;
                                 $streamUrl = $parts[1];
 
-                                if (validateUrl($streamUrl)) {
-                                    // 模糊匹配台标
-                                    $iconUrl = iconUrlMatch($channelName);
-                                    $newFileContent .= "#EXTINF:-1,tvg-id=\"$channelName\" tvg-name=\"$channelName\"" .
-                                                        (!empty($iconUrl) ? " tvg-logo=\"$iconUrl\"" : "") .
-                                                        (!empty($groupTitle) ? " group-title=\"$groupTitle\"" : "") .
-                                                        ",$originalChannelName\n";
-                                    $newFileContent .= "$streamUrl\n";
-                                }
+                                // 模糊匹配台标
+                                $iconUrl = iconUrlMatch($channelName);
+                                $newFileContent .= "#EXTINF:-1,tvg-id=\"$channelName\" tvg-name=\"$channelName\"" .
+                                                    (!empty($iconUrl) ? " tvg-logo=\"$iconUrl\"" : "") .
+                                                    (!empty($groupTitle) ? " group-title=\"$groupTitle\"" : "") .
+                                                    ",$originalChannelName\n";
+                                $newFileContent .= "$streamUrl\n";
                             }
                         }
                     }
