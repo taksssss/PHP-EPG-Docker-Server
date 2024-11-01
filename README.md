@@ -219,6 +219,10 @@ PHP 实现的 EPG（电子节目指南）服务端， `Docker` 部署，自带�
 
 ![编辑频道映射](/pic/channelsMapping.png)
 
+**查看频道节目表**
+
+![查看频道节目表](/pic/channelEPG.png)
+
 **频道指定 `EPG` 源**
 
 ![频道指定EPG源](/pic/channelsBindEPG.png)
