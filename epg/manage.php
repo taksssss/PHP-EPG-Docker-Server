@@ -264,6 +264,8 @@ try {
             $action = 'get_cron_logs';
         } elseif (isset($_GET['get_channel'])) {
             $action = 'get_channel';
+        } elseif (isset($_GET['get_epg_by_channel'])) {
+            $action = 'get_epg_by_channel';
         } elseif (isset($_GET['get_icon'])) {
             $action = 'get_icon';
         } elseif (isset($_GET['get_channel_bind_epg'])) {
@@ -314,6 +316,25 @@ try {
                     'channels' => $mappedChannels,
                     'count' => count($mappedChannels)
                 ];
+                break;
+
+            case 'get_epg_by_channel':
+                // 查询
+                $channel = urldecode($_GET['channel']);
+                $date = urldecode($_GET['date']);
+                $stmt = $db->prepare("SELECT epg_diyp FROM epg_data WHERE channel = :channel AND date = :date");
+                $stmt->execute([':channel' => $channel, ':date' => $date]);
+                $result = $stmt->fetch(PDO::FETCH_ASSOC); // 获取单条结果            
+                if ($result) {
+                    $epgOutput = "";
+                    $epgData = json_decode($result['epg_diyp'], true);                    
+                    foreach ($epgData['epg_data'] as $epgItem) {
+                        $epgOutput .= "{$epgItem['start']} {$epgItem['title']}\n";
+                    }            
+                    $dbResponse = ['channel' => $channel, 'date' => $date, 'epg' => trim($epgOutput)];
+                } else {
+                    $dbResponse = ['channel' => $channel, 'date' => $date, 'epg' => '无节目信息'];
+                }
                 break;
 
             case 'get_icon':
@@ -714,7 +735,8 @@ try {
 
         <label for="xml_urls">【EPG源地址】（支持 xml 跟 .xml.gz 格式， # 为注释，支持获取 猫 数据）</label><span id="channelbind" onclick="showModal('channelbindepg')" style="color: blue; cursor: pointer;">（频道指定EPG源）</span><br><br>
         <textarea placeholder="一行一个，地址前面加 # 可以临时停用，后面加 # 可以备注。快捷键： Ctrl+/  。
-猫示例：tvmao, 猫频道名1, 自定义频道名:猫频道名2, ..." id="xml_urls" name="xml_urls" style="height: 122px;"><?php echo implode("\n", array_map('trim', $Config['xml_urls'])); ?></textarea><br><br>
+猫示例1：tvmao, 猫频道名, ...
+猫示例2：tvmao, 自定义频道名:猫频道名, ..." id="xml_urls" name="xml_urls" style="height: 122px;"><?php echo implode("\n", array_map('trim', $Config['xml_urls'])); ?></textarea><br><br>
 
         <div class="form-row">
             <label for="days_to_keep" class="label-days-to-keep">数据保存天数</label>
@@ -754,7 +776,7 @@ try {
         <div class="flex-container">
             <div class="flex-item" style="width: 100%;">
                 <label>
-                    【频道别名】（数据库频道名 => 频道别名1, 频道别名2, ...）<span id="dbChannelName" onclick="showModal('channel')" style="color: blue; cursor: pointer;">（编辑别名）</span><span id="dbChannelName" onclick="showModal('icon')" style="color: blue; cursor: pointer;">（编辑台标）</span>
+                    【频道别名】（数据库频道名 => 频道别名1, 频道别名2, ...）<span id="dbChannelName" onclick="showModal('channel')" style="color: blue; cursor: pointer;">（频道信息）</span><span id="dbChannelName" onclick="showModal('icon')" style="color: blue; cursor: pointer;">（台标信息）</span>
                 </label><br><br>
                 <textarea id="channel_mappings" name="channel_mappings" style="height: 142px;"><?php echo implode("\n", array_map(function($search, $replace) { return $search . ' => ' . $replace; }, array_keys($Config['channel_mappings']), $Config['channel_mappings'])); ?></textarea><br><br>
             </div>
@@ -785,6 +807,19 @@ try {
     <div class="modal-content config-modal-content">
         <span class="close">&times;</span>
         <p id="modalMessage"></p>
+    </div>
+</div>
+
+<!-- 频道 EPG 模态框 -->
+<div id="epgModal" class="modal">
+    <div class="modal-content epg-modal-content">
+        <span class="close">&times;</span>
+        <h2 id="epgTitle">频道名</h2>
+        <span id="epgDate">日期</span>
+        <span id="prevDate" style="cursor: pointer; color: blue; margin-left: 10px;">&#9664; 前一天</span>
+        <span id="nextDate" style="cursor: pointer; color: blue; margin-left: 10px;">后一天 &#9654;</span>
+        <br><br>
+        <textarea id="epgContent" readonly style="width: 100%; height: 400px;"></textarea>
     </div>
 </div>
 
@@ -856,11 +891,11 @@ try {
             </div>
             <div class="tooltip" style="width:auto; margin-right: 10px;">
                 <button id="deleteUnusedIcons" type="button" onclick="deleteUnusedIcons()">清理</button>
-                <span class="tooltiptext">清理未在列表中<br>使用的台标文件</span>
+                <span class="tooltiptext">清理未使用<br>服务器台标文件</span>
             </div>
             <div class="tooltip" style="width:auto; margin-right: 10px;">
                 <button id="showAllIcons" type="button" onclick="showModal('allicon')">全显</button>
-                <span class="tooltiptext">同时显示<br>无节目表内置台标</span>
+                <span class="tooltiptext">同时显示<br>无节目单台标</span>
             </div>
             <div class="tooltip" style="width:auto;">
                 <button id="uploadAllIcons" type="button" onclick="uploadAllIcons();">转存</button>
