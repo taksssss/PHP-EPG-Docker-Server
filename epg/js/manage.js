@@ -412,7 +412,7 @@ function filterChannels(type) {
             const row = document.createElement('tr');
             if (type === 'channel') {
                 row.innerHTML = `<td style="color: blue; cursor: pointer;" 
-                                    onclick="showModal('epg', true, { channel: '${item.original}', date: '${new Date().toISOString().split('T')[0]}' })">
+                                    onclick="showModal('epg', true, { channel: '${item.original}', date: '${new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Shanghai' })}' })">
                                     ${item.original} </td>
                                 <td contenteditable="true">${item.mapped || ''}</td>`;
                 row.querySelector('td[contenteditable]').addEventListener('input', function() {
