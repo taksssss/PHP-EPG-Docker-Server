@@ -59,7 +59,7 @@ function downloadXmlData($xml_url, $db, &$log_messages, $gen_list) {
     $xml_data = downloadData($xml_url);
     if ($xml_data !== false && stripos($xml_data, 'not found') === false) {
         logMessage($log_messages, "【下载】 成功");
-        if (strtoupper(substr($xml_url, -3)) === '.GZ') {
+        if (substr($xml_data, 0, 2) === "\x1F\x8B") { // 通过魔数判断 .gz 文件
             $xml_data = gzdecode($xml_data);
             if ($xml_data === false) {
                 logMessage($log_messages, ' 【解压缩失败！！！】');
