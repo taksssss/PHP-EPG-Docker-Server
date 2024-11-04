@@ -20,6 +20,15 @@ session_start();
 $configUpdated = isset($_SESSION['configUpdated']) && $_SESSION['configUpdated'];
 if ($configUpdated) {
     unset($_SESSION['configUpdated']);
+} else {
+    // 首次进入界面，检查 cron.php 是否运行正常
+    if($Config['interval_time']!=0) {
+        $output = [];
+        exec("ps aux | grep '[c]ron.php'", $output);
+        if(!$output) {
+            exec('php cron.php > /dev/null 2>/dev/null &');
+        }
+    }
 }
 
 if (isset($_SESSION['import_message'])) {
@@ -159,6 +168,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update'])) {
     $include_future_only = isset($_POST['include_future_only']) ? intval($_POST['include_future_only']) : $Config['include_future_only'];
     $ret_default = isset($_POST['ret_default']) ? intval($_POST['ret_default']) : $Config['ret_default'];
     $tvmao_default = isset($_POST['tvmao_default']) ? intval($_POST['tvmao_default']) : $Config['tvmao_default'];
+    $all_chs = isset($_POST['all_chs']) ? intval($_POST['all_chs']) : $Config['all_chs'];
     $gen_list_enable = isset($_POST['gen_list_enable']) ? intval($_POST['gen_list_enable']) : $Config['gen_list_enable'];
     $cache_time = intval($_POST['cache_time']) * 3600;
     $db_type = isset($_POST['db_type']) ? $_POST['db_type'] : $Config['db_type'];
@@ -207,6 +217,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update'])) {
         'include_future_only' => $include_future_only,
         'ret_default' => $ret_default,
         'tvmao_default' => $tvmao_default,
+        'all_chs' => $all_chs,
         'gen_list_enable' => $gen_list_enable,
         'cache_time' => $cache_time,
         'db_type' => $db_type,
@@ -235,14 +246,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update'])) {
     header('Location: manage.php');
     exit;
 } else {
-    // 首次进入界面，检查 cron.php 是否运行正常
-    if($Config['interval_time']!=0) {
-        $output = [];
-        exec("ps aux | grep '[c]ron.php'", $output);
-        if(!$output) {
-            exec('php cron.php > /dev/null 2>/dev/null &');
-        }
-    }
+
 }
 
 // 连接数据库并获取日志表中的数据
@@ -338,7 +342,7 @@ try {
                 break;
 
             case 'get_icon':
-                // 是否显示无节目表的内置台标
+                // 是否显示无节目单的内置台标
                 if(isset($_GET['get_all_icon'])) {
                     $iconList = $iconListMerged;
                 }
@@ -995,11 +999,22 @@ try {
             <option value="1" <?php if (!isset($Config['ret_default']) || $Config['ret_default'] == 1) echo 'selected'; ?>>是</option>
             <option value="0" <?php if (isset($Config['ret_default']) && $Config['ret_default'] == 0) echo 'selected'; ?>>否</option>
         </select>
-        <label for="tvmao_default" title="尝试使用 猫 接口补充预告数据">补充预告：</label>
-        <select id="tvmao_default" name="tvmao_default" required>
-            <option value="1" <?php if (isset($Config['tvmao_default']) && $Config['tvmao_default'] == 1) echo 'selected'; ?>>是</option>
-            <option value="0" <?php if (!isset($Config['tvmao_default']) || $Config['tvmao_default'] == 0) echo 'selected'; ?>>否</option>
-        </select>
+        <div class="tooltip" style="width:auto;">
+            <label for="tvmao_default" title="">补充预告<span style="vertical-align: super;">*</span>：</label>
+            <select id="tvmao_default" name="tvmao_default" required>
+                <option value="1" <?php if (isset($Config['tvmao_default']) && $Config['tvmao_default'] == 1) echo 'selected'; ?>>是</option>
+                <option value="0" <?php if (!isset($Config['tvmao_default']) || $Config['tvmao_default'] == 0) echo 'selected'; ?>>否</option>
+            </select>
+            <span class="tooltiptext">尝试使用 猫 接口<br>补充预告数据</span>
+        </div>
+        <div class="tooltip" style="width:auto;">
+            <label for="all_chs" title="">全转简中<span style="vertical-align: super;">*</span>：</label>
+            <select id="all_chs" name="all_chs" required>
+                <option value="1" <?php if (isset($Config['all_chs']) && $Config['all_chs'] == 1) echo 'selected'; ?>>是</option>
+                <option value="0" <?php if (!isset($Config['all_chs']) || $Config['all_chs'] == 0) echo 'selected'; ?>>否</option>
+            </select>
+            <span class="tooltiptext">节目单&描述<br>转简体中文</span>
+        </div>
         <br><br>
         <label for="cache_time">缓存时间：</label>
         <select id="cache_time" name="cache_time" required>

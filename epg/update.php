@@ -56,6 +56,7 @@ function getFormatTime($time) {
 
 // 下载 XML 数据并存入数据库
 function downloadXmlData($xml_url, $db, &$log_messages, $gen_list) {
+    global $Config;
     $xml_data = downloadData($xml_url);
     if ($xml_data !== false && stripos($xml_data, 'not found') === false) {
         logMessage($log_messages, "【下载】 成功");
@@ -66,6 +67,8 @@ function downloadXmlData($xml_url, $db, &$log_messages, $gen_list) {
                 return;
             }
         }
+        $xml_data = preg_replace('/[\x00-\x1F]/u', ' ', $xml_data); // 清除所有控制字符
+        if (isset($Config['all_chs']) && $Config['all_chs']) { $xml_data = t2s($xml_data); }
         $db->beginTransaction();
         try {
             processXmlData($xml_url, $xml_data, $db, $gen_list);
@@ -82,6 +85,7 @@ function downloadXmlData($xml_url, $db, &$log_messages, $gen_list) {
 
 // 获取限定频道列表及映射关系
 function getGenList($db) {
+    global $Config;
     $channels = $db->query("SELECT channel FROM gen_list")->fetchAll(PDO::FETCH_COLUMN);
     if (empty($channels)) {
         return ['gen_list_mapping' => [], 'gen_list' => []];
@@ -292,7 +296,7 @@ function processXmlData($xml_url, $xml_data, $db, $gen_list) {
     }
 
     // 繁简转换和频道筛选
-    $simplifiedChannelNames = explode("\n", t2s(implode("\n", $cleanChannelNames)));
+    $simplifiedChannelNames = (isset($Config['all_chs']) && $Config['all_chs']) ? $cleanChannelNames : explode("\n", t2s(implode("\n", $cleanChannelNames)));
     $channelNamesMap = [];
     foreach ($cleanChannelNames as $channelId => $channelName) {
         $channelNameSimplified = array_shift($simplifiedChannelNames);

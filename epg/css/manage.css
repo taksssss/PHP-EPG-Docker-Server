@@ -44,16 +44,15 @@ textarea[id="mysql_username"], textarea[id="mysql_password"] {
     padding-left: 5px;
     padding-right: 5px;
 }
-.modal-content select[id="db_type"], textarea[id="mysql_username"] {
+.modal-content select[id="db_type"], textarea[id="mysql_username"], textarea[id="mysql_dbname"] {
     width: 85px;
-    margin-right: 11px;
+    margin-right: 12px;
 }
 textarea[id="mysql_host"], textarea[id="mysql_password"] {
     width: 118px;
 }
 textarea[id="mysql_dbname"] {
     width: 88px;
-    margin-right: 12px;
 }
 .form-row {
     display: flex;
@@ -79,7 +78,7 @@ textarea[id="mysql_dbname"] {
     border-radius: 5px;
     box-sizing: border-box;
     width: 98px;
-    margin-right: 88px;
+    margin-right: 12px;
     text-align: center;
 }
 .form-row input[type="time"] {
@@ -91,7 +90,7 @@ textarea[id="mysql_dbname"] {
     width: 90px;
 }
 .form-row input[id="start_time"] {
-    margin-left: 166px;
+    margin-left: 242px;
 }
 .form-row input[id="end_time"],
 select[id="interval_hour"]{
@@ -306,18 +305,18 @@ button[id="uploadAllIcons"], button[id="showAllIcons"] {
 }
 .modal-content select[id="include_future_only"] {
     width: 102px;
-    margin-right: 20px;
 }
 .modal-content select[id="gen_xml"] {
     width: 54px;
-    margin-right: 12px;
 }
 .modal-content select[id="ret_default"] {
     width: 56px;
-    margin-right: 12px;
 }
 .modal-content select[id="tvmao_default"] {
-    width: 70px;
+    width: 63px;
+}
+.modal-content select[id="all_chs"] {
+    width: 79px;
     margin-right: 0px;
 }
 .modal-content select[id="cache_time"] {

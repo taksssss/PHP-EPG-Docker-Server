@@ -195,9 +195,8 @@ function showModal(type, $popup = true, $data = '') {
             fetchData('manage.php?get_channel_match=true', updateChannelMatchList);
             document.getElementById("moreSettingModal").style.display = "none";
             break;
-        case 'moresetting':
-            // 设置 MySQL 相关输入框状态
-            updateMySQLFields();
+        case 'moresetting':            
+            updateMySQLFields(); // 设置 MySQL 相关输入框状态
             document.getElementById('db_type').addEventListener('change', updateMySQLFields);
             modal = document.getElementById("moreSettingModal");
             logSpan = document.getElementsByClassName("close")[8];
@@ -462,7 +461,8 @@ function handleIconFileUpload(event, item, row, allData) {
                             <img src="${iconUrl}?${new Date().getTime()}" style="max-width: 80px; max-height: 50px; background-color: #ccc;">
                         </a>
                     `;
-                    document.getElementById('iconTable').dataset.allIcons = JSON.stringify(allData);
+                    document.getElementById('iconTable').dataset.allIcons = JSON.stringify(allData);                    
+                    updateIconListJsonFile();
                 } else {
                     alert('上传失败：' + data.message);
                 }
@@ -546,7 +546,8 @@ function uploadAllIcons() {
             uploadAllIcons(); // 继续上传
         }
         else {
-            progressDisplay.textContent = "全部转存成功，点击“保存配置”！";
+            progressDisplay.textContent = "全部转存成功，已保存！";
+            updateIconListJsonFile();
         }
     });
 }
@@ -665,7 +666,7 @@ async function parseSource() {
             } else {
                 chName = line.split(',')[0].trim();
             }
-            if (chName) channels.add(chName);
+            if (chName) channels.add(chName.toUpperCase());
         }
     });
 
@@ -678,21 +679,7 @@ async function parseSource() {
 
 // 保存数据并更新配置
 function saveAndUpdateConfig($doUpdate = true) {
-    var iconTableElement = document.getElementById('iconTable');
-    var allIcons = iconTableElement && iconTableElement.dataset.allIcons ? JSON.parse(iconTableElement.dataset.allIcons) : null;
-    if(allIcons) {
-        fetch('manage.php', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: new URLSearchParams({
-                update_icon_list: true,
-                updatedIcons: JSON.stringify(allIcons) // 传递更新后的图标数据
-            })
-        });
-    }
-
+    updateIconListJsonFile();
     const textAreaContent = document.getElementById('gen_list_text').value;
     fetch('manage.php?set_gen_list=true', {
         method: 'POST',
@@ -716,9 +703,27 @@ function saveAndUpdateConfig($doUpdate = true) {
     });
 }
 
+// 更新 iconList.json
+function updateIconListJsonFile(){
+    var iconTableElement = document.getElementById('iconTable');
+    var allIcons = iconTableElement && iconTableElement.dataset.allIcons ? JSON.parse(iconTableElement.dataset.allIcons) : null;
+    if(allIcons) {
+        fetch('manage.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: new URLSearchParams({
+                update_icon_list: true,
+                updatedIcons: JSON.stringify(allIcons) // 传递更新后的图标数据
+            })
+        });
+    }
+}
+
 // 在提交表单时，将更多设置中的数据包括在表单数据中
 document.getElementById('settingsForm').addEventListener('submit', function() {
-    const fields = ['gen_xml', 'include_future_only', 'ret_default', 'tvmao_default', 'gen_list_enable', 
+    const fields = ['gen_xml', 'include_future_only', 'ret_default', 'tvmao_default', 'all_chs', 'gen_list_enable', 
                     'cache_time', 'db_type', 'mysql_host', 'mysql_dbname', 'mysql_username', 'mysql_password'];
     fields.forEach(function(field) {
         const hiddenInput = document.createElement('input');
