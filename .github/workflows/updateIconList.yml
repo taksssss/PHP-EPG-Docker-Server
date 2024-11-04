@@ -13,14 +13,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Download iconList_default.json
+      - name: Download defaultIconList.json
         run: |
-          curl -sL https://github.com/taksssss/tv/raw/refs/heads/main/iconList_default.json -o epg/iconList_default.json
+          curl -sL https://github.com/taksssss/tv/raw/refs/heads/main/iconList_default.json -o epg/defaultIconList.json
 
       - name: Commit and push changes
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add epg/iconList_default.json
-          git diff --cached --quiet || git commit -m "Update iconList_default.json"
+          git add epg/defaultIconList.json
+          git diff --cached --quiet || git commit -m "Update defaultIconList.json"
           git push

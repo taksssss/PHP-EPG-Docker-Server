@@ -9,7 +9,7 @@
         }
     ],
     "require": {
-        "php": ">=7.0",
+        "php": ">=8.0",
         "ext-zip": "*",
         "symfony/console": "^5.4|^6.3",
         "symfony/process": "^5.4|^6.3"

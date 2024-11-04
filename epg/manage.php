@@ -67,8 +67,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['login'])) {
         // 密码正确，设置会话变量
         $_SESSION['loggedin'] = true;
 
-        // 设置会话变量，表明用户可以访问 phpliteadmin.php
+        // 设置会话变量，表明用户可以访问 phpliteadmin.php 、 tinyfilemanager.php
         $_SESSION['can_access_phpliteadmin'] = true;
+        $_SESSION['can_access_tinyfilemanager'] = true;
     } else {
         $error = "密码错误";
     }
@@ -86,7 +87,7 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
     <html lang="zh-CN">
     <head>
         <title>登录</title>
-        <link rel="stylesheet" type="text/css" href="css/login.css">
+        <link rel="stylesheet" type="text/css" href="assets/css/login.css">
     </head>
     <body>
         <div class="container">
@@ -730,7 +731,7 @@ try {
 <html lang="zh-CN">
 <head>
     <title>管理配置</title>
-    <link rel="stylesheet" type="text/css" href="css/manage.css">
+    <link rel="stylesheet" type="text/css" href="assets/css/manage.css">
 </head>
 <body>
 <div class="container">
@@ -792,7 +793,8 @@ try {
         <br><br>
         <div class="button-container">
             <a href="update.php" target="_blank">更新数据</a>
-            <a href="phpliteadmin.php" target="_blank" onclick="return handleDbManagement();">管理数据</a>
+            <a href="assets/phpliteadmin.php" target="_blank" onclick="return handleDbManagement();">管理数据</a>
+            <a href="assets/tinyfilemanager.php" target="_blank">管理文件</a>
             <button type="button" onclick="showModal('cron')">定时日志</button>
             <button type="button" onclick="showModal('update')">更新日志</button>
             <button type="button" onclick="showModal('moresetting')">更多设置</button>
@@ -1059,6 +1061,6 @@ try {
     var endTime = <?php echo json_encode($Config['end_time']); ?>;
     var importMessage = <?php echo json_encode($importMessage); ?>;
 </script>
-<script src="js/manage.js"></script>
+<script src="assets/js/manage.js"></script>
 </body>
 </html>

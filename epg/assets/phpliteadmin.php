@@ -454,7 +454,7 @@ if (!isset($_SESSION['can_access_phpliteadmin']) || $_SESSION['can_access_phplit
     // 设置跳转延迟，给用户时间看到消息
     echo "<script>
             setTimeout(function() {
-                window.location.href = 'manage.php';
+                window.location.href = '../manage.php';
             }, 2000); // 2秒后跳转
           </script>";
     

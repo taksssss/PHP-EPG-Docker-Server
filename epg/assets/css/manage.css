@@ -123,7 +123,7 @@ input[type="submit"]:hover,
 .button-container button[name="logoutbtn"] {    
     font-weight: normal;
     border-radius: 10px;
-    width: 100px;
+    width: 105px;
 }
 input[type="text"] {
     width: calc(100% - 22px);
