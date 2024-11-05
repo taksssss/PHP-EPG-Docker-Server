@@ -794,7 +794,7 @@ try {
         <div class="button-container">
             <a href="update.php" target="_blank">更新数据</a>
             <a href="assets/phpliteadmin.php" target="_blank" onclick="return handleDbManagement();">管理数据</a>
-            <a href="assets/tinyfilemanager.php" target="_blank">管理文件</a>
+            <a href="assets/tinyfilemanager/index.php" target="_blank">管理文件</a>
             <button type="button" onclick="showModal('cron')">定时日志</button>
             <button type="button" onclick="showModal('update')">更新日志</button>
             <button type="button" onclick="showModal('moresetting')">更多设置</button>

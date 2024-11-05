@@ -47,7 +47,7 @@
 $password = '';
 
 //directory relative to this file to search for databases (if false, manually list databases in the $databases variable)
-$directory = './data';
+$directory = false;
 
 //whether or not to scan the subdirectories of the above directory infinitely deep
 $subdirectories = false;
@@ -56,12 +56,8 @@ $subdirectories = false;
 //if any of the databases do not exist as they are referenced by their path, they will be created automatically
 $databases = array(
 	array(
-		'path'=> 'database1.sqlite',
-		'name'=> 'Database 1'
-	),
-	array(
-		'path'=> 'database2.sqlite',
-		'name'=> 'Database 2'
+		'path'=> '../data/data.db',
+		'name'=> 'php-epg'
 	),
 );
 
@@ -449,7 +445,7 @@ session_start();
 // 检查是否有权限访问 phpliteadmin.php
 if (!isset($_SESSION['can_access_phpliteadmin']) || $_SESSION['can_access_phpliteadmin'] !== true) {
     // 显示错误信息并跳转到 manage.php
-    echo "请通过管理页面访问。<br>正在跳转……";
+    echo '<div style="display: flex; justify-content: center; align-items: center; height: 100vh;">请通过管理页面访问。<br>正在跳转……</div>';
     
     // 设置跳转延迟，给用户时间看到消息
     echo "<script>

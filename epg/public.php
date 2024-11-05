@@ -15,11 +15,11 @@ use Overtrue\PHPOpenCC\OpenCC; // 使用 OpenCC 库
 // 检查并解析配置文件和图标列表文件
 @mkdir(__DIR__ . '/data', 0755, true);
 $iconDir = __DIR__ . '/data/icon/'; @mkdir($iconDir, 0755, true);
-file_exists($config_path = __DIR__ . '/data/config.json') || copy(__DIR__ . '/defaultConfig.json', $config_path);
+file_exists($config_path = __DIR__ . '/data/config.json') || copy(__DIR__ . '/assets/defaultConfig.json', $config_path);
 file_exists($iconList_path = __DIR__ . '/data/iconList.json') || file_put_contents($iconList_path, json_encode(new stdClass(), JSON_PRETTY_PRINT));
 $Config = json_decode(file_get_contents($config_path), true) or die("配置文件解析失败: " . json_last_error_msg());
 ($iconList = json_decode(file_get_contents($iconList_path), true)) !== null || die("图标列表文件解析失败: " . json_last_error_msg());
-$iconListDefault = json_decode(file_get_contents(__DIR__ . '/defaultIconList.json'), true) or die("默认图标列表文件解析失败: " . json_last_error_msg());
+$iconListDefault = json_decode(file_get_contents(__DIR__ . '/assets/defaultIconList.json'), true) or die("默认图标列表文件解析失败: " . json_last_error_msg());
 $iconListMerged = array_merge($iconListDefault, $iconList); // 同一个键，以 iconList 的为准
 $serverUrl = (($_SERVER['HTTPS'] ?? '') === 'on' ? 'https://' : 'http://') . $_SERVER['HTTP_HOST'];
 
