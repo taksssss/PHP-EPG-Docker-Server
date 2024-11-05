@@ -244,7 +244,7 @@ function fetchHandler() {
 
         // 频道在列表中但无当天数据，尝试通过 tvmao 接口获取数据
         $retry = $response && !processResponse($response, $oriChName, $date, $type, $init);
-        if ($retry && $Config['tvmao_default'] === 1 && $date > date('Y-m-d')) {
+        if ($retry && $Config['tvmao_default'] === 1 && $date >= date('Y-m-d')) {
             $matchChannelName = json_decode($response, true)['channel_name'] ?? $oriChName;
             $json_url = "https://sp0.baidu.com/8aQDcjqpAAV3otqbppnN2DJv/api.php?query=$matchChannelName&resource_id=12520&format=json";
             downloadJSONData($json_url, $db, $log_messages, $matchChannelName, $replaceFlag = false); // 只更新无数据的日期

@@ -7,7 +7,7 @@
     "tvmao_default": 0,
     "all_chs": 0,
     "gen_list_enable": 0,
-    "cache_time": 21600,
+    "cache_time": 0,
     "db_type": "sqlite",
     "mysql": {
         "host": "mysql",
