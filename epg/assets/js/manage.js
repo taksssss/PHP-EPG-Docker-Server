@@ -1,7 +1,5 @@
 document.addEventListener('DOMContentLoaded', function() {
     // 页面加载时执行，预加载数据，减少等待时间
-    showModal('channelbindepg', $popup = false); // 这一行必须有，否则保存时丢失数据
-    showModal('moresetting', $popup = false); // 这一行必须有，否则保存时丢失数据
     showModal('update', $popup = false);
     showModal('cron', $popup = false);
     showModal('channel', $popup = false);
@@ -640,7 +638,7 @@ async function parseSource() {
             text = '';
             for (let url of urls) {
                 try {
-                    const response = await fetch('manage.php?url=' + encodeURIComponent(url));
+                    const response = await fetch('manage.php?download_data=true&url=' + encodeURIComponent(url));
                     const result = await response.json(); // 解析 JSON 响应
                     
                     if (result.success && !/not found/i.test(result.data)) {

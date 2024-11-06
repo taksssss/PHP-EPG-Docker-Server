@@ -18,9 +18,9 @@
     "start_time": "00:00",
     "end_time": "23:59",
     "interval_time": 21600,
-    "manage_password": "",
     "channel_bind_epg": [],
     "channel_mappings": {
         "CCTV$1": "regex:\/^CCTV[-\\s]*(\\d{1,2}(\\s*P(LUS)?|[K\\+])?)(?![\\s-]*(美洲|欧洲)).*\/i"
-    }
+    },
+    "manage_password": "d41d8cd98f00b204e9800998ecf8427e"
 }
