@@ -32,7 +32,8 @@ jobs:
 
       - name: Create zip file of the epg folder
         run: |
-          zip -r codes.zip epg/
+          cd epg
+          zip -r ../codes.zip *
 
       - name: Commit the zip file
         run: |
