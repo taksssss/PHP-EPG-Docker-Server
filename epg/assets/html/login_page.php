@@ -5,25 +5,28 @@
     <link rel="stylesheet" type="text/css" href="assets/css/login.css">
 </head>
 <body>
-    <div class="container">
-        <h2>登录</h2>
-        <form method="POST">
-            <label for="password">管理密码:</label><br><br>
-            <input type="password" id="password" name="password"><br><br>
-            <input type="hidden" name="login" value="1">
-            <input type="submit" value="登录">
-        </form>
-        <div class="button-container">
-            <button type="button" onclick="showChangePasswordForm()">更改密码</button>
-        </div>
-        <?php if (!empty($error)) echo "<p style='color:red;'>$error</p>"; ?>
-        <?php echo $passwordChangedMessage; ?>
-        <?php echo $passwordChangeErrorMessage; ?>
+<div class="container">
+    <h2>登录</h2>
+    <form method="POST">
+        <label for="password">管理密码:</label><br><br>
+        <input type="password" id="password" name="password"><br><br>
+        <input type="hidden" name="login" value="1">
+        <input type="submit" value="登录">
+    </form>
+    <div class="button-container">
+        <button type="button" onclick="showChangePasswordForm()">更改密码</button>
     </div>
-    <!-- 底部显示 -->
-    <div class="footer">
-        <a href="https://github.com/taksssss/PHP-EPG-Docker-Server" style="color: #888; text-decoration: none;">https://github.com/taksssss/PHP-EPG-Docker-Server</a>
-    </div>
+    <?php if (!empty($error)) echo "<p style='color:red;'>$error</p>"; ?>
+    <?php echo $passwordChangedMessage; ?>
+    <?php echo $passwordChangeErrorMessage; ?>
+</div>
+
+<!-- 底部显示 -->
+<div class="footer">
+    <a href="https://github.com/taksssss/EPG-Server" style="color: #888; text-decoration: none;">
+        https://github.com/taksssss/EPG-Server v<?php echo htmlspecialchars($currentVersion); ?>
+    </a>
+</div>
 
 <!-- 修改密码模态框 -->
 <div id="changePasswordModal" class="modal">

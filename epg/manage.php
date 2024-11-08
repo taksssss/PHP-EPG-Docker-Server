@@ -6,7 +6,7 @@
  * 管理界面脚本，用于处理会话管理、密码更改、登录验证、配置更新、更新日志展示等功能。
  *
  * 作者: Tak
- * GitHub: https://github.com/taksssss/PHP-EPG-Docker-Server
+ * GitHub: https://github.com/taksssss/EPG-Server
  */
 
 // 引入公共脚本，初始化数据库
@@ -30,11 +30,11 @@ if ($configUpdated) {
     }
 }
 
-if (isset($_SESSION['import_message'])) {
-    $importMessage = $_SESSION['import_message'];
-    unset($_SESSION['import_message']); // 清除消息以防再次显示
+if (isset($_SESSION['display_message'])) {
+    $displayMessage = $_SESSION['display_message'];
+    unset($_SESSION['display_message']); // 清除消息以防再次显示
 } else {
-    $importMessage = '';
+    $displayMessage = '';
 }
 
 // 过渡到新的 md5 密码
@@ -94,24 +94,22 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
 // 检查是否提交配置表单
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update'])) {
 
+    // 获取 $_POST 中除了 'update' 以外的所有键
+    $config_keys = array_keys(array_filter($_POST, function($key) {
+        return !in_array($key, ['update']); // 排除 'update' 和 'xml_urls' 键
+    }, ARRAY_FILTER_USE_KEY));
+    
+    foreach ($config_keys as $key) {
+        ${$key} = (is_numeric($_POST[$key]) ? intval($_POST[$key]) : $_POST[$key]);
+    }
+    
     // 获取表单数据并去除每个 URL 末尾的换行符
-    $xml_urls = array_map('trim', explode("\n", str_replace(["，", "："], [",", ":"], trim($_POST['xml_urls']))));
+    $xml_urls = array_map('trim', explode("\n", str_replace(["，", "："], [",", ":"], trim($xml_urls))));
 
     // 过滤和规范化 xml_urls
     $xml_urls = array_values(array_map(function($url) {
         return preg_replace('/^#\s*(?:#\s*)*(\S+)(\s*#.*)?$/', '# $1$2', trim($url));
     }, $xml_urls));
-
-    $config_keys = [
-        'days_to_keep', 'gen_xml', 'include_future_only', 'ret_default', 'tvmao_default',
-        'all_chs', 'gen_list_enable', 'cache_time', 'db_type', 'mysql_host',
-        'mysql_dbname', 'mysql_username', 'mysql_password', 'start_time', 'end_time',
-        'interval_hour', 'interval_minute'
-    ];
-    
-    foreach ($config_keys as $key) {
-        ${$key} = (is_numeric($_POST[$key]) ? intval($_POST[$key]) : $_POST[$key]);
-    }
     
     $cache_time *= 3600;
     $interval_time = $interval_hour * 3600 + $interval_minute * 60;    
@@ -141,15 +139,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update'])) {
     // 获取旧的配置
     $oldConfig = $Config;
 
+    // 移除以 mysql_ 和 interval_ 开头的键
+    $config_keys_filtered = array_filter($config_keys, function($key) {
+        return !preg_match('/^(mysql_|interval_)/', $key);
+    });
+
     // 需要包含在新配置中的变量
-    $config_keys = [
-        'xml_urls', 'days_to_keep', 'gen_xml', 'include_future_only', 'ret_default', 
-        'tvmao_default', 'all_chs', 'gen_list_enable', 'cache_time', 'db_type', 'mysql',
-        'start_time', 'end_time', 'interval_time', 'channel_bind_epg', 'channel_mappings'
-    ];
+    $config_keys_new = ['channel_bind_epg', 'interval_time', 'mysql'];
+    $config_keys_save = array_merge($config_keys_filtered, $config_keys_new);
 
     // 使用 compact 创建新配置数组
-    $newConfig = array_merge(compact($config_keys), ['manage_password' => $Config['manage_password']]); // 保留密码
+    $newConfig = array_merge(compact($config_keys_save), ['manage_password' => $Config['manage_password']]); // 保留密码
 
     // 将新配置写回 config.json
     file_put_contents($config_path, json_encode($newConfig, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
@@ -181,14 +181,48 @@ try {
 
         // 确定操作类型
         $action_map = [
-            'get_update_logs', 'get_cron_logs', 'get_channel', 'get_epg_by_channel',
-            'get_icon', 'get_channel_bind_epg', 'get_channel_match', 'get_gen_list',
-            'download_data', 'delete_unused_icons'
+            'get_version_update_info', 'update_version', 'get_update_logs', 'get_cron_logs',
+            'get_channel', 'get_epg_by_channel', 'get_icon', 'get_channel_bind_epg',
+            'get_channel_match', 'get_gen_list', 'download_data', 'delete_unused_icons'
         ];
         $action = key(array_intersect_key($_GET, array_flip($action_map))) ?: '';
 
         // 根据操作类型执行不同的逻辑
         switch ($action) {
+            case 'get_version_update_info':
+                if ($Config['check_update'] ?? true) {
+                    // 尝试读取远程版本信息
+                    $versionUrl = 'https://gitee.com/taksssss/EPG-Server/raw/main/epg/assets/version.txt';
+                    $lines = @file($versionUrl, FILE_IGNORE_NEW_LINES);
+                
+                    // 返回结果，若读取失败则返回错误信息
+                    $dbResponse = $lines ? [
+                        'hasUpdate' => version_compare($currentVersion, $lines[0], '<'),
+                        'updateVersion' => $lines[0],
+                        'updateInfo' => array_slice($lines, 1)
+                    ] : '';
+                } else {
+                    $dbResponse = ['hasUpdate' => false];
+                }
+                break;
+
+            case 'update_version':
+                // 下载文件并保存到临时文件
+                $updateUrl = 'https://gitee.com/taksssss/EPG-Server/raw/main/codes.zip';
+                if ($zipContent = downloadData($updateUrl)) {
+                    file_put_contents('tmp.zip', $zipContent);
+            
+                    // 解压并删除临时文件
+                    $zip = new ZipArchive();
+                    if ($zip->open('tmp.zip') === TRUE) {
+                        $zip->extractTo('.');
+                        $zip->close();
+                        unlink('tmp.zip');
+                        $dbResponse = ['updated' => true];
+                    }
+                }
+                break;
+
             case 'get_update_logs':
                 // 获取更新日志
                 $dbResponse = $db->query("SELECT * FROM update_log")->fetchAll(PDO::FETCH_ASSOC);
@@ -445,7 +479,7 @@ try {
                 } else {
                     $message = "导入失败！无法打开压缩文件。";
                 }
-                $_SESSION['import_message'] = $message;
+                $_SESSION['display_message'] = $message;
                 header('Location: manage.php');
                 exit;
 

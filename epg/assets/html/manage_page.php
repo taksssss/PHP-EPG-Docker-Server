@@ -76,14 +76,19 @@
 
 <!-- 底部显示 -->
 <div class="footer">
-    <a href="https://github.com/taksssss/PHP-EPG-Docker-Server" style="color: #888; text-decoration: none;">https://github.com/taksssss/PHP-EPG-Docker-Server</a>
+    <a href="https://github.com/taksssss/EPG-Server" style="color: #888; text-decoration: none;">
+        https://github.com/taksssss/EPG-Server v<?php echo htmlspecialchars($currentVersion); ?>
+    </a>
 </div>
 
-<!-- 配置更新模态框 -->
-<div id="myModal" class="modal">
-    <div class="modal-content config-modal-content">
+<!-- 配置消息模态框 -->
+<div id="messageModal" class="modal">
+    <div class="modal-content message-modal-content">
         <span class="close">&times;</span>
         <p id="modalMessage"></p>
+        <div class="modal-footer">
+            <!-- 这里的按钮将在 JavaScript 中动态添加 -->
+        </div>
     </div>
 </div>
 
@@ -250,68 +255,114 @@
     <div class="modal-content more-setting-modal-content">
         <span class="close">&times;</span>
         <h2>更多设置</h2>
-        <label for="gen_xml">生成 xml 文件：</label>
-        <select id="gen_xml" name="gen_xml" required>
-            <option value="1" <?php if ($Config['gen_xml'] == 1) echo 'selected'; ?>>是</option>
-            <option value="0" <?php if ($Config['gen_xml'] == 0) echo 'selected'; ?>>否</option>
-        </select>
-        <label for="include_future_only">内容：</label>
-        <select id="include_future_only" name="include_future_only" required>
-            <option value="1" <?php if ($Config['include_future_only'] == 1) echo 'selected'; ?>>预告数据</option>
-            <option value="0" <?php if ($Config['include_future_only'] == 0) echo 'selected'; ?>>所有数据</option>
-        </select>
-        <form id="importForm" method="post" enctype="multipart/form-data" style="display: inline-block;">
-            <input type="file" name="importFile" id="importFile" style="display: none;" accept=".gz" onchange="document.getElementById('importForm').submit();">
-            <input type="hidden" name="importExport" id="formImportExport" value="">
-            <span id="import" onclick="document.getElementById('importFile').click()" style="color: blue; cursor: pointer; margin-right: 20px;">数据导入</span>
-            <span id="export" onclick="document.getElementById('importForm').submit()" style="color: blue; cursor: pointer;">数据导出</span>
-        </form>
-        <br><br>
-        <label for="ret_default">返回精彩节目：</label>
-        <select id="ret_default" name="ret_default" required>
-            <option value="1" <?php if (!isset($Config['ret_default']) || $Config['ret_default'] == 1) echo 'selected'; ?>>是</option>
-            <option value="0" <?php if (isset($Config['ret_default']) && $Config['ret_default'] == 0) echo 'selected'; ?>>否</option>
-        </select>
-        <div class="tooltip" style="width:auto;">
-            <label for="tvmao_default" title="">补充预告<span style="vertical-align: super;">*</span>：</label>
-            <select id="tvmao_default" name="tvmao_default" required>
-                <option value="1" <?php if (isset($Config['tvmao_default']) && $Config['tvmao_default'] == 1) echo 'selected'; ?>>是</option>
-                <option value="0" <?php if (!isset($Config['tvmao_default']) || $Config['tvmao_default'] == 0) echo 'selected'; ?>>否</option>
-            </select>
-            <span class="tooltiptext">尝试使用 猫 接口<br>补充预告数据</span>
+
+        <!-- 第一行 -->
+        <div class="row">
+            <div class="column">
+                <label for="gen_xml">生成 xml 文件：</label>
+                <select id="gen_xml" name="gen_xml" required>
+                    <option value="1" <?php if ($Config['gen_xml'] == 1) echo 'selected'; ?>>是</option>
+                    <option value="0" <?php if ($Config['gen_xml'] == 0) echo 'selected'; ?>>否</option>
+                </select>
+            </div>
+            <div class="column">
+                <label for="include_future_only">xml 内容：</label>
+                <select id="include_future_only" name="include_future_only" required>
+                    <option value="1" <?php if ($Config['include_future_only'] == 1) echo 'selected'; ?>>预告数据</option>
+                    <option value="0" <?php if ($Config['include_future_only'] == 0) echo 'selected'; ?>>所有数据</option>
+                </select>
+            </div>
+            <div class="column">
+                <form id="importForm" method="post" enctype="multipart/form-data" style="display: inline-block;">
+                    <input type="file" name="importFile" id="importFile" style="display: none;" accept=".gz" onchange="document.getElementById('importForm').submit();">
+                    <input type="hidden" name="importExport" id="formImportExport" value="">
+                    <span id="import" onclick="document.getElementById('importFile').click()" style="color: blue; cursor: pointer; margin-right: 20px;">数据导入</span>
+                    <span id="export" onclick="document.getElementById('importForm').submit()" style="color: blue; cursor: pointer;">数据导出</span>
+                </form>
+            </div>
         </div>
-        <div class="tooltip" style="width:auto;">
-            <label for="all_chs" title="">全转简中<span style="vertical-align: super;">*</span>：</label>
-            <select id="all_chs" name="all_chs" required>
-                <option value="1" <?php if (isset($Config['all_chs']) && $Config['all_chs'] == 1) echo 'selected'; ?>>是</option>
-                <option value="0" <?php if (!isset($Config['all_chs']) || $Config['all_chs'] == 0) echo 'selected'; ?>>否</option>
-            </select>
-            <span class="tooltiptext">节目单&描述<br>转简体中文</span>
+
+        <!-- 第二行 -->
+        <div class="row">
+            <div class="column">
+                <label for="ret_default">返回精彩节目：</label>
+                <select id="ret_default" name="ret_default" required>
+                    <option value="1" <?php if (!isset($Config['ret_default']) || $Config['ret_default'] == 1) echo 'selected'; ?>>是</option>
+                    <option value="0" <?php if (isset($Config['ret_default']) && $Config['ret_default'] == 0) echo 'selected'; ?>>否</option>
+                </select>
+            </div>
+            <div class="column">
+                <div class="tooltip" style="display: flex;">
+                    <label for="tvmao_default" title="">补充预告<span style="vertical-align: super;">*</span>：</label>
+                    <select id="tvmao_default" name="tvmao_default" required>
+                        <option value="1" <?php if (isset($Config['tvmao_default']) && $Config['tvmao_default'] == 1) echo 'selected'; ?>>是</option>
+                        <option value="0" <?php if (!isset($Config['tvmao_default']) || $Config['tvmao_default'] == 0) echo 'selected'; ?>>否</option>
+                    </select>
+                    <span class="tooltiptext">尝试使用 猫 接口<br>补充预告数据</span>
+                </div>
+            </div>
+            <div class="column">
+                <div class="tooltip" style="display: flex;">
+                    <label for="all_chs" title="">全转简中<span style="vertical-align: super;">*</span>：</label>
+                    <select id="all_chs" name="all_chs" required>
+                        <option value="1" <?php if (isset($Config['all_chs']) && $Config['all_chs'] == 1) echo 'selected'; ?>>是</option>
+                        <option value="0" <?php if (!isset($Config['all_chs']) || $Config['all_chs'] == 0) echo 'selected'; ?>>否</option>
+                    </select>
+                    <span class="tooltiptext">节目单&描述<br>转简体中文</span>
+                </div>
+            </div>
         </div>
-        <br><br>
-        <label for="cache_time">缓存时间：</label>
-        <select id="cache_time" name="cache_time" required>
-            <?php for ($h = 0; $h < 24; $h++): ?>
-                <option value="<?php echo $h; ?>" <?php echo floor($Config['cache_time'] / 3600) == $h ? 'selected' : ''; ?>>
-                    <?php echo $h; ?>
-                </option>
-            <?php endfor; ?>
-        </select> 小时
-        <label for="db_type" style="margin-left: 12px;">数据库：</label>
-        <select id="db_type" name="db_type" required>
-            <option value="sqlite" <?php if (!isset($Config['db_type']) || $Config['db_type'] == 'sqlite') echo 'selected'; ?>>SQLite</option>
-            <option value="mysql" <?php if (isset($Config['db_type']) && $Config['db_type'] == 'mysql') echo 'selected'; ?>>MySQL</option>
-        </select>
-        <label for="mysql_host">地址：</label>
-        <textarea id="mysql_host"><?php echo htmlspecialchars($Config['mysql']['host'] ?? ''); ?></textarea>
-        <br><br>
-        <label for="mysql_dbname">数据库名：</label>
-        <textarea id="mysql_dbname"><?php echo htmlspecialchars($Config['mysql']['dbname'] ?? ''); ?></textarea>
-        <label for="mysql_username">用户名：</label>
-        <textarea id="mysql_username"><?php echo htmlspecialchars($Config['mysql']['username'] ?? ''); ?></textarea>
-        <label for="mysql_password">密码：</label>
-        <textarea id="mysql_password"><?php echo htmlspecialchars($Config['mysql']['password'] ?? ''); ?></textarea>
-        <br><br>
+
+        <!-- 第三行 -->
+        <div class="row">
+            <div class="column">
+                <label for="check_update">检查版本更新：</label>
+                <select id="check_update" name="check_update" required>
+                    <option value="1" <?php if (!isset($Config['check_update']) || $Config['check_update'] == 1) echo 'selected'; ?>>是</option>
+                    <option value="0" <?php if (isset($Config['check_update']) && $Config['check_update'] == 0) echo 'selected'; ?>>否</option>
+                </select>
+            </div>
+            <div class="column">
+                <label for="cache_time">缓存时间：</label>
+                <select id="cache_time" name="cache_time" required>
+                    <?php for ($h = 0; $h < 24; $h++): ?>
+                        <option value="<?php echo $h; ?>" <?php echo floor($Config['cache_time'] / 3600) == $h ? 'selected' : ''; ?>>
+                            <?php echo $h; ?>
+                        </option>
+                    <?php endfor; ?>
+                </select>
+                <label style="margin-left: 5px">小时</label>
+            </div>
+            <div class="column">
+                <label for="db_type">数据库：</label>
+                <select id="db_type" name="db_type" required>
+                    <option value="sqlite" <?php if (!isset($Config['db_type']) || $Config['db_type'] == 'sqlite') echo 'selected'; ?>>SQLite</option>
+                    <option value="mysql" <?php if (isset($Config['db_type']) && $Config['db_type'] == 'mysql') echo 'selected'; ?>>MySQL</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- 第四行 -->
+        <div class="row" style="gap: 10px;">
+            <div class="column">
+                <label for="mysql_host">地址：</label>
+                <textarea id="mysql_host"><?php echo htmlspecialchars($Config['mysql']['host'] ?? ''); ?></textarea>
+            </div>
+            <div class="column">
+                <label for="mysql_dbname">库名：</label>
+                <textarea id="mysql_dbname"><?php echo htmlspecialchars($Config['mysql']['dbname'] ?? ''); ?></textarea>
+            </div>
+            <div class="column">
+                <label for="mysql_username">用户：</label>
+                <textarea id="mysql_username"><?php echo htmlspecialchars($Config['mysql']['username'] ?? ''); ?></textarea>
+            </div>
+            <div class="column">
+                <label for="mysql_password">密码：</label>
+                <textarea id="mysql_password"><?php echo htmlspecialchars($Config['mysql']['password'] ?? ''); ?></textarea>
+            </div>
+        </div>
+
+        <!-- 其他设置 -->
         <label for="gen_list_text">仅生成以下频道：</label>
         <select id="gen_list_enable" name="gen_list_enable" style="width: 48px; margin-right: 0px;" required>
             <option value="1" <?php if (isset($Config['gen_list_enable']) && $Config['gen_list_enable'] == 1) echo 'selected'; ?>>是</option>
@@ -320,17 +371,20 @@
         <span>
             （粘贴m3u、txt地址或内容，<span onclick="parseSource()" style="color: blue; cursor: pointer; text-decoration: underline;">解析</span> 后
             <span onclick="showModal('channelmatch')" style="color: blue; cursor: pointer; text-decoration: underline;">查看匹配</span>）
-        </span><br><br>
+        </span>
+        <br><br>
         <textarea id="gen_list_text"></textarea><br><br>
+
         <button id="saveConfig" type="button" onclick="saveAndUpdateConfig();">保存配置</button>
     </div>
 </div>
+
 <script>
     var configUpdated = <?php echo json_encode($configUpdated); ?>;
     var intervalTime = <?php echo json_encode($Config['interval_time']); ?>;
     var startTime = <?php echo json_encode($Config['start_time']); ?>;
     var endTime = <?php echo json_encode($Config['end_time']); ?>;
-    var importMessage = <?php echo json_encode($importMessage); ?>;
+    var displayMessage = <?php echo json_encode($displayMessage); ?>;
 </script>
 <script src="assets/js/manage.js"></script>
 </body>

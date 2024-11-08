@@ -6,7 +6,7 @@
  * 该脚本用于定期从配置的 XML 源下载节目数据，并将其存入 SQLite 数据库中。
  * 
  * 作者: Tak
- * GitHub: https://github.com/taksssss/PHP-EPG-Docker-Server
+ * GitHub: https://github.com/taksssss/EPG-Server
  */
 
 // 引入公共脚本
@@ -154,7 +154,7 @@ function generateXmlFromEpgData($db, $include_future_only, $gen_list_mapping, &$
     $xmlWriter->startDocument('1.0', 'UTF-8');
     $xmlWriter->startElement('tv');
     $xmlWriter->writeAttribute('info-name', 'by Tak');
-    $xmlWriter->writeAttribute('info-url', 'https://github.com/taksssss/PHP-EPG-Docker-Server');
+    $xmlWriter->writeAttribute('info-url', 'https://github.com/taksssss/EPG-Server');
     $xmlWriter->setIndent(true);
     $xmlWriter->setIndentString('	'); // 设置缩进
 

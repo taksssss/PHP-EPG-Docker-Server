@@ -7,7 +7,7 @@
  * 并从 SQLite 数据库中提取或返回默认数据。
  *
  * 作者: Tak
- * GitHub: https://github.com/taksssss/PHP-EPG-Docker-Server
+ * GitHub: https://github.com/taksssss/EPG-Server
  */
 
 // 引入公共脚本
@@ -260,7 +260,7 @@ function fetchHandler() {
             $default_diyp_program_info = [
                 'channel_name' => $cleanChName,
                 'date' => $date,
-                'url' => "https://github.com/taksssss/PHP-EPG-Docker-Server",
+                'url' => "https://github.com/taksssss/EPG-Server",
                 'icon' => $iconUrl,
                 'epg_data' => !$ret_default ? '' : array_map(function($hour) {
                     return [
@@ -279,7 +279,7 @@ function fetchHandler() {
                     'isLive' => '',
                     'liveSt' => 0,
                     'channelName' => $cleanChName,
-                    'lvUrl' => 'https://github.com/taksssss/PHP-EPG-Docker-Server',
+                    'lvUrl' => 'https://github.com/taksssss/EPG-Server',
                     'icon' => $iconUrl,
                     'program' => !$ret_default ? '' : array_map(function($hour) {
                         return [

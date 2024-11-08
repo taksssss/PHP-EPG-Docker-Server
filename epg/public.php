@@ -6,7 +6,7 @@
  * 该脚本包含公共设置、公共函数。
  *
  * 作者: Tak
- * GitHub: https://github.com/taksssss/PHP-EPG-Docker-Server
+ * GitHub: https://github.com/taksssss/EPG-Server
  */
 
 require 'assets/opencc/vendor/autoload.php'; // 引入 Composer 自动加载器
@@ -22,6 +22,7 @@ $Config = json_decode(file_get_contents($config_path), true) or die("配置文�
 $iconListDefault = json_decode(file_get_contents(__DIR__ . '/assets/defaultIconList.json'), true) or die("默认图标列表文件解析失败: " . json_last_error_msg());
 $iconListMerged = array_merge($iconListDefault, $iconList); // 同一个键，以 iconList 的为准
 $serverUrl = (($_SERVER['HTTPS'] ?? '') === 'on' ? 'https://' : 'http://') . $_SERVER['HTTP_HOST'];
+$currentVersion = file('assets/version.txt', FILE_IGNORE_NEW_LINES)[0] ?? '';  // 版本号
 
 // 设置时区为亚洲/上海
 date_default_timezone_set("Asia/Shanghai");
@@ -253,7 +254,7 @@ function insertDataToDatabase($channelsData, $db, $replaceFlag = true) {
             $diypContent = json_encode([
                 'channel_name' => $channelName,
                 'date' => $date,
-                'url' => 'https://github.com/taksssss/PHP-EPG-Docker-Server',
+                'url' => 'https://github.com/taksssss/EPG-Server',
                 'epg_data' => $diypProgrammes
             ], JSON_UNESCAPED_UNICODE);
             // 当天及未来数据覆盖，其他日期数据忽略

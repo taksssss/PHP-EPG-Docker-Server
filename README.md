@@ -1,11 +1,11 @@
-![PHP-EPG-Docker-Server](https://socialify.git.ci/TakcC/PHP-EPG-Docker-Server/image?description=1&descriptionEditable=Docker%F0%9F%90%B3%E9%83%A8%E7%BD%B2%EF%BC%8C%E5%B8%A6%E8%AE%BE%E7%BD%AE%E7%95%8C%E9%9D%A2%E3%80%81%E5%8F%B0%E6%A0%87%E7%AE%A1%E7%90%86%EF%BC%8C%E6%94%AF%E6%8C%81DIYP%E3%80%81%E8%B6%85%E7%BA%A7%E7%9B%B4%E6%92%AD%E5%8F%8Axmltv%E3%80%82&font=Inter&forks=1&issues=1&language=1&owner=1&pattern=Circuit%20Board&pulls=1&stargazers=1&theme=Auto)
+![EPG-Server](https://socialify.git.ci/taksssss/EPG-Server/image?description=1&descriptionEditable=Docker%F0%9F%90%B3%E9%83%A8%E7%BD%B2%EF%BC%8C%E5%B8%A6%E8%AE%BE%E7%BD%AE%E7%95%8C%E9%9D%A2%E3%80%81%E5%8F%B0%E6%A0%87%E7%AE%A1%E7%90%86%EF%BC%8C%E6%94%AF%E6%8C%81DIYP%E3%80%81%E8%B6%85%E7%BA%A7%E7%9B%B4%E6%92%AD%E5%8F%8Axmltv%E3%80%82&font=Inter&forks=1&issues=1&language=1&owner=1&pattern=Circuit%20Board&pulls=1&stargazers=1&theme=Auto)
 
-# 📺 PHP-EPG-Docker-Server
+# 📺 EPG-Server
 ![Docker Pulls](https://img.shields.io/docker/pulls/taksss/php-epg) ![Image Size](https://img.shields.io/docker/image-size/taksss/php-epg)
 
 PHP 实现的 EPG（电子节目指南）服务端， `Docker` 部署，自带设置界面、台标管理，支持 **DIYP & 百川** 、 **超级直播** 以及 **xmltv** 格式。
 
-## ℹ️ 主要功能
+## 💻 主要功能
 - 支持返回 **`DIYP & 百川`** 、 **`超级直播`** 以及 **`xmltv`** 格式 📡
 - 提供 **`amd64`** 跟 **`arm64`** 、 **`armv7`** 架构镜像，支持 **电视盒子** 等设备 🐳
 - 基镜像采用 **`alpine`** ，压缩后大小**仅 20 MB** 📦
@@ -20,16 +20,16 @@ PHP 实现的 EPG（电子节目指南）服务端， `Docker` 部署，自带�
 - 内置 **定时任务** ⏳
 - 支持生成 **指定频道节目单** 📝
 - 支持生成 **匹配 M3U** 的 `xmltv` 格式文件 💯
+- 支持转换 `txt/m3u` 直播源（**匹配台标**） ➰
 - 支持查看 **频道匹配** 结果 🪢
 - 兼容多种 `xmltv` 格式 🗂️
 - 包含网页设置页面 🌐
 - 支持多个 EPG 源 📡
 - 可配置数据保存天数 📅
 - 内置 `phpLiteAdmin` 方便管理数据库 🛠️
+- 内置 `tinyfilemanager` 方便管理文件 📄
 
-> [!TIP]  
-> 台标匹配需搭配 [酷9APP](https://www.right.com.cn/forum/thread-8388801-1-1.html) 使用。
->
+> [!TIP]
 > `xmltv` 用户搭配 [【一键生成】匹配 M3U 文件的 XML 节目单](https://www.right.com.cn/forum/thread-8392662-1-1.html) 使用。
 
 ![设置页面](/pic/management.png)
@@ -41,61 +41,7 @@ PHP 实现的 EPG（电子节目指南）服务端， `Docker` 部署，自带�
 
 ## 📝 更新日志
 
-### 2024-11-07
-1. 优化：明文密码改用 md5 加密
-2. 优化：文件目录
-
-### 2024-11-05
-
-1. 新增：`tinyfilemanager` 文件管理器
-2. 优化：文件目录
-
-### 2024-11-04
-
-1. 新增：节目单、节目描述转简体中文（默认关闭，`更多设置` -> `全转简中`）
-2. 优化：台标转存、台标上传后自动保存
-3. 优化：`.gz` 文件判断准确性（支持 302 重定向）
-4. 优化：部分设置提示样式
-5. 修复：部分控制字符导致 `xmltv` 文件解析失败
-
-### 2024-11-01
-
-1. 新增：查看频道节目单
-2. 优化：猫 接口示例（见首页截图）
-
-### 2024-10-29
-
-1. 修复：直播源转换无法识别 IPv6 地址、中文地址
-2. 优化：猫 接口预告数据更新逻辑
-3. 优化：猫 接口示例
-
-### 2024-10-25
-
-1. 新增：猫 接口自定义频道名（自定义名称:猫频道名）
-2. 新增：猫 接口获取预告数据开关（默认关闭）
-3. 优化：猫 接口跨天节目处理
-4. 优化：猫 接口获取数据范围（保证数据完整性）
-5. 优化：`xmltv` 文件删除逻辑
-
-### 2024-10-24
-
-1. 新增：预告数据不存在时，尝试使用 猫 接口获取
-2. 新增：上传 `txt/m3u` 直播源，返回匹配 `EPG及台标` 的 `m3u` 文件
-3. 优化：更换 猫 接口，更方便更稳定（直接使用频道名即可）
-4. 优化：内置台标地址增至 2700+
-
-### 2024-10-15
-
-1. 新增：获取 猫 数据
-2. 优化：未使用台标文件从自动清理改为手动清理
-3. 优化：内置台标地址增至 2000+
-
-### 2024-10-7
-
-1. 新增：编辑台标频道名
-2. 修复：打开管理数据页面后退出异常
-
-### 历史更新记录见[CHANGELOG.md](./CHANGELOG.md)
+### [CHANGELOG.md](./CHANGELOG.md)
 
 ## TODO：
 
@@ -130,7 +76,8 @@ PHP 实现的 EPG（电子节目指南）服务端， `Docker` 部署，自带�
      taksss/php-epg:latest
    ```
 
-   > 默认端口为 `5678` ，根据需要自行修改。
+   > 默认端口为 `5678` ，根据需要自行修改（注意端口占用）
+   > 
    > 无法正常拉取镜像的，可使用同步更新的 `腾讯云容器镜像`（`ccr.ccs.tencentyun.com/taksss/php-epg:latest`）
 
 <details>
@@ -217,47 +164,10 @@ PHP 实现的 EPG（电子节目指南）服务端， `Docker` 部署，自带�
 > - `Ctrl + S`：保存设置
 > - `Ctrl + /`：对选中 EPG 地址设置（取消）注释
 
-## 🖼️ 效果示例
+## ⭐ Star History
+[![Star History Chart](https://api.star-history.com/svg?repos=taksssss/EPG-Server&type=Date)](https://star-history.com/#taksssss/EPG-Server&Date)
 
-**DIYP**
-
-![DIYP 示例](/pic/DIYP.png)
-
-**TiviMate**
-
-![TiviMate](/pic/TiviMate.jpg)
-
-## 📸 系统截图
-
-**台标管理**
-
-![台标管理](/pic/iconList.png)
-
-**搜索频道、编辑映射**
-
-![编辑频道映射](/pic/channelsMapping.png)
-
-**查看频道节目单**
-
-![查看频道节目单](/pic/channelEPG.png)
-
-**频道指定 `EPG` 源**
-
-![频道指定EPG源](/pic/channelsBindEPG.png)
-
-**更多设置**
-
-![更多设置](/pic/moresetting.png)
-
-**查看频道匹配**
-
-![查看频道匹配](/pic/channelsMatch.png)
-
-**phpLiteAdmin**
-
-![phpLiteAdmin](/pic/phpliteadmin.png)
-
-## 🙏 特别鸣谢
+## 👍 特别鸣谢
 - [ChatGPT](https://chatgpt.com/)
 - [celetor/epg](https://github.com/celetor/epg)
 - [sparkssssssssss/epg](https://github.com/sparkssssssssss/epg)
@@ -266,6 +176,3 @@ PHP 实现的 EPG（电子节目指南）服务端， `Docker` 部署，自带�
 - [EPG 51zmt](http://epg.51zmt.top:8000/)
 - [fanmingming/live](https://github.com/fanmingming/live)
 - [wanglindl/TVlogo](https://github.com/wanglindl/TVlogo)
-
-## Star History
-[![Star History Chart](https://api.star-history.com/svg?repos=taksssss/PHP-EPG-Docker-Server&type=Date)](https://star-history.com/#taksssss/PHP-EPG-Docker-Server&Date)
