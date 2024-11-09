@@ -2,7 +2,6 @@
 <html lang="zh-CN">
 <head>
     <title>管理配置</title>
-    <link rel="stylesheet" type="text/css" href="assets/css/manage.css">
 </head>
 <body>
 <div class="container">
@@ -77,7 +76,7 @@
 <!-- 底部显示 -->
 <div class="footer">
     <a href="https://github.com/taksssss/EPG-Server" style="color: #888; text-decoration: none;">
-        https://github.com/taksssss/EPG-Server v<?php echo htmlspecialchars($currentVersion); ?>
+        https://github.com/taksssss/EPG-Server
     </a>
 </div>
 
@@ -316,14 +315,14 @@
         <!-- 第三行 -->
         <div class="row">
             <div class="column">
-                <label for="check_update">检查版本更新：</label>
-                <select id="check_update" name="check_update" required>
-                    <option value="1" <?php if (!isset($Config['check_update']) || $Config['check_update'] == 1) echo 'selected'; ?>>是</option>
-                    <option value="0" <?php if (isset($Config['check_update']) && $Config['check_update'] == 0) echo 'selected'; ?>>否</option>
+                <label for="db_type">数据库：</label>
+                <select id="db_type" name="db_type" required>
+                    <option value="sqlite" <?php if (!isset($Config['db_type']) || $Config['db_type'] == 'sqlite') echo 'selected'; ?>>SQLite</option>
+                    <option value="mysql" <?php if (isset($Config['db_type']) && $Config['db_type'] == 'mysql') echo 'selected'; ?>>MySQL</option>
                 </select>
             </div>
             <div class="column">
-                <label for="cache_time">缓存时间：</label>
+                <label for="cache_time">缓存时间(小时)：</label>
                 <select id="cache_time" name="cache_time" required>
                     <?php for ($h = 0; $h < 24; $h++): ?>
                         <option value="<?php echo $h; ?>" <?php echo floor($Config['cache_time'] / 3600) == $h ? 'selected' : ''; ?>>
@@ -331,14 +330,9 @@
                         </option>
                     <?php endfor; ?>
                 </select>
-                <label style="margin-left: 5px">小时</label>
-            </div>
+            </div>            
             <div class="column">
-                <label for="db_type">数据库：</label>
-                <select id="db_type" name="db_type" required>
-                    <option value="sqlite" <?php if (!isset($Config['db_type']) || $Config['db_type'] == 'sqlite') echo 'selected'; ?>>SQLite</option>
-                    <option value="mysql" <?php if (isset($Config['db_type']) && $Config['db_type'] == 'mysql') echo 'selected'; ?>>MySQL</option>
-                </select>
+                <!-- <span id="export" style="color: blue; cursor: pointer;">直播源管理</span> -->
             </div>
         </div>
 
@@ -346,7 +340,7 @@
         <div class="row" style="gap: 10px;">
             <div class="column">
                 <label for="mysql_host">地址：</label>
-                <textarea id="mysql_host"><?php echo htmlspecialchars($Config['mysql']['host'] ?? ''); ?></textarea>
+                <textarea id="mysql_host" style="width: 129px; margin-right: 25px;"><?php echo htmlspecialchars($Config['mysql']['host'] ?? ''); ?></textarea>
             </div>
             <div class="column">
                 <label for="mysql_dbname">库名：</label>
@@ -385,7 +379,11 @@
     var startTime = <?php echo json_encode($Config['start_time']); ?>;
     var endTime = <?php echo json_encode($Config['end_time']); ?>;
     var displayMessage = <?php echo json_encode($displayMessage); ?>;
+
+    // js、css 缓存处理
+    var currentDate = new Date().toISOString().split('T')[0];
+    document.head.appendChild(Object.assign(document.createElement('link'), {rel: 'stylesheet', href: 'assets/css/manage.css?date=' + currentDate}));
+    document.head.appendChild(Object.assign(document.createElement('script'), {src: 'assets/js/manage.js?date=' + currentDate}));
 </script>
-<script src="assets/js/manage.js"></script>
 </body>
 </html>

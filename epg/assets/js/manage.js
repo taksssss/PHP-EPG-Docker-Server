@@ -1,67 +1,11 @@
 document.addEventListener('DOMContentLoaded', function() {
-    // 页面加载时检查更新
-    checkVersionUpdate();
-
-    // 预加载数据，减少等待时间
+    // 页面加载时预加载数据，减少等待时间
     showModal('channelbindepg', $popup = false);
+    showModal('moresetting', $popup = false);
     showModal('update', $popup = false);
     showModal('cron', $popup = false);
     showModal('channel', $popup = false);
 });
-
-// 异步请求检查版本
-function checkVersionUpdate() {
-    fetch('manage.php?get_version_update_info=true')  // 异步调用 PHP 后端
-        .then(response => response.json())  // 解析 JSON 格式的返回数据
-        .then(data => {
-            if (data.hasUpdate) {
-                const updateMessage = `检测到新版本：<br>v${data.updateVersion}<br><br>更新内容：<br>${data.updateInfo.join('<br>')}`;
-                showMessageModal(updateMessage);
-                var modal = document.getElementById("messageModal");
-        
-                // 创建两个新的按钮
-                var upgradeBtn = document.createElement("button");
-                upgradeBtn.classList.add("button", "button-primary");
-                upgradeBtn.textContent = "升级";
-                var ignoreBtn = document.createElement("button");
-                ignoreBtn.classList.add("button", "button-secondary");
-                ignoreBtn.textContent = "忽略";
-                var modalFooter = modal.querySelector(".modal-footer");
-                modalFooter.appendChild(upgradeBtn);
-                modalFooter.appendChild(ignoreBtn);
-        
-                // 为“升级”按钮绑定事件
-                upgradeBtn.onclick = function() {
-                    modalFooter.removeChild(upgradeBtn);
-                    modalFooter.removeChild(ignoreBtn);
-                    showMessageModal('升级中……<br>请耐心等待……');
-                    fetch('manage.php?update_version=true')
-                        .then(response => response.json())  // 解析 JSON 格式的返回数据
-                        .then(data => {
-                            if (data.updated) {
-                                alert('升级成功！');
-                                window.location.href = 'manage.php';
-                            } else {
-                                alert('升级失败！！！');
-                            }
-                        })
-                        .catch(error => {
-                            alert('升级失败！！！');
-                        });
-                };
-        
-                // 为“忽略”按钮绑定事件
-                ignoreBtn.onclick = function() {
-                    modal.style.display = "none";  // 关闭模态框
-                    modalFooter.removeChild(upgradeBtn);
-                    modalFooter.removeChild(ignoreBtn);
-                };
-            }
-        })
-        .catch(error => {
-            console.error('无法检查更新，请稍后重试。', error);
-        });
-}
 
 function handleDbManagement() {
     if (document.getElementById('db_type').value === 'mysql') {
@@ -779,7 +723,7 @@ function updateIconListJsonFile(){
 
 // 在提交表单时，将更多设置中的数据包括在表单数据中
 document.getElementById('settingsForm').addEventListener('submit', function() {
-    const fields = ['gen_xml', 'include_future_only', 'ret_default', 'tvmao_default', 'all_chs', 'check_update', 
+    const fields = ['gen_xml', 'include_future_only', 'ret_default', 'tvmao_default', 'all_chs', 
         'cache_time', 'db_type', 'mysql_host', 'mysql_dbname', 'mysql_username', 'mysql_password', 'gen_list_enable'];
 
     const form = this;

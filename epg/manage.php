@@ -96,7 +96,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update'])) {
 
     // 获取 $_POST 中除了 'update' 以外的所有键
     $config_keys = array_keys(array_filter($_POST, function($key) {
-        return !in_array($key, ['update']); // 排除 'update' 和 'xml_urls' 键
+        return !in_array($key, ['update']);
     }, ARRAY_FILTER_USE_KEY));
     
     foreach ($config_keys as $key) {
@@ -181,48 +181,14 @@ try {
 
         // 确定操作类型
         $action_map = [
-            'get_version_update_info', 'update_version', 'get_update_logs', 'get_cron_logs',
-            'get_channel', 'get_epg_by_channel', 'get_icon', 'get_channel_bind_epg',
-            'get_channel_match', 'get_gen_list', 'download_data', 'delete_unused_icons'
+            'get_update_logs', 'get_cron_logs', 'get_channel', 'get_epg_by_channel',
+             'get_icon', 'get_channel_bind_epg', 'get_channel_match', 'get_gen_list',
+             'download_data', 'delete_unused_icons'
         ];
         $action = key(array_intersect_key($_GET, array_flip($action_map))) ?: '';
 
         // 根据操作类型执行不同的逻辑
         switch ($action) {
-            case 'get_version_update_info':
-                if ($Config['check_update'] ?? true) {
-                    // 尝试读取远程版本信息
-                    $versionUrl = 'https://gitee.com/taksssss/EPG-Server/raw/main/epg/assets/version.txt';
-                    $lines = @file($versionUrl, FILE_IGNORE_NEW_LINES);
-                
-                    // 返回结果，若读取失败则返回错误信息
-                    $dbResponse = $lines ? [
-                        'hasUpdate' => version_compare($currentVersion, $lines[0], '<'),
-                        'updateVersion' => $lines[0],
-                        'updateInfo' => array_slice($lines, 1)
-                    ] : '';
-                } else {
-                    $dbResponse = ['hasUpdate' => false];
-                }
-                break;
-
-            case 'update_version':
-                // 下载文件并保存到临时文件
-                $updateUrl = 'https://gitee.com/taksssss/EPG-Server/raw/main/codes.zip';
-                if ($zipContent = downloadData($updateUrl)) {
-                    file_put_contents('tmp.zip', $zipContent);
-            
-                    // 解压并删除临时文件
-                    $zip = new ZipArchive();
-                    if ($zip->open('tmp.zip') === TRUE) {
-                        $zip->extractTo('.');
-                        $zip->close();
-                        unlink('tmp.zip');
-                        $dbResponse = ['updated' => true];
-                    }
-                }
-                break;
-
             case 'get_update_logs':
                 // 获取更新日志
                 $dbResponse = $db->query("SELECT * FROM update_log")->fetchAll(PDO::FETCH_ASSOC);

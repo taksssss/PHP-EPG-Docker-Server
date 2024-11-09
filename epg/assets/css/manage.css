@@ -29,7 +29,7 @@ textarea {
     word-break: break-all; /* 允许单词内断行 */
 }
 textarea[id="gen_list_text"] {
-    height: 147px;
+    height: 164px;
 }
 .form-row {
     display: flex;
@@ -187,15 +187,19 @@ input[type="text"] {
     width: 830px;
 }
 .message-modal-content {
-    width: 220px;
+    width: 180px;
     height: auto;
     text-align: justify;
     line-height: 1.6;
 }
 .channel-bind-epg-modal-content,
 .more-setting-modal-content,
-.channel-match-modal-content {
+.channel-match-modal-content,
+.icon-modal-content,
+.channel-modal-content,
+.epg-modal-content {
     width: 600px;
+    height: 530px;
 }
 .icon-modal-content {
     width: 700px;
@@ -303,6 +307,7 @@ input[type="text"] {
 }
 .row textarea {
     height: 32px;
+    line-height: 1.3;
     white-space: nowrap; /* 禁止换行 */
     scrollbar-width: none; /* 隐藏滚动条 */
 }

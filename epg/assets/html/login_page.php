@@ -2,7 +2,6 @@
 <html lang="zh-CN">
 <head>
     <title>登录</title>
-    <link rel="stylesheet" type="text/css" href="assets/css/login.css">
 </head>
 <body>
 <div class="container">
@@ -24,7 +23,7 @@
 <!-- 底部显示 -->
 <div class="footer">
     <a href="https://github.com/taksssss/EPG-Server" style="color: #888; text-decoration: none;">
-        https://github.com/taksssss/EPG-Server v<?php echo htmlspecialchars($currentVersion); ?>
+        https://github.com/taksssss/EPG-Server
     </a>
 </div>
 
@@ -64,6 +63,10 @@
             }
         }
     }
+    
+    // css 缓存处理
+    var currentDate = new Date().toISOString().split('T')[0];
+    document.head.appendChild(Object.assign(document.createElement('link'), {rel: 'stylesheet', href: 'assets/css/login.css?date=' + currentDate}));
 </script>
 </body>
 </html>
