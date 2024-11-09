@@ -9,8 +9,9 @@
  * GitHub: https://github.com/taksssss/EPG-Server
  */
 
-// 引入公共脚本
+// 引入公共脚本，初始化数据库
 require_once 'public.php';
+initialDB();
 
 // 取消时间限制
 set_time_limit(0);

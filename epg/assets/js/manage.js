@@ -1,7 +1,6 @@
 document.addEventListener('DOMContentLoaded', function() {
     // 页面加载时预加载数据，减少等待时间
     showModal('channelbindepg', $popup = false);
-    showModal('moresetting', $popup = false);
     showModal('update', $popup = false);
     showModal('cron', $popup = false);
     showModal('channel', $popup = false);

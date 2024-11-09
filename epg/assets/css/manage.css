@@ -178,11 +178,6 @@ input[type="text"] {
     transform: translateY(-50%);
     width: 530px;
 }
-/* 版本升级按钮 */
-.modal-footer {
-    display: flex;
-    gap: 10px;
-}
 .update-log-modal-content {
     width: 830px;
 }
