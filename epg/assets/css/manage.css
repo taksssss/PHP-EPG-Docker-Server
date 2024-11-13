@@ -4,7 +4,7 @@ body {
     align-items: center;
     height: 100vh;
     margin: 0;
-    font-family: Arial, sans-serif;
+    font-family: Tahoma, sans-serif;
     background-color: #f0f0f0;
 }
 .container {
@@ -24,12 +24,12 @@ textarea {
     border-radius: 5px;
     box-sizing: border-box;
     resize: none;
-    font-family: SimSun;
+    font-family: "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", Arial, sans-serif;
     white-space: pre-wrap; /* 保持空白字符和换行符，同时在内容超出容器宽度时换行 */
     word-break: break-all; /* 允许单词内断行 */
 }
 textarea[id="gen_list_text"] {
-    height: 164px;
+    height: 157px;
 }
 .form-row {
     display: flex;
@@ -47,24 +47,21 @@ textarea[id="gen_list_text"] {
     margin-left: 70px;
 }
 .form-row select, 
-.modal-content select {
-    font-family: SimSun;
-    padding: 6px;
-    font-size: 16px;
+.modal-content select,
+.form-row input[type="time"] {
+    font-family: "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", Arial, sans-serif;
+    font-size: 15px;
     border: 1px solid #ccc;
     border-radius: 5px;
     box-sizing: border-box;
     width: 98px;
+    height: 32px;
     margin-right: 12px;
     text-align: center;
 }
 .form-row input[type="time"] {
-    padding: 5px;
-    font-size: 16px;
-    border: 1px solid #ccc;
-    border-radius: 5px;
-    box-sizing: border-box;
     width: 90px;
+    margin-right: 0px;
 }
 .form-row input[id="start_time"] {
     margin-left: 242px;
@@ -76,12 +73,13 @@ select[id="interval_hour"]{
 .form-row select[id="interval_hour"], select[id="interval_minute"] {
     width: 70px;
     margin-right: 0px;
-    text-align: center;
 }
 .button-container {
     display: flex;
     gap: 15px;
+    margin: 0 auto;
     align-items: center;
+    text-align: center;
     justify-content: space-between;
 }
 .button-container a, .button-container button {
@@ -176,25 +174,24 @@ input[type="text"] {
     box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2);
     top: 50%;
     transform: translateY(-50%);
-    width: 530px;
+    width: 600px;
+    height: 530px;
+}
+.cron-log-modal-content {
+    width: 400px;
 }
 .update-log-modal-content {
     width: 830px;
 }
-.message-modal-content {
-    width: 180px;
-    height: auto;
-    text-align: justify;
-    line-height: 1.6;
+.live-source-modal-content {
+    width: 830px;
+    height: 630px;
 }
-.channel-bind-epg-modal-content,
-.more-setting-modal-content,
-.channel-match-modal-content,
-.icon-modal-content,
-.channel-modal-content,
-.epg-modal-content {
-    width: 600px;
-    height: 530px;
+.message-modal-content {
+    width: auto;
+    height: auto;
+    text-align: center;
+    line-height: 1.6;
 }
 .icon-modal-content {
     width: 700px;
@@ -212,14 +209,15 @@ input[type="text"] {
     cursor: pointer;
 }
 .table-container {
-    height: 440px; /* 固定高度 */
+    height: 460px; /* 固定高度 */
     overflow-y: scroll; /* 启用垂直滚动条 */
     border: 1px solid #ccc;
     border-radius: 5px;
+    font-size: 15px;
 }
 .table-container[id="channel-table-container"],
 .table-container[id="icon-table-container"] {
-    height: 354px;
+    height: 352px;
 }
 .table-container[id="channel-bind-epg-table-container"] {
     height: 400px;
@@ -227,7 +225,11 @@ input[type="text"] {
 .table-container[id="channel-match-table-container"] {
     height: 460px;
 }
-#logTable, #channelMatchTable, #channelTable, #iconTable, #channelBindEPGTable {
+.table-container[id="live-source-table-container"] {
+    height: 66%;
+}
+#logTable, #channelMatchTable, #channelTable, 
+#iconTable, #channelBindEPGTable, #liveSourceTable {
     width: 100%;
     border-collapse: separate;
     border-spacing: 0 5px; /* 调整行之间的垂直间距 */
@@ -240,16 +242,17 @@ input[type="text"] {
 #channelTable th, #channelTable td,
 #iconTable th, #iconTable td,
 #channelBindEPGTable th, #channelBindEPGTable td,
-#channelMatchTable th, #channelMatchTable td {
+#channelMatchTable th, #channelMatchTable td,
+#liveSourceTable th, #liveSourceTable td {
     border: 1px solid #ccc;
     padding: 5px;
-    text-align: left;
     word-break: break-all; /* 允许单词内断行 */
 }
 #channelTable th, #channelTable td,
 #iconTable th, #iconTable td,
 #channelMatchTable th, #channelMatchTable td,
-#channelBindEPGTable th {
+#channelBindEPGTable th,
+#liveSourceTable th, #liveSourceTable td {
     text-align: center;
 }
 #logTable th:nth-child(1), 
@@ -308,7 +311,7 @@ input[type="text"] {
 }
 /* 工具提示容器 */
 .tooltip {
-    position: relative;
+    position: sticky;
     display: inline-block;
     width: 100%;
 }

@@ -15,9 +15,6 @@ require_once 'public.php';
 // 设置超时时间为20分钟
 set_time_limit(20*60);
 
-// 设置时间格式
-define('TIME_FORMAT', "[y-m-d H:i:s]");
-
 // 删除过期数据和日志
 function deleteOldData($db, $keep_days, &$log_messages) {
     global $Config;
@@ -439,8 +436,18 @@ foreach ($Config['xml_urls'] as $xml_url) {
 
 // 判断是否生成 xmltv 文件
 if ($Config['gen_xml']) {
-    generateXmlFromEpgData($db, $Config['include_future_only'], $gen_list_mapping, $log_messages);        
+    generateXmlFromEpgData($db, $Config['include_future_only'], $gen_list_mapping, $log_messages);
     logMessage($log_messages, "【xmltv文件】 已生成 t.xml、t.xml.gz");
+}
+
+// 判断是否同步更新直播源
+if (isset($Config['live_source_auto_sync']) && $Config['live_source_auto_sync'] == 1) {
+    $errorLog = do_parse_source_info();
+    if ($errorLog) {
+        logMessage($log_messages, "【直播源】 部分更新失败：" . rtrim(str_replace('<br>', '、', $errorLog), '、'));
+    } else {
+        logMessage($log_messages, "【直播源】 已同步更新");
+    }
 }
 
 // 统计更新后数据条数

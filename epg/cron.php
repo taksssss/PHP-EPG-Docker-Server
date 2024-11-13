@@ -61,7 +61,7 @@ $interval_time = $Config['interval_time'];
 
 // 如果间隔时间为0，则不执行
 if ($interval_time == 0) {
-    logCronMessage("间隔时间设置为0。退出...");
+    logCronMessage("【取消定时任务】间隔时间设置为0。");
     exit;
 }
 
@@ -123,15 +123,15 @@ $initial_sleep = $next_execution_time - $current_time;
 logCronMessage("【开始时间】 " . date('H:i', $first_run_today));
 logCronMessage("【结束时间】 " . date('H:i', $end_time_today));
 $logContent = "【间隔时间】 " . gmdate('H小时i分钟', $interval_time) . "\n";
-$logContent .= "\t\t  -------运行时间表-------\n";
+$logContent .= "\t\t\t\t-------运行时间表-------\n";
 
 // 循环输出每次执行的时间
 $current_execution_time = $first_run_today;
 while ($current_execution_time < $end_time_today) {
-    $logContent .= "\t\t\t   " . date('H:i', $current_execution_time) . "\n";
+    $logContent .= "\t\t\t\t\t      " . date('H:i', $current_execution_time) . "\n";
     $current_execution_time += $interval_time;
 }
-$logContent .= "\t\t  ------------------------";
+$logContent .= "\t\t\t\t--------------------------";
 logCronMessage($logContent);
 
 logCronMessage("【下次执行】 " . date('m/d H:i', $next_execution_time));

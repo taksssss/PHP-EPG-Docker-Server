@@ -2,6 +2,7 @@
 <html lang="zh-CN">
 <head>
     <title>管理配置</title>
+    <link rel="stylesheet" type="text/css" href="assets/css/manage.css?ver=20241113">
 </head>
 <body>
 <div class="container">
@@ -51,13 +52,16 @@
         <div class="flex-container">
             <div class="flex-item" style="width: 100%;">
                 <label>
-                    【频道别名】（数据库频道名 => 频道别名1, 频道别名2, ...）<span id="dbChannelName" onclick="showModal('channel')" style="color: blue; cursor: pointer;">（频道信息）</span><span id="dbChannelName" onclick="showModal('icon')" style="color: blue; cursor: pointer;">（台标信息）</span>
+                    【频道别名】（数据库频道名 => 频道别名1, 频道别名2, ...）
+                    <span id="channelInfi" onclick="showModal('channel')" style="color: blue; cursor: pointer;">（频道管理）</span>
+                    <span id="iconInfo" onclick="showModal('icon')" style="color: blue; cursor: pointer;">（台标管理）</span>
+                    <span id="liveInfo" onclick="showModal('live')" style="color: blue; cursor: pointer;">（直播源管理）</span>
                 </label><br><br>
                 <textarea id="channel_mappings" name="channel_mappings" style="height: 142px;"><?php echo implode("\n", array_map(function($search, $replace) { return $search . ' => ' . $replace; }, array_keys($Config['channel_mappings']), $Config['channel_mappings'])); ?></textarea><br><br>
             </div>
         </div>
         <div class="tooltip">
-            <input id="updateConfig" type="submit" name="update" value="更新配置">
+            <input id="update_config" name="update_config" type="submit" value="更新配置">
             <span class="tooltiptext">快捷键：Ctrl+S</span>
         </div>
         <br><br>
@@ -83,7 +87,6 @@
 <!-- 配置消息模态框 -->
 <div id="messageModal" class="modal">
     <div class="modal-content message-modal-content">
-        <span class="close">&times;</span>
         <p id="modalMessage"></p>
         <div class="modal-footer">
             <!-- 这里的按钮将在 JavaScript 中动态添加 -->
@@ -130,7 +133,7 @@
     <div class="modal-content cron-log-modal-content">
         <span class="close">&times;</span>
         <h2>定时任务日志</h2>
-        <textarea id="cronLogContent" readonly style="width: 100%; height: 440px;"></textarea>
+        <textarea id="cronLogContent" readonly style="width: 100%; height: 460px;"></textarea>
     </div>
 </div>
 
@@ -165,11 +168,6 @@
         <h2 id="iconModalTitle">频道列表</h2>
         <div style="display: flex;">
             <input type="text" id="iconSearchInput" placeholder="搜索频道名..." onkeyup="filterChannels('icon')" style="flex: 1; margin-right: 10px;">
-            <div class="tooltip" style="width:auto; margin-right: 10px;">
-                <input type="file" name="m3utxtFile" id="m3utxtFile" style="display: none;" accept=".m3u, .txt">
-                <button id="m3uMatchIcons" type="button" onclick="document.getElementById('m3utxtFile').click()">M3U</button>
-                <span class="tooltiptext">上传 m3u/txt 文件<br>匹配 EPG 及台标</span>
-            </div>
             <div class="tooltip" style="width:auto; margin-right: 10px;">
                 <button id="deleteUnusedIcons" type="button" onclick="deleteUnusedIcons()">清理</button>
                 <span class="tooltiptext">清理未使用<br>服务器台标文件</span>
@@ -249,6 +247,65 @@
     </div>
 </div>
 
+<!-- 直播源管理模态框 -->
+<div id="liveSourceManageModal" class="modal">
+    <div class="modal-content live-source-modal-content">
+        <span class="close">&times;</span>
+        
+        <!-- 输入框使用 textarea 用于输入直播源 URL -->
+        <div class="input-container">
+            <label for="sourceUrlTextarea">【直播源地址】</label><br>
+            <textarea id="sourceUrlTextarea" placeholder="支持 .txt 和 .m3u 格式，光标离开后自动保存。
+地址前面加 # 可以临时停用，后面加 # 可以备注并作为分组前缀。快捷键： Ctrl+/  。
+示例：https://xxx.xx/xx.m3u #前缀1:" style="height: 100px;"></textarea><br><br>
+        </div>
+        
+        <!-- 中间按钮区 -->
+        <div class="button-container" style="width: 82%;">
+            <input type="file" name="liveSourceFile" id="liveSourceFile" style="display: none;" accept=".m3u, .txt">
+            <button id="uploadSourceBtn" onclick="document.getElementById('liveSourceFile').click()">上传源</button>
+            <div class="tooltip" style="width: 120%;">
+                <button id="parseSourceInfoBtn" onclick="parseSourceInfo()">解析源</button>
+                <span class="tooltiptext">在线源解析较慢</span>
+            </div>
+            <button id="copyM3UBtn" onclick="copyText('<?php echo $serverUrl . dirname($_SERVER['SCRIPT_NAME']) . '/data/live/tv.m3u'; ?>')">m3u地址</button>
+            <button id="copyTXTBtn" onclick="copyText('<?php echo $serverUrl . dirname($_SERVER['SCRIPT_NAME']) . '/data/live/tv.txt'; ?>')">txt地址</button>
+            <div class="tooltip" style="width: 120%;">
+                <button id="toggleLiveSourceSyncBtn" onclick="toggleLiveSourceSync()">
+                    同步:<?php echo (isset($Config['live_source_auto_sync']) && $Config['live_source_auto_sync'] == 1 ? '是' : '否'); ?>
+                </button>
+                <span class="tooltiptext">跟随节目单更新</span>
+            </div>
+            <div class="tooltip" style="width: 120%;">
+                <button id="cleanUnusedSourceBtn" onclick="cleanUnusedSource()">清理</button>
+                <span class="tooltiptext">清理未使用<br>直播源文件</span>
+            </div>
+            <button id="saveSourceBtn" onclick="saveLiveSourceInfo()">保存</button>
+        </div>
+        <br>
+        
+        <!-- 表格显示解析结果 -->
+        <div class="table-container" id="live-source-table-container">
+            <table id="liveSourceTable">
+                <thead style="position: sticky; top: 0; background-color: white;">
+                    <tr>
+                        <th style='width: 33px'>序号</th>
+                        <th style='width: 10%'>分组</th>
+                        <th style='width: 10%'>频道名</th>
+                        <th>直播地址</th>
+                        <th style='width: 20%'>台标地址</th>
+                        <th style='width: 8%'>tvg-id</th>
+                        <th style='width: 10%'>tvg-name</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- 数据由 JavaScript 动态生成 -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
 <!-- 更多设置模态框 -->
 <div id="moreSettingModal" class="modal">
     <div class="modal-content more-setting-modal-content">
@@ -315,14 +372,7 @@
         <!-- 第三行 -->
         <div class="row">
             <div class="column">
-                <label for="db_type">数据库：</label>
-                <select id="db_type" name="db_type" required>
-                    <option value="sqlite" <?php if (!isset($Config['db_type']) || $Config['db_type'] == 'sqlite') echo 'selected'; ?>>SQLite</option>
-                    <option value="mysql" <?php if (isset($Config['db_type']) && $Config['db_type'] == 'mysql') echo 'selected'; ?>>MySQL</option>
-                </select>
-            </div>
-            <div class="column">
-                <label for="cache_time">缓存时间(小时)：</label>
+                <label for="cache_time">缓存时间 (小时)：</label>
                 <select id="cache_time" name="cache_time" required>
                     <?php for ($h = 0; $h < 24; $h++): ?>
                         <option value="<?php echo $h; ?>" <?php echo floor($Config['cache_time'] / 3600) == $h ? 'selected' : ''; ?>>
@@ -330,24 +380,28 @@
                         </option>
                     <?php endfor; ?>
                 </select>
-            </div>            
+            </div>
             <div class="column">
-                <!-- <span id="export" style="color: blue; cursor: pointer;">直播源管理</span> -->
+                <label for="db_type">数据库：</label>
+                <select id="db_type" name="db_type" required>
+                    <option value="sqlite" <?php if (!isset($Config['db_type']) || $Config['db_type'] == 'sqlite') echo 'selected'; ?>>SQLite</option>
+                    <option value="mysql" <?php if (isset($Config['db_type']) && $Config['db_type'] == 'mysql') echo 'selected'; ?>>MySQL</option>
+                </select>
+            </div>
+            <div class="column">
+                <label for="mysql_host">地址：</label>
+                <textarea id="mysql_host"><?php echo htmlspecialchars($Config['mysql']['host'] ?? ''); ?></textarea>
             </div>
         </div>
 
         <!-- 第四行 -->
-        <div class="row" style="gap: 10px;">
+        <div class="row">
             <div class="column">
-                <label for="mysql_host">地址：</label>
-                <textarea id="mysql_host" style="width: 129px; margin-right: 25px;"><?php echo htmlspecialchars($Config['mysql']['host'] ?? ''); ?></textarea>
-            </div>
-            <div class="column">
-                <label for="mysql_dbname">库名：</label>
+                <label for="mysql_dbname">数据库名：</label>
                 <textarea id="mysql_dbname"><?php echo htmlspecialchars($Config['mysql']['dbname'] ?? ''); ?></textarea>
             </div>
             <div class="column">
-                <label for="mysql_username">用户：</label>
+                <label for="mysql_username">用户名：</label>
                 <textarea id="mysql_username"><?php echo htmlspecialchars($Config['mysql']['username'] ?? ''); ?></textarea>
             </div>
             <div class="column">
@@ -358,7 +412,7 @@
 
         <!-- 其他设置 -->
         <label for="gen_list_text">仅生成以下频道：</label>
-        <select id="gen_list_enable" name="gen_list_enable" style="width: 48px; margin-right: 0px;" required>
+        <select id="gen_list_enable" name="gen_list_enable" style="width: 50px; margin-right: 0px;" required>
             <option value="1" <?php if (isset($Config['gen_list_enable']) && $Config['gen_list_enable'] == 1) echo 'selected'; ?>>是</option>
             <option value="0" <?php if (!isset($Config['gen_list_enable']) || $Config['gen_list_enable'] == 0) echo 'selected'; ?>>否</option>
         </select>
@@ -374,16 +428,8 @@
 </div>
 
 <script>
-    var configUpdated = <?php echo json_encode($configUpdated); ?>;
-    var intervalTime = <?php echo json_encode($Config['interval_time']); ?>;
-    var startTime = <?php echo json_encode($Config['start_time']); ?>;
-    var endTime = <?php echo json_encode($Config['end_time']); ?>;
     var displayMessage = <?php echo json_encode($displayMessage); ?>;
-
-    // js、css 缓存处理
-    var currentDate = new Date().toISOString().split('T')[0];
-    document.head.appendChild(Object.assign(document.createElement('link'), {rel: 'stylesheet', href: 'assets/css/manage.css?date=' + currentDate}));
-    document.head.appendChild(Object.assign(document.createElement('script'), {src: 'assets/js/manage.js?date=' + currentDate}));
 </script>
+<script src="assets/js/manage.js?ver=20241113"></script>
 </body>
 </html>

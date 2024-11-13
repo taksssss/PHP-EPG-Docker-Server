@@ -2,6 +2,7 @@
 <html lang="zh-CN">
 <head>
     <title>登录</title>
+    <link rel="stylesheet" type="text/css" href="assets/css/login.css?ver=20241113">
 </head>
 <body>
 <div class="container">
@@ -63,10 +64,6 @@
             }
         }
     }
-    
-    // css 缓存处理
-    var currentDate = new Date().toISOString().split('T')[0];
-    document.head.appendChild(Object.assign(document.createElement('link'), {rel: 'stylesheet', href: 'assets/css/login.css?date=' + currentDate}));
 </script>
 </body>
 </html>

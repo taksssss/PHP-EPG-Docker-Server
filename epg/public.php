@@ -15,13 +15,16 @@ use Overtrue\PHPOpenCC\OpenCC; // 使用 OpenCC 库
 // 检查并解析配置文件和图标列表文件
 @mkdir(__DIR__ . '/data', 0755, true);
 $iconDir = __DIR__ . '/data/icon/'; @mkdir($iconDir, 0755, true);
+$liveDir = __DIR__ . '/data/live/'; @mkdir($liveDir, 0755, true);
+$liveFileDir = __DIR__ . '/data/live/file/'; @mkdir($liveFileDir, 0755, true);
 file_exists($config_path = __DIR__ . '/data/config.json') || copy(__DIR__ . '/assets/defaultConfig.json', $config_path);
 file_exists($iconList_path = __DIR__ . '/data/iconList.json') || file_put_contents($iconList_path, json_encode(new stdClass(), JSON_PRETTY_PRINT));
-$Config = json_decode(file_get_contents($config_path), true) or die("配置文件解析失败: " . json_last_error_msg());
 ($iconList = json_decode(file_get_contents($iconList_path), true)) !== null || die("图标列表文件解析失败: " . json_last_error_msg());
 $iconListDefault = json_decode(file_get_contents(__DIR__ . '/assets/defaultIconList.json'), true) or die("默认图标列表文件解析失败: " . json_last_error_msg());
 $iconListMerged = array_merge($iconListDefault, $iconList); // 同一个键，以 iconList 的为准
 $serverUrl = (($_SERVER['HTTPS'] ?? '') === 'on' ? 'https://' : 'http://') . ($_SERVER['HTTP_HOST'] ?? '');
+
+$Config = json_decode(file_get_contents($config_path), true) or die("配置文件解析失败: " . json_last_error_msg());
 
 // 设置时区为亚洲/上海
 date_default_timezone_set("Asia/Shanghai");
@@ -166,7 +169,7 @@ function downloadData($url, $timeout = 30, $connectTimeout = 10, $retry = 3) {
 
 // 日志记录函数
 function logMessage(&$log_messages, $message) {
-    $log_messages[] = date(TIME_FORMAT) . " " . $message;
+    $log_messages[] = date("[y-m-d H:i:s]") . " " . $message;
 }
 
 // 下载 JSON 数据并存入数据库
@@ -279,5 +282,142 @@ function insertDataToDatabase($channelsData, $db, $replaceFlag = true) {
             }
         }
     }
+}
+
+// 解析 txt、m3u 直播源，并生成直播列表（包含分组、地址等信息）
+function do_parse_source_info() {
+    global $liveDir, $serverUrl;
+
+    // 频道数据模糊匹配函数
+    function dbChNameMatch($channelName) {
+        global $db;
+        $concat = $db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql' ? "CONCAT('%', channel, '%')" : "'%' || channel || '%'";
+        $stmt = $db->prepare("
+            SELECT channel FROM epg_data WHERE date = :date
+            AND (channel = :channel OR channel LIKE :like_channel OR :channel LIKE $concat)
+            ORDER BY CASE WHEN channel = :channel THEN 1 WHEN channel LIKE :like_channel THEN 2 ELSE 3 END, LENGTH(channel) DESC
+            LIMIT 1
+        ");
+        $stmt->execute([':date' => date('Y-m-d'), ':channel' => $channelName, ':like_channel' => $channelName . '%']);
+        return $stmt->fetchColumn();
+    }
+
+    // 读取 source.txt 内容，处理每行 URL
+    $sourceContent = file_get_contents($liveDir . 'source.txt');
+    $lines = array_filter(array_map('ltrim', explode("\n", $sourceContent)));
+
+    // 写入表头
+    $csvFilePath = $liveDir . 'channels.csv';
+    $csvFile = fopen($csvFilePath, 'w');
+    fputcsv($csvFile, ['频道分组', '频道名', '直播地址', '台标地址', 'tvg-id', 'tvg-name']);
+    $errorLog = '';
+
+    foreach ($lines as $line) {
+        if (empty($line) || $line[0] === '#') continue;
+    
+        // 解析 URL 和分组前缀
+        list($url, $groupPrefix) = explode('#', $line) + [1 => ''];
+        $url = trim($url);
+    
+        // 获取 URL 内容
+        $urlContent = downloadData($url, 5);
+        if (!$urlContent || stripos($urlContent, 'not found') !== false) {
+            $errorLog .= "$url<br>";
+            continue;
+        }
+    
+        $lines = explode("\n", $urlContent);
+    
+        // 处理 M3U 格式的直播源
+        if (strpos($urlContent, '#EXTM3U') !== false) {
+            foreach ($lines as $i => $line) {
+                $line = trim($line);
+    
+                // 跳过空行和 M3U 头部
+                if (empty($line) || strpos($line, '#EXTM3U') === 0) continue;
+    
+                if (strpos($line, '#EXTINF') === 0 && isset($lines[$i + 1])) {
+                    // 处理 `#EXTINF` 行，提取频道信息
+                    if (preg_match('/#EXTINF:-1(.*),(.+)/', $line, $matches)) {
+                        $channelInfo = $matches[1];
+                        $channelName = trim($matches[2]);
+                        $streamUrl = trim($lines[$i + 1]);
+    
+                        // 将频道信息组织成数组
+                        $rowData = [
+                            'groupTitle' => preg_match('/group-title="([^"]+)"/', $channelInfo, $match) ? trim($groupPrefix . $match[1]) : '',
+                            'channelName' => $channelName,
+                            'streamUrl' => $streamUrl,
+                            'iconUrl' => iconUrlMatch(cleanChannelName($channelName)),
+                            'tvgId' => preg_match('/tvg-id="([^"]+)"/', $channelInfo, $match) ? $match[1] : '',
+                            'tvgName' => preg_match('/tvg-name="([^"]+)"/', $channelInfo, $match) ? $match[1] : '',
+                        ];
+    
+                        // 写入 CSV 文件
+                        fputcsv($csvFile, $rowData);
+                    }
+                }
+            }
+        } else {
+            // 处理 TXT 格式的直播源
+            $groupTitlePart = '';
+            foreach ($lines as $line) {
+                $line = trim($line);
+                $parts = explode(',', $line);
+            
+                if (count($parts) == 2) {
+                    if ($parts[1] === '#genre#') {
+                        $groupTitlePart = trim($parts[0]); // 更新 group-title
+                        continue;
+                    }
+            
+                    $groupTitle = trim($groupPrefix . $groupTitlePart);
+                    $originalChannelName = trim($parts[0]);
+                    $dbChNameMatch = dbChNameMatch(cleanChannelName($originalChannelName));
+                    $channelName = $dbChNameMatch ?: $originalChannelName;
+                    $iconUrl = iconUrlMatch($channelName);
+                    $tvgName = $dbChNameMatch ? $channelName : "";
+            
+                    fputcsv($csvFile, [$groupTitle, $originalChannelName, $parts[1], $iconUrl, "", $tvgName]);
+                }
+            }   
+        }
+    }
+    
+    fclose($csvFile);
+
+    // 执行文件生成
+    generateLiveFiles($csvFilePath, $serverUrl . dirname($_SERVER['SCRIPT_NAME']), $liveDir);
+
+    return $errorLog;
+}
+
+// 生成 M3U 和 TXT 文件
+function generateLiveFiles($csvFilePath, $epgUrl, $liveDir) {
+    $m3uContent = "#EXTM3U x-tvg-url=\"{$epgUrl}/t.xml.gz\"\n";
+    $groups = [];
+    $csvFile = fopen($csvFilePath, 'r');
+    fgetcsv($csvFile);  // 跳过表头
+
+    while ($row = fgetcsv($csvFile)) {
+        list($groupTitle, $channelName, $streamUrl, $iconUrl, $tvgId, $tvgName) = $row;
+        $extInfLine = "#EXTINF:-1" .
+            ($tvgId ? " tvg-id=\"$tvgId\"" : "") .
+            ($tvgName ? " tvg-name=\"$tvgName\"" : "") .
+            ($iconUrl ? " tvg-logo=\"$iconUrl\"" : "") .
+            ($groupTitle ? " group-title=\"$groupTitle\"" : "") .
+            ",$channelName";
+        
+        $m3uContent .= $extInfLine . "\n" . $streamUrl . "\n";
+        $groups[$groupTitle ?: "未分组"][] = "$channelName,$streamUrl";
+    }
+    fclose($csvFile);
+
+    file_put_contents($liveDir . 'tv.m3u', $m3uContent);
+    $txtContent = "";
+    foreach ($groups as $group => $channels) {
+        $txtContent .= "$group,#genre#\n" . implode("\n", $channels) . "\n\n";
+    }
+    file_put_contents($liveDir . 'tv.txt', trim($txtContent));
 }
 ?>

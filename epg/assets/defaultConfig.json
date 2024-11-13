@@ -22,5 +22,6 @@
         "username": "phpepg",
         "password": "phpepg"
     },
+    "live_source_auto_sync": 0,
     "manage_password": ""
 }
