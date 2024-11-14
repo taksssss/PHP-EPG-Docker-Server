@@ -51,33 +51,9 @@ function getFormatTime($time) {
     ];
 }
 
-// 下载 XML 数据并存入数据库
-function downloadXmlData($xml_url, $db, &$log_messages, $gen_list) {
-    global $Config;
-    $xml_data = downloadData($xml_url);
-    if ($xml_data !== false && stripos($xml_data, 'not found') === false) {
-        logMessage($log_messages, "【下载】 成功");
-        if (substr($xml_data, 0, 2) === "\x1F\x8B") { // 通过魔数判断 .gz 文件
-            $xml_data = gzdecode($xml_data);
-            if ($xml_data === false) {
-                logMessage($log_messages, ' 【解压缩失败！！！】');
-                return;
-            }
-        }
-        $xml_data = preg_replace('/[\x00-\x1F]/u', ' ', $xml_data); // 清除所有控制字符
-        if (isset($Config['all_chs']) && $Config['all_chs']) { $xml_data = t2s($xml_data); }
-        $db->beginTransaction();
-        try {
-            processXmlData($xml_url, $xml_data, $db, $gen_list);
-            $db->commit();
-            logMessage($log_messages, "【更新】 成功");
-        } catch (Exception $e) {
-            $db->rollBack();
-            logMessage($log_messages, "【处理数据出错！！！】 " . $e->getMessage());
-        }
-    } else {
-        logMessage($log_messages, "【下载】 失败！！！");
-    }
+// 辅助函数：将日期和时间格式化为 XMLTV 格式
+function formatTime($date, $time) {
+    return date('YmdHis O', strtotime("$date $time"));
 }
 
 // 获取限定频道列表及映射关系
@@ -134,6 +110,154 @@ function getChannelBindEPG() {
     return $channelBindEPG;
 }
 
+// 下载 XML 数据并存入数据库
+function downloadXmlData($xml_url, $db, &$log_messages, $gen_list) {
+    global $Config;
+    $xml_data = downloadData($xml_url);
+    if ($xml_data !== false && stripos($xml_data, 'not found') === false) {
+        logMessage($log_messages, "【下载】 成功");
+        if (substr($xml_data, 0, 2) === "\x1F\x8B") { // 通过魔数判断 .gz 文件
+            $xml_data = gzdecode($xml_data);
+            if ($xml_data === false) {
+                logMessage($log_messages, ' 【解压缩失败！！！】');
+                return;
+            }
+        }
+        $xml_data = preg_replace('/[\x00-\x1F]/u', ' ', $xml_data); // 清除所有控制字符
+        if (isset($Config['all_chs']) && $Config['all_chs']) { $xml_data = t2s($xml_data); }
+        $db->beginTransaction();
+        try {
+            processXmlData($xml_url, $xml_data, $db, $gen_list);
+            $db->commit();
+            logMessage($log_messages, "【更新】 成功");
+        } catch (Exception $e) {
+            $db->rollBack();
+            logMessage($log_messages, "【处理数据出错！！！】 " . $e->getMessage());
+        }
+    } else {
+        logMessage($log_messages, "【下载】 失败！！！");
+    }
+}
+
+// 处理 XML 数据并逐步存入数据库
+function processXmlData($xml_url, $xml_data, $db, $gen_list) {
+    global $Config;
+    global $processedRecords;
+    global $channel_bind_epg;
+
+    $reader = new XMLReader();
+    if (!$reader->XML($xml_data)) {
+        throw new Exception("无法解析 XML 数据");
+    }
+
+    $cleanChannelNames = [];
+
+    // 读取频道数据
+    while ($reader->read() && $reader->name !== 'channel');
+    while ($reader->name === 'channel') {
+        $channel = new SimpleXMLElement($reader->readOuterXML());
+        $channelId = (string)$channel['id'];
+        $cleanChannelNames[$channelId] = cleanChannelName((string)$channel->{'display-name'});
+        $reader->next('channel');
+    }
+
+    // 繁简转换和频道筛选
+    $simplifiedChannelNames = (isset($Config['all_chs']) && $Config['all_chs']) ? $cleanChannelNames : explode("\n", t2s(implode("\n", $cleanChannelNames)));
+    $channelNamesMap = [];
+    foreach ($cleanChannelNames as $channelId => $channelName) {
+        $channelNameSimplified = array_shift($simplifiedChannelNames);
+
+        // 假如 channel_bind_epg 存在且频道在其中有记录，且不为当前 xml_url，直接跳过
+        if (!empty($channel_bind_epg) && 
+            isset($channel_bind_epg[$channelNameSimplified]) && 
+            !in_array($xml_url, $channel_bind_epg[$channelNameSimplified])
+        ) {
+            continue; // 跳过当前循环，继续处理下一个
+        }
+
+        // 当 gen_list_enable 为 0 时，插入所有数据
+        if (empty($Config['gen_list_enable'])) {
+            $channelNamesMap[$channelId] = $channelNameSimplified;
+            continue;
+        }
+        $matchFound = false;
+        foreach ($gen_list as $item) {
+            if (stripos($channelNameSimplified, $item) !== false || stripos($item, $channelNameSimplified) !== false) {
+                $matchFound = true;
+                break;
+            }
+        }
+        if ($matchFound) {
+            $channelNamesMap[$channelId] = $channelNameSimplified;
+        }
+    }
+
+    $reader->close();
+    $reader->XML($xml_data); // 重置 XMLReader
+    while ($reader->read() && $reader->name !== 'programme');
+
+    $currentChannelProgrammes = [];
+    $crossDayProgrammes = []; // 保存跨天的节目数据
+    
+    while ($reader->name === 'programme') {
+        $programme = new SimpleXMLElement($reader->readOuterXML());
+        $start = getFormatTime((string)$programme['start']);
+        $end = getFormatTime((string)$programme['stop']);
+        $channelId = (string)$programme['channel'];
+        $channelName = $channelNamesMap[$channelId] ?? null;
+        $recordKey = $channelName . '-' . $start['date'];
+
+        // 优先处理跨天数据
+        if (isset($crossDayProgrammes[$channelId][$start['date']]) && !isset($processedRecords[$recordKey])) {
+            $currentChannelProgrammes[$channelId]['diyp_data'][$start['date']] = array_merge(
+                $currentChannelProgrammes[$channelId]['diyp_data'][$start['date']] ?? [],
+                $crossDayProgrammes[$channelId][$start['date']]
+            );
+            $currentChannelProgrammes[$channelId]['channel_name'] = $channelName;
+            unset($crossDayProgrammes[$channelId][$start['date']]);
+        }
+    
+        if ($channelName && !isset($processedRecords[$recordKey])) {
+            $programmeData = [
+                'start' => $start['time'],
+                'end' => $start['date'] === $end['date'] ? $end['time'] : '00:00',
+                'title' => (string)$programme->title,
+                'desc' => isset($programme->desc) && (string)$programme->desc !== (string)$programme->title ? (string)$programme->desc : ''
+            ];
+    
+            $currentChannelProgrammes[$channelId]['diyp_data'][$start['date']][] = $programmeData;
+    
+            // 保存跨天的节目数据
+            if ($start['date'] !== $end['date'] && $end['time'] !== '00:00') {
+                $crossDayProgrammes[$channelId][$end['date']][] = [
+                    'start' => '00:00',
+                    'end' => $end['time'],
+                    'title' => $programmeData['title'],
+                    'desc' => $programmeData['desc']
+                ];
+            }
+    
+            $currentChannelProgrammes[$channelId]['channel_name'] = $channelName;
+    
+            // 每次达到 50 时，插入数据并保留最后一条
+            if (count($currentChannelProgrammes) >= 50) {
+                $lastProgramme = array_pop($currentChannelProgrammes); // 取出最后一条
+                insertDataToDatabase($currentChannelProgrammes, $db, $xml_url); // 插入前 49 条
+                $currentChannelProgrammes = [$channelId => $lastProgramme]; // 清空并重新赋值最后一条
+            }
+        }
+    
+        $reader->next('programme');
+    }
+    
+    // 插入剩余的数据
+    if ($currentChannelProgrammes) {
+        insertDataToDatabase($currentChannelProgrammes, $db, $xml_url);
+    }
+    
+    $reader->close();
+}
+
 // 从 epg_data 表生成 XML 数据并逐个频道写入 t.xml 文件
 function generateXmlFromEpgData($db, $include_future_only, $gen_list_mapping, &$log_messages) {
     global $Config, $iconList, $iconList_path;
@@ -150,8 +274,8 @@ function generateXmlFromEpgData($db, $include_future_only, $gen_list_mapping, &$
     $xmlWriter->openUri('t.xml');
     $xmlWriter->startDocument('1.0', 'UTF-8');
     $xmlWriter->startElement('tv');
-    $xmlWriter->writeAttribute('info-name', 'by Tak');
-    $xmlWriter->writeAttribute('info-url', 'https://github.com/taksssss/EPG-Server');
+    $xmlWriter->writeAttribute('generator-info-name', 'Tak');
+    $xmlWriter->writeAttribute('generator-info-url', 'https://github.com/taksssss/EPG-Server');
     $xmlWriter->setIndent(true);
     $xmlWriter->setIndentString('	'); // 设置缩进
 
@@ -263,130 +387,6 @@ function compressXmlFile($filePath) {
     // 关闭文件
     fclose($file);
     gzclose($gzFile);
-}
-
-// 辅助函数：将日期和时间格式化为 XMLTV 格式
-function formatTime($date, $time) {
-    return date('YmdHis O', strtotime("$date $time"));
-}
-
-// 处理 XML 数据并逐步存入数据库
-function processXmlData($xml_url, $xml_data, $db, $gen_list) {
-    global $Config;
-    global $processedRecords;
-    global $channel_bind_epg;
-
-    $reader = new XMLReader();
-    if (!$reader->XML($xml_data)) {
-        throw new Exception("无法解析 XML 数据");
-    }
-
-    $cleanChannelNames = [];
-
-    // 读取频道数据
-    while ($reader->read() && $reader->name !== 'channel');
-    while ($reader->name === 'channel') {
-        $channel = new SimpleXMLElement($reader->readOuterXML());
-        $channelId = (string)$channel['id'];
-        $cleanChannelNames[$channelId] = cleanChannelName((string)$channel->{'display-name'});
-        $reader->next('channel');
-    }
-
-    // 繁简转换和频道筛选
-    $simplifiedChannelNames = (isset($Config['all_chs']) && $Config['all_chs']) ? $cleanChannelNames : explode("\n", t2s(implode("\n", $cleanChannelNames)));
-    $channelNamesMap = [];
-    foreach ($cleanChannelNames as $channelId => $channelName) {
-        $channelNameSimplified = array_shift($simplifiedChannelNames);
-
-        // 假如 channel_bind_epg 存在且频道在其中有记录，且不为当前 xml_url，直接跳过
-        if (!empty($channel_bind_epg) && 
-            isset($channel_bind_epg[$channelNameSimplified]) && 
-            !in_array($xml_url, $channel_bind_epg[$channelNameSimplified])
-        ) {
-            continue; // 跳过当前循环，继续处理下一个
-        }
-
-        // 当 gen_list_enable 为 0 时，插入所有数据
-        if (empty($Config['gen_list_enable'])) {
-            $channelNamesMap[$channelId] = $channelNameSimplified;
-            continue;
-        }
-        $matchFound = false;
-        foreach ($gen_list as $item) {
-            if (stripos($channelNameSimplified, $item) !== false || stripos($item, $channelNameSimplified) !== false) {
-                $matchFound = true;
-                break;
-            }
-        }
-        if ($matchFound) {
-            $channelNamesMap[$channelId] = $channelNameSimplified;
-        }
-    }
-
-    $reader->close();
-    $reader->XML($xml_data); // 重置 XMLReader
-    while ($reader->read() && $reader->name !== 'programme');
-
-    $currentChannelProgrammes = [];
-    $crossDayProgrammes = []; // 保存跨天的节目数据
-    
-    while ($reader->name === 'programme') {
-        $programme = new SimpleXMLElement($reader->readOuterXML());
-        $start = getFormatTime((string)$programme['start']);
-        $end = getFormatTime((string)$programme['stop']);
-        $channelId = (string)$programme['channel'];
-        $channelName = $channelNamesMap[$channelId] ?? null;
-        $recordKey = $channelName . '-' . $start['date'];
-
-        // 优先处理跨天数据
-        if (isset($crossDayProgrammes[$channelId][$start['date']]) && !isset($processedRecords[$recordKey])) {
-            $currentChannelProgrammes[$channelId]['diyp_data'][$start['date']] = array_merge(
-                $currentChannelProgrammes[$channelId]['diyp_data'][$start['date']] ?? [],
-                $crossDayProgrammes[$channelId][$start['date']]
-            );
-            $currentChannelProgrammes[$channelId]['channel_name'] = $channelName;
-            unset($crossDayProgrammes[$channelId][$start['date']]);
-        }
-    
-        if ($channelName && !isset($processedRecords[$recordKey])) {
-            $programmeData = [
-                'start' => $start['time'],
-                'end' => $start['date'] === $end['date'] ? $end['time'] : '00:00',
-                'title' => (string)$programme->title,
-                'desc' => isset($programme->desc) && (string)$programme->desc !== (string)$programme->title ? (string)$programme->desc : ''
-            ];
-    
-            $currentChannelProgrammes[$channelId]['diyp_data'][$start['date']][] = $programmeData;
-    
-            // 保存跨天的节目数据
-            if ($start['date'] !== $end['date'] && $end['time'] !== '00:00') {
-                $crossDayProgrammes[$channelId][$end['date']][] = [
-                    'start' => '00:00',
-                    'end' => $end['time'],
-                    'title' => $programmeData['title'],
-                    'desc' => $programmeData['desc']
-                ];
-            }
-    
-            $currentChannelProgrammes[$channelId]['channel_name'] = $channelName;
-    
-            // 每次达到 50 时，插入数据并保留最后一条
-            if (count($currentChannelProgrammes) >= 50) {
-                $lastProgramme = array_pop($currentChannelProgrammes); // 取出最后一条
-                insertDataToDatabase($currentChannelProgrammes, $db); // 插入前 49 条
-                $currentChannelProgrammes = [$channelId => $lastProgramme]; // 清空并重新赋值最后一条
-            }
-        }
-    
-        $reader->next('programme');
-    }
-    
-    // 插入剩余的数据
-    if ($currentChannelProgrammes) {
-        insertDataToDatabase($currentChannelProgrammes, $db);
-    }
-    
-    $reader->close();
 }
 
 // 记录开始时间

@@ -60,13 +60,13 @@ function readEPGData($date, $oriChName, $cleanChName, $db, $type) {
     $cache_time = ($date < date('Y-m-d')) ? 7 * 24 * 3600 : $Config['cache_time'];
 
     // 检查是否开启缓存并安装了 Memcached 类
-    $memcached_enabled = $Config['cache_time'] && class_exists('Memcached');
+    $memcached_enabled = $Config['cache_time'] && class_exists('Memcached') && (new Memcached())->connect('localhost', 11211);
     $cache_key = base64_encode("{$date}_{$cleanChName}_{$type}");
 
     if ($memcached_enabled) {
         // 初始化 Memcached
         $memcached = new Memcached();
-        $memcached->addServer('127.0.0.1', 11211); // 请确保 Memcached 服务器地址和端口正确
+        $memcached->addServer('localhost', 11211); // 请确保 Memcached 服务器地址和端口正确
 
         // 从缓存中读取数据
         $cached_data = $memcached->get($cache_key);
@@ -121,9 +121,9 @@ function readEPGData($date, $oriChName, $cleanChName, $db, $type) {
     $rowArray = json_decode($row, true);
     $iconUrl = iconUrlMatch($rowArray['channel_name']) ?? iconUrlMatch($cleanChName) ?? iconUrlMatch($oriChName);
     $rowArray = array_merge(
-        array_slice($rowArray, 0, array_search('url', array_keys($rowArray)) + 1),
+        array_slice($rowArray, 0, array_search('source', array_keys($rowArray)) + 1),
         ['icon' => $iconUrl],
-        array_slice($rowArray, array_search('url', array_keys($rowArray)) + 1)
+        array_slice($rowArray, array_search('source', array_keys($rowArray)) + 1)
     );
     $row = json_encode($rowArray, JSON_UNESCAPED_UNICODE);
 
@@ -163,6 +163,7 @@ function readEPGData($date, $oriChName, $cleanChName, $db, $type) {
                 'liveSt' => $current_programme ? $current_programme['st'] : 0,
                 'channelName' => $diyp_data['channel_name'],
                 'lvUrl' => $diyp_data['url'],
+                'srcUrl' => $diyp_data['source'],
                 'icon' => $diyp_data['icon'],
                 'program' => $program
             ]
@@ -254,7 +255,7 @@ function fetchHandler() {
 
         // 返回默认数据
         $ret_default = !isset($Config['ret_default']) || $Config['ret_default'];
-        $iconUrl = iconUrlMatch($cleanChName);
+        $iconUrl = iconUrlMatch($cleanChName) ?? iconUrlMatch($oriChName);
         if ($type === 'diyp') {
             // 无法获取到数据时返回默认 diyp 数据
             $default_diyp_program_info = [

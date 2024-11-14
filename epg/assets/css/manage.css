@@ -220,7 +220,7 @@ input[type="text"] {
     height: 352px;
 }
 .table-container[id="channel-bind-epg-table-container"] {
-    height: 400px;
+    height: 399px;
 }
 .table-container[id="channel-match-table-container"] {
     height: 460px;
@@ -232,11 +232,11 @@ input[type="text"] {
 #iconTable, #channelBindEPGTable, #liveSourceTable {
     width: 100%;
     border-collapse: separate;
-    border-spacing: 0 5px; /* 调整行之间的垂直间距 */
+    border-spacing: 0 0px; /* 调整行之间的垂直间距 */
     table-layout: fixed; /* 固定表格布局，防止内容超出 */
 }
-#channelMatchTable, #channelTable, #iconTable, #channelBindEPGTable {
-    border-spacing: 0 0px; /* 调整行之间的垂直间距 */
+#logTable, #liveSourceTable {
+    border-spacing: 0 5px; /* 调整行之间的垂直间距 */
 }
 #logTable th, #logTable td,
 #channelTable th, #channelTable td,

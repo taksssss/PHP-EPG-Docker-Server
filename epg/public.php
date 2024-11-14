@@ -237,11 +237,11 @@ function processJsonData($json_data, $db, $channel_name, $replaceFlag) {
                         ]);
     }}}}}
     $channelProgrammes[$channelId]['channel_name'] = $channel_name;
-    insertDataToDatabase($channelProgrammes, $db, $replaceFlag);
+    insertDataToDatabase($channelProgrammes, $db, 'tvmao', $replaceFlag);
 }
 
 // 插入数据到数据库
-function insertDataToDatabase($channelsData, $db, $replaceFlag = true) {
+function insertDataToDatabase($channelsData, $db, $sourceUrl, $replaceFlag = true) {
     global $processedRecords;
     global $Config;
 
@@ -257,6 +257,7 @@ function insertDataToDatabase($channelsData, $db, $replaceFlag = true) {
                 'channel_name' => $channelName,
                 'date' => $date,
                 'url' => 'https://github.com/taksssss/EPG-Server',
+                'source' => $sourceUrl,
                 'epg_data' => $diypProgrammes
             ], JSON_UNESCAPED_UNICODE);
             // 当天及未来数据覆盖，其他日期数据忽略

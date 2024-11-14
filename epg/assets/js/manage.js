@@ -33,12 +33,15 @@ document.getElementById('settingsForm').addEventListener('submit', function(even
     })
     .then(response => response.json())
     .then(data => {
-        const message = data.success ? 
-            (data.interval_time === 0 ? 
-                "配置已更新<br><br>已取消定时任务" : 
-                `配置已更新<br><br>已设置定时任务<br>开始时间：${data.start_time}<br>结束时间：${data.end_time}<br>间隔周期：${formatTime(data.interval_time)}`) 
-            : '保存失败！';
+        const { memcached_set, interval_time, start_time, end_time } = data;
+        const message = memcached_set 
+            ? interval_time === 0 
+                ? "配置已更新<br><br>已取消定时任务" 
+                : `配置已更新<br><br>已设置定时任务<br>开始时间：${start_time}<br>结束时间：${end_time}<br>间隔周期：${formatTime(interval_time)}`
+            : '配置已更新<br><br>Memcached 启用失败<br>缓存时间已设为 0';
 
+        if (!memcached_set) document.getElementById('cache_time').value = 0;
+        
         showMessageModal(message);
     })
     .catch(() => showMessageModal('发生错误，请重试。'));
@@ -128,12 +131,6 @@ function handleKeydown(event) {
 }
 
 function formatTime(seconds) {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    return `${hours}:${minutes}`;
-}
-
-function formatTime(seconds) {
     const formattedHours = String(Math.floor(seconds / 3600)).padStart(2, '0');
     const formattedMinutes = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
     return `${formattedHours}:${formattedMinutes}`;
@@ -161,10 +158,6 @@ function showMessageModal(message) {
             modal.style.display = "none";
         }
     };
-}
-
-if (displayMessage) {
-    showMessageModal(displayMessage);
 }
 
 function showModal(type, $popup = true, $data = '') {
@@ -278,6 +271,7 @@ function fetchData(endpoint, callback) {
 // 更新 EPG 内容
 function updateEpgContent(epgData) {
     document.getElementById('epgTitle').innerHTML = epgData.channel;
+    document.getElementById('epgSource').innerHTML = `来源：${epgData.source}`;
     document.getElementById('epgDate').innerHTML = epgData.date;
     var epgContent = document.getElementById("epgContent");
     epgContent.value = epgData.epg;
@@ -529,36 +523,6 @@ function cleanUnusedSource() {
         showMessageModal('Error: ' + error);
     });
 }
-
-// 上传直播源文件
-document.getElementById('liveSourceFile').addEventListener('change', function() {
-    const file = this.files[0];
-    const allowedExtensions = ['m3u', 'txt'];
-    const fileExtension = file.name.split('.').pop().toLowerCase();
-
-    // 检查文件类型
-    if (!allowedExtensions.includes(fileExtension)) {
-        showMessageModal('只接受 .m3u 和 .txt 文件');
-        return;
-    }
-
-    // 创建 FormData 并发送 AJAX 请求
-    const formData = new FormData();
-    formData.append('liveSourceFile', file);
-
-    fetch('manage.php', { method: 'POST', body: formData })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                showModal('live');
-            } else {
-                showMessageModal('上传失败: ' + data.message);
-            }
-        })
-        .catch(error => showMessageModal('上传过程中发生错误：' + error));
-
-    this.value = ''; // 重置文件输入框的值，确保可以连续上传相同文件
-});
 
 // 复制文本并提示
 function copyText(text) {
@@ -916,3 +880,33 @@ function updateIconListJsonFile(){
         });
     }
 }
+
+// 导入配置
+document.getElementById('importFile').addEventListener('change', function() {
+    const file = this.files[0];
+    const fileExtension = file.name.split('.').pop().toLowerCase();
+
+    // 检查文件类型
+    if (fileExtension != 'gz') {
+        showMessageModal('只接受 .gz 文件');
+        return;
+    }
+
+    // 发送 AJAX 请求
+    const formData = new FormData(document.getElementById('importForm'));
+
+    fetch('manage.php', { method: 'POST', body: formData })
+    .then(response => response.json())
+    .then(data => {
+        showMessageModal(data.message);
+        if (data.success) {
+            // 延迟刷新页面
+            setTimeout(() => {
+                window.location.href = 'manage.php';
+            }, 3000);
+        }
+    })
+    .catch(error => showMessageModal('导入过程中发生错误：' + error));
+
+    this.value = ''; // 重置文件输入框的值，确保可以连续上传相同文件
+});

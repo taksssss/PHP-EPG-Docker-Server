@@ -15,7 +15,6 @@ initialDB();
 
 session_start();
 
-
 // 首次进入界面，检查 cron.php 是否运行正常
 if($Config['interval_time']!=0) {
     $output = [];
@@ -23,13 +22,6 @@ if($Config['interval_time']!=0) {
     if(!$output) {
         exec('php cron.php > /dev/null 2>/dev/null &');
     }
-}
-
-if (isset($_SESSION['display_message'])) {
-    $displayMessage = $_SESSION['display_message'];
-    unset($_SESSION['display_message']); // 清除消息以防再次显示
-} else {
-    $displayMessage = '';
 }
 
 // 过渡到新的 md5 密码
@@ -82,7 +74,7 @@ $passwordChangeErrorMessage = isset($passwordChangeError) ? "<p style='color:red
 // 检查是否已登录
 if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
     // 显示登录表单
-    include 'assets/html/login_page.php';
+    include 'assets/html/login.html';
     exit;
 }
 
@@ -140,6 +132,14 @@ function updateConfig() {
         }
     }
 
+    $memcached_set = true;
+    
+    // 检查 Memcache 有效性
+    if (!empty($Config['cache_time']) && (!class_exists('Memcached') || !(new Memcached())->connect('localhost', 11211))) {
+        $Config['cache_time'] = 0;
+        $memcached_set = false;
+    }
+
     // 将新配置写回 config.json
     file_put_contents($config_path, json_encode($Config, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
 
@@ -147,6 +147,8 @@ function updateConfig() {
     if ($oldConfig['start_time'] !== $start_time || $oldConfig['end_time'] !== $end_time || $oldConfig['interval_time'] !== $interval_time) {
         exec('php cron.php > /dev/null 2>/dev/null &');
     }
+
+    return $memcached_set;
 }
 
 // 连接数据库并获取日志表中的数据
@@ -213,16 +215,17 @@ try {
                 $date = urldecode($_GET['date']);
                 $stmt = $db->prepare("SELECT epg_diyp FROM epg_data WHERE channel = :channel AND date = :date");
                 $stmt->execute([':channel' => $channel, ':date' => $date]);
-                $result = $stmt->fetch(PDO::FETCH_ASSOC); // 获取单条结果            
+                $result = $stmt->fetch(PDO::FETCH_ASSOC); // 获取单条结果
                 if ($result) {
+                    $epgData = json_decode($result['epg_diyp'], true);
+                    $epgSource = $epgData['source'] ?? '';
                     $epgOutput = "";
-                    $epgData = json_decode($result['epg_diyp'], true);                    
                     foreach ($epgData['epg_data'] as $epgItem) {
                         $epgOutput .= "{$epgItem['start']} {$epgItem['title']}\n";
                     }            
-                    $dbResponse = ['channel' => $channel, 'date' => $date, 'epg' => trim($epgOutput)];
+                    $dbResponse = ['channel' => $channel, 'source' => $epgSource, 'date' => $date, 'epg' => trim($epgOutput)];
                 } else {
-                    $dbResponse = ['channel' => $channel, 'date' => $date, 'epg' => '无节目信息'];
+                    $dbResponse = ['channel' => $channel, 'source' => '', 'date' => $date, 'epg' => '无节目信息'];
                 }
                 break;
 
@@ -464,9 +467,9 @@ try {
         switch ($action) {
             case 'update_config':
                 // 更新配置
-                updateConfig();
+                $memcached_set = updateConfig();
                 echo json_encode([
-                    'success' => true,
+                    'memcached_set' => $memcached_set,
                     'interval_time' => $Config['interval_time'],
                     'start_time' => $Config['start_time'],
                     'end_time' => $Config['end_time']
@@ -498,10 +501,12 @@ try {
                 // 导入配置
                 $zip = new ZipArchive();
                 $importFile = $_FILES['importFile']['tmp_name'];
+                $successFlag = false;
                 $message = "";
                 if ($zip->open($importFile) === TRUE) {
                     if ($zip->extractTo('.')) {
-                        $message = "导入成功！";
+                        $successFlag = true;
+                        $message = "导入成功！<br>3秒后自动刷新页面……";
                     } else {
                         $message = "导入失败！解压过程中发生问题。";
                     }
@@ -509,8 +514,7 @@ try {
                 } else {
                     $message = "导入失败！无法打开压缩文件。";
                 }
-                $_SESSION['display_message'] = $message;
-                header('Location: manage.php');
+                echo json_encode(['success' => $successFlag, 'message' => $message]);
                 exit;
 
             case 'export_config':
@@ -636,5 +640,5 @@ try {
 }
 
 // 生成配置管理表单
-include 'assets/html/manage_page.php';
+include 'assets/html/manage.html';
 ?>

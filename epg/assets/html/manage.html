@@ -2,17 +2,20 @@
 <html lang="zh-CN">
 <head>
     <title>管理配置</title>
-    <link rel="stylesheet" type="text/css" href="assets/css/manage.css?ver=20241113">
+    <link rel="stylesheet" type="text/css" href="assets/css/manage.css?ver=20241114">
 </head>
 <body>
 <div class="container">
     <h2>管理配置</h2>
     <form method="POST" id="settingsForm">
 
-        <label for="xml_urls">【EPG源地址】（支持 xml 跟 .xml.gz 格式， # 为注释，支持获取 猫 数据）</label><span id="channelbind" onclick="showModal('channelbindepg')" style="color: blue; cursor: pointer;">（频道指定EPG源）</span><br><br>
+        <label for="xml_urls">【EPG源地址】（支持 xml 跟 .xml.gz 格式， # 为注释，支持获取 猫 数据）</label>
+        <span id="channelbind" onclick="showModal('channelbindepg')" style="color: blue; cursor: pointer;">（频道指定EPG源）</span>
+        <br><br>
         <textarea placeholder="一行一个，地址前面加 # 可以临时停用，后面加 # 可以备注。快捷键： Ctrl+/  。
 猫示例1：tvmao, 猫频道名1, 猫频道名2,...
-猫示例2：tvmao, 自定义1:猫频道名1, 自定义2:猫频道名2, ..." id="xml_urls" name="xml_urls" style="height: 122px;"><?php echo implode("\n", array_map('trim', $Config['xml_urls'])); ?></textarea><br><br>
+猫示例2：tvmao, 自定义1:猫频道名1, 自定义2:猫频道名2, ..." id="xml_urls" name="xml_urls" style="height: 122px;"><?php echo implode("\n", array_map('trim', $Config['xml_urls'])); ?></textarea>
+        <br><br>
 
         <div class="form-row">
             <label for="days_to_keep" class="label-days-to-keep">数据保存天数</label>
@@ -56,12 +59,18 @@
                     <span id="channelInfi" onclick="showModal('channel')" style="color: blue; cursor: pointer;">（频道管理）</span>
                     <span id="iconInfo" onclick="showModal('icon')" style="color: blue; cursor: pointer;">（台标管理）</span>
                     <span id="liveInfo" onclick="showModal('live')" style="color: blue; cursor: pointer;">（直播源管理）</span>
-                </label><br><br>
-                <textarea id="channel_mappings" name="channel_mappings" style="height: 142px;"><?php echo implode("\n", array_map(function($search, $replace) { return $search . ' => ' . $replace; }, array_keys($Config['channel_mappings']), $Config['channel_mappings'])); ?></textarea><br><br>
+                </label>
+                <br><br>
+                <textarea id="channel_mappings" name="channel_mappings" style="height: 142px;"><?php 
+                    echo implode("\n", array_map(function($search, $replace) {
+                        return $search . ' => ' . $replace;
+                    }, array_keys($Config['channel_mappings']), $Config['channel_mappings']));
+                ?></textarea>
             </div>
         </div>
+        <br>
         <div class="tooltip">
-            <input id="update_config" name="update_config" type="submit" value="更新配置">
+            <input id="update_config" name="update_config" type="submit" value="保存配置">
             <span class="tooltiptext">快捷键：Ctrl+S</span>
         </div>
         <br><br>
@@ -99,11 +108,13 @@
     <div class="modal-content epg-modal-content">
         <span class="close">&times;</span>
         <h2 id="epgTitle">频道名</h2>
-        <span id="epgDate">日期</span>
-        <span id="prevDate" style="cursor: pointer; color: blue; margin-left: 10px;">&#9664; 前一天</span>
-        <span id="nextDate" style="cursor: pointer; color: blue; margin-left: 10px;">后一天 &#9654;</span>
+        <span id="epgSource" style="word-break: break-all;">来源</span>
         <br><br>
-        <textarea id="epgContent" readonly style="width: 100%; height: 400px;"></textarea>
+        <span id="epgDate">日期</span>
+        <span id="prevDate" style="cursor: pointer; color: blue; user-select: none; margin-left: 10px;">&#9664; 前一天</span>
+        <span id="nextDate" style="cursor: pointer; color: blue; user-select: none; margin-left: 10px;">后一天 &#9654;</span>
+        <br><br>
+        <textarea id="epgContent" readonly style="width: 100%; height: 380px;"></textarea>
     </div>
 </div>
 
@@ -257,8 +268,9 @@
             <label for="sourceUrlTextarea">【直播源地址】</label><br>
             <textarea id="sourceUrlTextarea" placeholder="支持 .txt 和 .m3u 格式，光标离开后自动保存。
 地址前面加 # 可以临时停用，后面加 # 可以备注并作为分组前缀。快捷键： Ctrl+/  。
-示例：https://xxx.xx/xx.m3u #前缀1:" style="height: 100px;"></textarea><br><br>
+示例：https://xxx.xx/xx.m3u #前缀1:" style="height: 100px;"></textarea>
         </div>
+        <br>
         
         <!-- 中间按钮区 -->
         <div class="button-container" style="width: 82%;">
@@ -268,8 +280,8 @@
                 <button id="parseSourceInfoBtn" onclick="parseSourceInfo()">解析源</button>
                 <span class="tooltiptext">在线源解析较慢</span>
             </div>
-            <button id="copyM3UBtn" onclick="copyText('<?php echo $serverUrl . dirname($_SERVER['SCRIPT_NAME']) . '/data/live/tv.m3u'; ?>')">m3u地址</button>
-            <button id="copyTXTBtn" onclick="copyText('<?php echo $serverUrl . dirname($_SERVER['SCRIPT_NAME']) . '/data/live/tv.txt'; ?>')">txt地址</button>
+            <button id="copyM3UBtn" onclick="copyText(`<?php echo $serverUrl . dirname($_SERVER['SCRIPT_NAME']) . '/data/live/tv.m3u'; ?>`)">m3u地址</button>
+            <button id="copyTXTBtn" onclick="copyText(`<?php echo $serverUrl . dirname($_SERVER['SCRIPT_NAME']) . '/data/live/tv.txt'; ?>`)">txt地址</button>            
             <div class="tooltip" style="width: 120%;">
                 <button id="toggleLiveSourceSyncBtn" onclick="toggleLiveSourceSync()">
                     同步:<?php echo (isset($Config['live_source_auto_sync']) && $Config['live_source_auto_sync'] == 1 ? '是' : '否'); ?>
@@ -330,7 +342,7 @@
             </div>
             <div class="column">
                 <form id="importForm" method="post" enctype="multipart/form-data" style="display: inline-block;">
-                    <input type="file" name="importFile" id="importFile" style="display: none;" accept=".gz" onchange="document.getElementById('importForm').submit();">
+                    <input type="file" name="importFile" id="importFile" style="display: none;" accept=".gz">
                     <input type="hidden" name="importExport" id="formImportExport" value="">
                     <span id="import" onclick="document.getElementById('importFile').click()" style="color: blue; cursor: pointer; margin-right: 20px;">数据导入</span>
                     <span id="export" onclick="document.getElementById('importForm').submit()" style="color: blue; cursor: pointer;">数据导出</span>
@@ -372,14 +384,17 @@
         <!-- 第三行 -->
         <div class="row">
             <div class="column">
-                <label for="cache_time">缓存时间 (小时)：</label>
-                <select id="cache_time" name="cache_time" required>
-                    <?php for ($h = 0; $h < 24; $h++): ?>
-                        <option value="<?php echo $h; ?>" <?php echo floor($Config['cache_time'] / 3600) == $h ? 'selected' : ''; ?>>
-                            <?php echo $h; ?>
-                        </option>
-                    <?php endfor; ?>
-                </select>
+                <div class="tooltip" style="display: flex;">
+                    <label for="cache_time">缓存时间 (小时)：</label>
+                    <select id="cache_time" name="cache_time" required>
+                        <?php for ($h = 0; $h < 24; $h++): ?>
+                            <option value="<?php echo $h; ?>" <?php echo floor($Config['cache_time'] / 3600) == $h ? 'selected' : ''; ?>>
+                                <?php echo $h; ?>
+                            </option>
+                        <?php endfor; ?>
+                    </select>
+                    <span class="tooltiptext">Mecached 缓存</span>
+                </div>
             </div>
             <div class="column">
                 <label for="db_type">数据库：</label>
@@ -426,10 +441,6 @@
         <button id="saveConfig" type="button" onclick="saveAndUpdateConfig();">保存配置</button>
     </div>
 </div>
-
-<script>
-    var displayMessage = <?php echo json_encode($displayMessage); ?>;
-</script>
-<script src="assets/js/manage.js?ver=20241113"></script>
+<script src="assets/js/manage.js?ver=20241114"></script>
 </body>
 </html>
