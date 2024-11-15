@@ -60,14 +60,11 @@ function readEPGData($date, $oriChName, $cleanChName, $db, $type) {
     $cache_time = ($date < date('Y-m-d')) ? 7 * 24 * 3600 : $Config['cache_time'];
 
     // 检查是否开启缓存并安装了 Memcached 类
-    $memcached_enabled = $Config['cache_time'] && class_exists('Memcached') && (new Memcached())->connect('localhost', 11211);
+    $memcached_enabled = $Config['cache_time'] && class_exists('Memcached')
+        && ($memcached = new Memcached())->addServer('localhost', 11211);
     $cache_key = base64_encode("{$date}_{$cleanChName}_{$type}");
 
     if ($memcached_enabled) {
-        // 初始化 Memcached
-        $memcached = new Memcached();
-        $memcached->addServer('localhost', 11211); // 请确保 Memcached 服务器地址和端口正确
-
         // 从缓存中读取数据
         $cached_data = $memcached->get($cache_key);
         if ($cached_data) {
@@ -182,14 +179,9 @@ function readEPGData($date, $oriChName, $cleanChName, $db, $type) {
     return false;
 }
 
-// 获取当前时间戳
-function getNowTimestamp() {
-    return time();
-}
-
 // 查找当前节目
 function findCurrentProgramme($programmes) {
-    $now = getNowTimestamp();
+    $now = time();
     foreach ($programmes as $programme) {
         if ($programme['st'] <= $now && $programme['et'] >= $now) {
             return $programme;
@@ -200,12 +192,39 @@ function findCurrentProgramme($programmes) {
 
 // 处理请求
 function fetchHandler() {
-    global $init, $db, $Config;
+    global $init, $db, $Config, $liveDir, $serverUrl;
 
     $uri = parse_url($_SERVER['REQUEST_URI']);
     $query_params = [];
     if (isset($uri['query'])) {
         parse_str($uri['query'], $query_params);
+    }
+
+    // 处理直播源请求
+    if (isset($query_params['live'])) {
+        if ($query_params['token'] === $Config['live_token']) {
+            header('Content-Type: text/plain');
+            $filePath = ($query_params['live'] === 'txt') ? $liveDir . 'tv.txt' : 
+                        ($query_params['live'] === 'm3u' ? $liveDir . 'tv.m3u' : null);
+        
+            if ($filePath && file_exists($filePath)) {
+                // 如果是 m3u 类型，替换 tvg-url
+                if ($query_params['live'] === 'm3u') {
+                    $content = file_get_contents($filePath);
+                    $tvgUrl = $serverUrl . dirname($_SERVER['SCRIPT_NAME']) . '/t.xml.gz';
+                    $content = preg_replace('/(#EXTM3U x-tvg-url=")(.*?)(")/', '$1' . $tvgUrl . '$3', $content);
+                    echo $content;
+                } else {
+                    // 直接输出 txt 内容
+                    echo file_get_contents($filePath);
+                }
+            } else {
+                echo "文件不存在或无效的 live 类型";
+            }
+        } else {
+            echo "无效的 token";
+        }
+        exit;
     }
 
     // 获取并清理频道名称，繁体转换成简体

@@ -24,9 +24,14 @@ if($Config['interval_time']!=0) {
     }
 }
 
-// 过渡到新的 md5 密码
-if (!preg_match('/^[a-f0-9]{32}$/i', $Config['manage_password'])) {
-    $Config['manage_password'] = md5($Config['manage_password']);
+// 过渡到新的 md5 密码并生成 live_token（如果不存在或为空）
+if (!preg_match('/^[a-f0-9]{32}$/i', $Config['manage_password']) || empty($Config['live_token'])) {
+    if (!preg_match('/^[a-f0-9]{32}$/i', $Config['manage_password'])) {
+        $Config['manage_password'] = md5($Config['manage_password']);
+    }
+    if (empty($Config['live_token'])) {
+        $Config['live_token'] = substr(bin2hex(random_bytes(5)), 0, 10);  // 生成 10 位随机字符串
+    }
     file_put_contents($config_path, json_encode($Config, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
 }
 
@@ -84,7 +89,7 @@ function updateConfig() {
 
     // 获取和过滤表单数据
     $config_keys = array_keys(array_filter($_POST, function($key) {
-        return $key !== 'update';
+        return $key !== 'update_config';
     }, ARRAY_FILTER_USE_KEY));
     
     foreach ($config_keys as $key) {
@@ -135,7 +140,7 @@ function updateConfig() {
     $memcached_set = true;
     
     // 检查 Memcache 有效性
-    if (!empty($Config['cache_time']) && (!class_exists('Memcached') || !(new Memcached())->connect('localhost', 11211))) {
+    if (!empty($Config['cache_time']) && (!class_exists('Memcached') || !(new Memcached())->addServer('localhost', 11211))) {
         $Config['cache_time'] = 0;
         $memcached_set = false;
     }
@@ -256,22 +261,17 @@ try {
                 $channels = $db->query("SELECT DISTINCT channel FROM epg_data ORDER BY channel ASC")->fetchAll(PDO::FETCH_COLUMN);
                 $channelBindEpg = $Config['channel_bind_epg'] ?? [];
                 $xmlUrls = $Config['xml_urls'];
-                $filteredUrls = array_values(array_filter(array_map(function($url) {
-                    $url = trim($url);
-                    if (preg_match('/^#?\s*tvmao/', $url)) { return '';}
-                    $url = (strpos($url, '#') === 0)
-                        ? preg_replace('/^([^#]*#[^#]*)#.*$/', '$1', $url)
-                        : preg_replace('/#.*$/', '', $url);
-                    return trim($url);
-                }, $xmlUrls)));
                 $dbResponse = array_map(function($epgSrc) use ($channelBindEpg) {
-                    $cleanEpgSrc = trim(preg_replace('/^\s*#\s*/', '', $epgSrc));
+                    $cleanEpgSrc = trim(explode('#', ltrim($epgSrc, '# '))[0]);
                     $isInactive = strpos(trim($epgSrc), '#') === 0;
                     return [
                         'epg_src' => ($isInactive ? '【已停用】' : '') . $cleanEpgSrc,
                         'channels' => $channelBindEpg[$cleanEpgSrc] ?? ''
                     ];
-                }, $filteredUrls);
+                }, array_filter($xmlUrls, function($epgSrc) {
+                    // 去除空行和包含 "tvmao" 的行
+                    return !empty(trim($epgSrc)) && strpos($epgSrc, 'tvmao') === false;
+                }));
                 $dbResponse = array_merge(
                     array_filter($dbResponse, function($item) { return strpos($item['epg_src'], '【已停用】') === false; }),
                     array_filter($dbResponse, function($item) { return strpos($item['epg_src'], '【已停用】') !== false; })
@@ -355,11 +355,12 @@ try {
                 break;
 
             case 'parse_source_info':
+                // 解析直播源
                 $errorLog = do_parse_source_info();
                 if ($errorLog) {
-                    $dbResponse = ['success' => false, 'message' => $errorLog];
+                    $dbResponse = ['success' => 'part', 'message' => $errorLog];
                 } else {
-                    $dbResponse = ['success' => true];
+                    $dbResponse = ['success' => 'full'];
                 }
                 break;
 
@@ -421,13 +422,15 @@ try {
                     if ($file === '.' || $file === '..') continue;
                     $fileRltPath = $parentRltPath . $file;
                     if (!array_filter($urls, function($url) use ($fileRltPath) {
-                        return stripos($url, $fileRltPath) !== false;
+                        $url = trim(explode('#', ltrim($url, '# '))[0]); // 处理注释
+                        $urlmd5 = md5(urlencode($url)); // 计算 md5
+                        return stripos($fileRltPath, $url) !== false || stripos($fileRltPath, $urlmd5) !== false;
                     })) {
                         if (@unlink($liveFileDir . $file)) { // 如果没有匹配的 URL，删除文件
                             $deletedCount++;
                         }
                     }
-                }                
+                }
                 $dbResponse = ['success' => true, 'message' => "共清理了 $deletedCount 个文件"];
                 break;
 
@@ -581,7 +584,7 @@ try {
                 $fileName = $file['name'];
                 $uploadFile = $liveFileDir . $fileName;
                 if (move_uploaded_file($file['tmp_name'], $uploadFile)) {
-                    $liveSourceUrl = $serverUrl . dirname($_SERVER['SCRIPT_NAME']) . '/data/live/file/' . basename($fileName);
+                    $liveSourceUrl = '/data/live/file/' . basename($fileName);
                     $sourceFilePath = $liveDir . 'source.txt';
                     $currentContent = file_get_contents($sourceFilePath);
                     if (!file_exists($sourceFilePath) || strpos($currentContent, $liveSourceUrl) === false) {
@@ -623,7 +626,7 @@ try {
                     fclose($file);
 
                     // 重新生成 M3U 和 TXT 文件
-                    generateLiveFiles($liveDir . 'channels.csv', $serverUrl . dirname($_SERVER['SCRIPT_NAME']), $liveDir);
+                    generateLiveFiles($liveDir . 'channels.csv', $liveDir);
                     
                     echo json_encode(['success' => true]);
                 } else {

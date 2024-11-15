@@ -23,5 +23,6 @@
         "password": "phpepg"
     },
     "live_source_auto_sync": 0,
+    "live_token": "",
     "manage_password": ""
 }

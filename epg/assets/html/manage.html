@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
     <title>管理配置</title>
-    <link rel="stylesheet" type="text/css" href="assets/css/manage.css?ver=20241114">
+    <link rel="stylesheet" type="text/css" href="assets/css/manage.css?ver=20241115">
 </head>
 <body>
 <div class="container">
@@ -69,7 +69,7 @@
             </div>
         </div>
         <br>
-        <div class="tooltip">
+        <div class="tooltip" style="display: inline-block;">
             <input id="update_config" name="update_config" type="submit" value="保存配置">
             <span class="tooltiptext">快捷键：Ctrl+S</span>
         </div>
@@ -273,15 +273,15 @@
         <br>
         
         <!-- 中间按钮区 -->
-        <div class="button-container" style="width: 82%;">
+        <div class="button-container" style="width: 85%;">
             <input type="file" name="liveSourceFile" id="liveSourceFile" style="display: none;" accept=".m3u, .txt">
             <button id="uploadSourceBtn" onclick="document.getElementById('liveSourceFile').click()">上传源</button>
             <div class="tooltip" style="width: 120%;">
                 <button id="parseSourceInfoBtn" onclick="parseSourceInfo()">解析源</button>
                 <span class="tooltiptext">在线源解析较慢</span>
             </div>
-            <button id="copyM3UBtn" onclick="copyText(`<?php echo $serverUrl . dirname($_SERVER['SCRIPT_NAME']) . '/data/live/tv.m3u'; ?>`)">m3u地址</button>
-            <button id="copyTXTBtn" onclick="copyText(`<?php echo $serverUrl . dirname($_SERVER['SCRIPT_NAME']) . '/data/live/tv.txt'; ?>`)">txt地址</button>            
+            <button id="copyM3UBtn" onclick="copyText(`<?php echo $serverUrl . dirname($_SERVER['SCRIPT_NAME']) . '/?live=m3u&token=' . $Config['live_token']; ?>`)">m3u地址</button>
+            <button id="copyTXTBtn" onclick="copyText(`<?php echo $serverUrl . dirname($_SERVER['SCRIPT_NAME']) . '/?live=txt&token=' . $Config['live_token']; ?>`)">txt地址</button>            
             <div class="tooltip" style="width: 120%;">
                 <button id="toggleLiveSourceSyncBtn" onclick="toggleLiveSourceSync()">
                     同步:<?php echo (isset($Config['live_source_auto_sync']) && $Config['live_source_auto_sync'] == 1 ? '是' : '否'); ?>
@@ -360,7 +360,7 @@
                 </select>
             </div>
             <div class="column">
-                <div class="tooltip" style="display: flex;">
+                <div class="tooltip">
                     <label for="tvmao_default" title="">补充预告<span style="vertical-align: super;">*</span>：</label>
                     <select id="tvmao_default" name="tvmao_default" required>
                         <option value="1" <?php if (isset($Config['tvmao_default']) && $Config['tvmao_default'] == 1) echo 'selected'; ?>>是</option>
@@ -370,7 +370,7 @@
                 </div>
             </div>
             <div class="column">
-                <div class="tooltip" style="display: flex;">
+                <div class="tooltip">
                     <label for="all_chs" title="">全转简中<span style="vertical-align: super;">*</span>：</label>
                     <select id="all_chs" name="all_chs" required>
                         <option value="1" <?php if (isset($Config['all_chs']) && $Config['all_chs'] == 1) echo 'selected'; ?>>是</option>
@@ -384,16 +384,13 @@
         <!-- 第三行 -->
         <div class="row">
             <div class="column">
-                <div class="tooltip" style="display: flex;">
-                    <label for="cache_time">缓存时间 (小时)：</label>
+                <div class="tooltip">
+                    <label for="cache_time">缓存时间<span style="vertical-align: super;">*</span>(小时)：</label>
                     <select id="cache_time" name="cache_time" required>
-                        <?php for ($h = 0; $h < 24; $h++): ?>
-                            <option value="<?php echo $h; ?>" <?php echo floor($Config['cache_time'] / 3600) == $h ? 'selected' : ''; ?>>
-                                <?php echo $h; ?>
-                            </option>
+                        <?php for ($h = 0; $h < 24; $h++): ?><option value="<?php echo $h; ?>" <?php echo $Config['cache_time'] / 3600 == $h ? 'selected' : ''; ?>><?php echo $h; ?></option>
                         <?php endfor; ?>
                     </select>
-                    <span class="tooltiptext">Mecached 缓存</span>
+                    <span class="tooltiptext">Memcached 缓存</span>
                 </div>
             </div>
             <div class="column">
@@ -426,7 +423,7 @@
         </div>
 
         <!-- 其他设置 -->
-        <label for="gen_list_text">仅生成以下频道：</label>
+        <label for="gen_list_text">仅生成以下频道数据：</label>
         <select id="gen_list_enable" name="gen_list_enable" style="width: 50px; margin-right: 0px;" required>
             <option value="1" <?php if (isset($Config['gen_list_enable']) && $Config['gen_list_enable'] == 1) echo 'selected'; ?>>是</option>
             <option value="0" <?php if (!isset($Config['gen_list_enable']) || $Config['gen_list_enable'] == 0) echo 'selected'; ?>>否</option>
@@ -441,6 +438,6 @@
         <button id="saveConfig" type="button" onclick="saveAndUpdateConfig();">保存配置</button>
     </div>
 </div>
-<script src="assets/js/manage.js?ver=20241114"></script>
+<script src="assets/js/manage.js?ver=20241115"></script>
 </body>
 </html>

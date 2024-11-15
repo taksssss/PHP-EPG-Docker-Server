@@ -29,19 +29,6 @@ cat <<EOF >> /etc/apache2/httpd.conf
 <Location "/epg/data/icon">
     Require all granted
 </Location>
-
-# Block access to /epg/data/live except for tv.m3u and tv.txt
-<Directory "/htdocs/epg/data/live">
-    Require all denied
-</Directory>
-
-<Files "tv.m3u">
-    Require all granted
-</Files>
-
-<Files "tv.txt">
-    Require all granted
-</Files>
 EOF
 
 # Change Server Admin, Name, Document Root

@@ -98,14 +98,6 @@ select[id="interval_hour"]{
 .button-container a:hover, .button-container button:hover {
     background-color: #0b7dda;
 }
-button[id="m3uMatchIcons"], button[id="deleteUnusedIcons"],
-button[id="uploadAllIcons"], button[id="showAllIcons"] {
-    width: auto;
-    height: 36px;
-    display: flex;
-    align-items: center;
-    font-size: 14px;
-}
 input[type="submit"],
 .button-container button[name="logoutbtn"],
 .modal-content button {
@@ -117,8 +109,14 @@ input[type="submit"],
     border-radius: 5px;
     cursor: pointer;
     box-sizing: border-box;
+    align-items: center;
     font-size: 16px;
     font-weight: bold;
+}
+button[id="deleteUnusedIcons"], button[id="uploadAllIcons"], 
+button[id="showAllIcons"] {
+    display: flex;
+    height: 36px;
 }
 input[type="submit"]:hover,
 .button-container button[name="logoutbtn"]:hover,
@@ -312,7 +310,7 @@ input[type="text"] {
 /* 工具提示容器 */
 .tooltip {
     position: sticky;
-    display: inline-block;
+    display: flex;
     width: 100%;
 }
 /* 工具提示文本 */

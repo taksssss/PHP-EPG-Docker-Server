@@ -44,7 +44,7 @@ try {
     if (!$is_sqlite) {
         // 如果是 MySQL 连接失败，则修改配置为 SQLite 并提示用户
         $Config['db_type'] = 'sqlite';
-        file_put_contents($config_path, json_encode($Config, JSON_PRETTY_PRINT));
+        file_put_contents($config_path, json_encode($Config, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
 
         echo '<p>MySQL 配置错误，已修改为 SQLite。<br>5 秒后自动刷新...</p>';
         echo '<meta http-equiv="refresh" content="5">';
@@ -287,7 +287,7 @@ function insertDataToDatabase($channelsData, $db, $sourceUrl, $replaceFlag = tru
 
 // 解析 txt、m3u 直播源，并生成直播列表（包含分组、地址等信息）
 function do_parse_source_info() {
-    global $liveDir, $serverUrl;
+    global $liveDir, $liveFileDir;
 
     // 频道数据模糊匹配函数
     function dbChNameMatch($channelName) {
@@ -321,12 +321,19 @@ function do_parse_source_info() {
         $url = trim($url);
     
         // 获取 URL 内容
-        $urlContent = downloadData($url, 5);
+        $urlContent = (stripos($url, '/data/live/file/') !== false) 
+            ? @file_get_contents(__DIR__ . $url) 
+            : downloadData($url, 5);
+        $fileName = md5(urlencode($url)) . '.txt';  // 用 MD5 对 URL 进行命名
+        $localFilePath = $liveFileDir . '/' . $fileName;
+        
         if (!$urlContent || stripos($urlContent, 'not found') !== false) {
-            $errorLog .= "$url<br>";
-            continue;
+            $urlContent = file_exists($localFilePath) ? file_get_contents($localFilePath) : '';
+            if (!$urlContent) { $errorLog .= "$url<br>"; continue; }
+        } else if (stripos($url, '/data/live/file/') === false) { // 检测是否上传的文件
+            file_put_contents($localFilePath, $urlContent);
         }
-    
+        
         $lines = explode("\n", $urlContent);
     
         // 处理 M3U 格式的直播源
@@ -349,7 +356,7 @@ function do_parse_source_info() {
                             'groupTitle' => preg_match('/group-title="([^"]+)"/', $channelInfo, $match) ? trim($groupPrefix . $match[1]) : '',
                             'channelName' => $channelName,
                             'streamUrl' => $streamUrl,
-                            'iconUrl' => iconUrlMatch(cleanChannelName($channelName)),
+                            'iconUrl' => iconUrlMatch(cleanChannelName($channelName)) ?? (preg_match('/tvg-logo="([^"]+)"/', $channelInfo, $match) ? $match[1] : ''),
                             'tvgId' => preg_match('/tvg-id="([^"]+)"/', $channelInfo, $match) ? $match[1] : '',
                             'tvgName' => preg_match('/tvg-name="([^"]+)"/', $channelInfo, $match) ? $match[1] : '',
                         ];
@@ -388,14 +395,14 @@ function do_parse_source_info() {
     fclose($csvFile);
 
     // 执行文件生成
-    generateLiveFiles($csvFilePath, $serverUrl . dirname($_SERVER['SCRIPT_NAME']), $liveDir);
+    generateLiveFiles($csvFilePath, $liveDir);
 
     return $errorLog;
 }
 
 // 生成 M3U 和 TXT 文件
-function generateLiveFiles($csvFilePath, $epgUrl, $liveDir) {
-    $m3uContent = "#EXTM3U x-tvg-url=\"{$epgUrl}/t.xml.gz\"\n";
+function generateLiveFiles($csvFilePath, $liveDir) {
+    $m3uContent = "#EXTM3U x-tvg-url=\"\"\n";
     $groups = [];
     $csvFile = fopen($csvFilePath, 'r');
     fgetcsv($csvFile);  // 跳过表头

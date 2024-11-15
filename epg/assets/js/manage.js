@@ -532,7 +532,7 @@ function copyText(text) {
     input.select();
     document.execCommand('copy');
     document.body.removeChild(input);
-    showMessageModal(`<a href="${text}" download style="color: blue; text-decoration: none;">${text}</a><br>地址已复制，可直接粘贴。`);
+    showMessageModal(`<a href="${text}" target="_blank" style="color: blue; text-decoration: none;">${text}</a><br>地址已复制，可直接粘贴。`);
 }
 
 // 搜索频道
@@ -828,10 +828,10 @@ function parseSourceInfo() {
     .then(response => response.json())
     .then(data => {
         showModal('live');
-        if (data.success) {
+        if (data.success == 'full') {
             showMessageModal('解析成功<br>已生成 M3U 及 TXT 文件');
-        } else {
-            showMessageModal('已生成 M3U 及 TXT 文件<br>以下源解析失败<br>' + data.message);
+        } else if (data.success == 'part') {
+            showMessageModal('已生成 M3U 及 TXT 文件<br>部分源解析失败<br>' + data.message);
         }
     })
     .catch(error => showMessageModal('解析过程中发生错误：' + error));
