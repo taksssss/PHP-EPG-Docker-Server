@@ -224,7 +224,7 @@ input[type="text"] {
     height: 460px;
 }
 .table-container[id="live-source-table-container"] {
-    height: 66%;
+    height: 410px;
 }
 #logTable, #channelMatchTable, #channelTable, 
 #iconTable, #channelBindEPGTable, #liveSourceTable {
@@ -335,4 +335,32 @@ input[type="text"] {
 .tooltip:hover .tooltiptext {
     visibility: visible;
     opacity: 1;
+}
+
+/* 分页控件样式 */
+#paginationContainer button {
+    width: 35px;
+    height: 25px;
+    margin: 0 2px;
+    padding: 0 0;
+    color: #888888;
+    border: 1px solid #ccc;
+    background-color: #f4f4f4;
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 14px;
+}
+#paginationContainer button.active {
+    background-color: #007bff;
+    color: white;
+    border-color: #0056b3;
+}
+#paginationContainer button:hover {
+    color: white;
+    background-color: #007bffb5;
+}
+#paginationContainer button[disabled] {
+    background-color: #e0e0e0;
+    color: #bbb;
+    cursor: not-allowed;
 }

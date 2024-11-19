@@ -190,9 +190,48 @@ function findCurrentProgramme($programmes) {
     return null;
 }
 
+// 处理直播源请求
+function liveFetchHandler($query_params) {
+    global $Config, $liveDir, $serverUrl, $liveFileDir;
+
+    if ($query_params['token'] === $Config['live_token']) {
+        header('Content-Type: text/plain');
+
+        // 如果存在 'url' 参数
+        if (!empty($query_params['url'])) {
+            $url = $query_params['url'];
+            $filePath = (stripos($url, '/data/live/file/') !== false) 
+                ? $liveFileDir . basename($url)
+                : $liveFileDir . '/' . md5(urlencode($url)) . '.txt';
+
+            echo file_exists($filePath) ? file_get_contents($filePath) : "文件不存在";
+            exit;
+        }
+
+        // 处理 'live' 参数
+        $filePath = $liveDir . (($query_params['live'] === 'txt') ? 'tv.txt' : ($query_params['live'] === 'm3u' ? 'tv.m3u' : ''));
+
+        if (file_exists($filePath)) {
+            $content = file_get_contents($filePath);
+            $tvgUrl = $serverUrl . dirname($_SERVER['SCRIPT_NAME']) . ($query_params['live'] === 'm3u' ? '/t.xml.gz' : '/');
+            if ($query_params['live'] === 'm3u') {
+                $content = preg_replace('/(#EXTM3U x-tvg-url=")(.*?)(")/', '$1' . $tvgUrl . '$3', $content, 1);
+            } elseif ($query_params['live'] === 'txt') {
+                $content = preg_replace('/#genre#/', '#genre#,' . $tvgUrl, $content, 1);
+            }
+            echo $content;
+        } else {
+            echo "文件不存在或无效的 live 类型";
+        }        
+    } else {
+        echo "无效的 token";
+    }
+    exit;
+}
+
 // 处理请求
 function fetchHandler() {
-    global $init, $db, $Config, $liveDir, $serverUrl;
+    global $init, $db, $Config;
 
     $uri = parse_url($_SERVER['REQUEST_URI']);
     $query_params = [];
@@ -200,31 +239,9 @@ function fetchHandler() {
         parse_str($uri['query'], $query_params);
     }
 
-    // 处理直播源请求
+    // 处理直播源请求    
     if (isset($query_params['live'])) {
-        if ($query_params['token'] === $Config['live_token']) {
-            header('Content-Type: text/plain');
-            $filePath = ($query_params['live'] === 'txt') ? $liveDir . 'tv.txt' : 
-                        ($query_params['live'] === 'm3u' ? $liveDir . 'tv.m3u' : null);
-        
-            if ($filePath && file_exists($filePath)) {
-                // 如果是 m3u 类型，替换 tvg-url
-                if ($query_params['live'] === 'm3u') {
-                    $content = file_get_contents($filePath);
-                    $tvgUrl = $serverUrl . dirname($_SERVER['SCRIPT_NAME']) . '/t.xml.gz';
-                    $content = preg_replace('/(#EXTM3U x-tvg-url=")(.*?)(")/', '$1' . $tvgUrl . '$3', $content);
-                    echo $content;
-                } else {
-                    // 直接输出 txt 内容
-                    echo file_get_contents($filePath);
-                }
-            } else {
-                echo "文件不存在或无效的 live 类型";
-            }
-        } else {
-            echo "无效的 token";
-        }
-        exit;
+        liveFetchHandler($query_params);
     }
 
     // 获取并清理频道名称，繁体转换成简体

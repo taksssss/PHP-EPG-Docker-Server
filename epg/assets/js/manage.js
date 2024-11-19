@@ -1,8 +1,8 @@
 document.addEventListener('DOMContentLoaded', function() {
     // 页面加载时预加载数据，减少等待时间
+    showModal('live', $popup = false);
     showModal('channel', $popup = false);
     showModal('update', $popup = false);
-    showModal('live', $popup = false);    
 });
 
 // 保存配置
@@ -286,7 +286,7 @@ function updateLogTable(logData) {
     logData.forEach(log => {
         var row = document.createElement("tr");
         row.innerHTML = `
-            <td>${new Date(log.timestamp).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}</td>
+            <td>${new Date(log.timestamp).toLocaleString('zh-CN')}</td>
             <td>${log.log_message}</td>
         `;
         logTableBody.appendChild(row);
@@ -298,7 +298,13 @@ function updateLogTable(logData) {
 // 更新 cron 日志内容
 function updateCronLogContent(logData) {
     var logContent = document.getElementById("cronLogContent");
-    logContent.value = logData.map(log => `[${new Date(log.timestamp).toLocaleString('zh-CN', {month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}] ${log.log_message}`).join('\n');
+    logContent.value = logData.map(log => 
+        `[${new Date(log.timestamp).toLocaleString('zh-CN', {
+            month: '2-digit', day: '2-digit', 
+            hour: '2-digit', minute: '2-digit', second: '2-digit', 
+            hour12: false 
+        })}] ${log.log_message}`)
+    .join('\n');
     logContent.scrollTop = logContent.scrollHeight;
 }
 
@@ -387,46 +393,104 @@ function updateGenList(genData) {
     }
 }
 
-// 显示直播源页面
-function updateLiveSourceModal(data) {
-    const sourceUrlTextarea = document.getElementById('sourceUrlTextarea');
-    if (data.source_content) {
-        sourceUrlTextarea.value = data.source_content;
-    }
-
+// 显示指定页码的数据
+function displayPage(data, page) {
     const tableBody = document.querySelector('#liveSourceTable tbody');
     tableBody.innerHTML = ''; // 清空表格内容
 
-    if (data.channels && Array.isArray(data.channels)) {
-        data.channels.forEach(item => {
-            // 创建单元格并填充数据
-            const fields = ['group', 'name', 'url', 'logo', 'tvg_id', 'tvg_name'];
-            const row = document.createElement('tr');
+    const start = (page - 1) * rowsPerPage;
+    const end = Math.min(start + rowsPerPage, data.length);
 
-            // 添加序号列
-            const indexCell = document.createElement('td');
-            indexCell.textContent = tableBody.children.length + 1;  // 序号
-            row.appendChild(indexCell);
-
-            // 添加其他列并设置为可编辑
-            fields.forEach(field => {
-                const cell = document.createElement('td');
-                cell.textContent = item[field];
-                cell.setAttribute('contenteditable', 'true');
-                row.appendChild(cell);
-            });
-
-            tableBody.appendChild(row);
-        });
-    } else {
-        // 如果没有数据，显示一行空白行
-        const row = document.createElement('tr');
-        const cell = document.createElement('td');
-        cell.colSpan = 6;
-        cell.textContent = '暂无数据';
-        row.appendChild(cell);
-        tableBody.appendChild(row);
+    if (data.length === 0) {
+        tableBody.innerHTML = '<tr><td colspan="7">暂无数据</td></tr>';
+        return;
     }
+
+    // 列索引和对应字段的映射
+    const columns = ['group', 'name', 'url', 'logo', 'tvg_id', 'tvg_name'];
+
+    // 填充当前页的表格数据
+    data.slice(start, end).forEach((item, index) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${start + index + 1}</td>
+            ${columns.map(col => `<td contenteditable="true">${item[col] || ''}</td>`).join('')}
+        `;
+
+        // 为每个单元格添加事件监听器
+        row.querySelectorAll('td[contenteditable="true"]').forEach((cell, columnIndex) => {
+            cell.addEventListener('input', () => {
+                const dataIndex = (currentPage - 1) * rowsPerPage + index;
+                if (dataIndex < allLiveData.length) {
+                    allLiveData[dataIndex][columns[columnIndex]] = cell.textContent.trim();
+                }
+            });
+        });
+
+        tableBody.appendChild(row);
+    });
+}
+
+// 创建分页控件
+function setupPagination(data) {
+    const paginationContainer = document.getElementById('paginationContainer');
+    paginationContainer.innerHTML = ''; // 清空分页容器
+
+    const totalPages = Math.ceil(data.length / rowsPerPage);
+    document.getElementById('live-source-table-container').style.height = totalPages <= 1 ? "410px" : "375px";
+    if (totalPages <= 1) return;
+
+    const maxButtons = 11; // 总显示按钮数，包括“<”和“>”
+    const pageButtons = maxButtons - 2; // 除去 "<" 和 ">" 的按钮数
+
+    // 创建按钮
+    const createButton = (text, page, isActive = false, isDisabled = false) => {
+        const button = document.createElement('button');
+        button.textContent = text;
+        button.className = isActive ? 'active' : '';
+        button.disabled = isDisabled;
+        button.onclick = () => {
+            if (!isDisabled) {
+                currentPage = page;
+                displayPage(data, currentPage); // 更新页面显示内容
+                setupPagination(data); // 更新分页控件
+            }
+        };
+        return button;
+    };
+
+    // 前部
+    paginationContainer.appendChild(createButton('<', currentPage - 1, false, currentPage === 1));
+    paginationContainer.appendChild(createButton(1, 1, currentPage === 1));
+    if (currentPage > 5 && totalPages > pageButtons) paginationContainer.appendChild(createButton('...', null, false, true));
+
+    // 中部
+    let startPage = Math.max(2, currentPage - Math.floor(pageButtons / 2) + 2);
+    let endPage = Math.min(totalPages - 1, currentPage + Math.floor(pageButtons / 2) - 2);
+    if (currentPage <= 5) { startPage = 2; endPage = Math.min(pageButtons - 2, totalPages - 1); }
+    else if (currentPage >= totalPages - 4) { startPage = Math.max(totalPages - pageButtons + 3, 2); endPage = totalPages - 1; }
+    for (let i = startPage; i <= endPage; i++) {
+        paginationContainer.appendChild(createButton(i, i, currentPage === i));
+    }
+
+    // 后部
+    if (currentPage < totalPages - 4 && totalPages > pageButtons) paginationContainer.appendChild(createButton('...', null, false, true));
+    paginationContainer.appendChild(createButton(totalPages, totalPages, currentPage === totalPages));
+    paginationContainer.appendChild(createButton('>', currentPage + 1, false, currentPage === totalPages));
+}
+
+let currentPage = 1; // 当前页码
+const rowsPerPage = 100; // 每页显示的行数
+let allLiveData = []; // 用于存储直播源数据
+
+// 更新模态框内容并初始化分页
+function updateLiveSourceModal(data) {
+    document.getElementById('sourceUrlTextarea').value = data.source_content || '';
+    const channels = Array.isArray(data.channels) ? data.channels : [];
+    allLiveData = channels;  // 将所有数据保存在全局变量中
+    currentPage = 1; // 重置为第一页
+    displayPage(channels, currentPage); // 显示第一页数据
+    setupPagination(channels); // 初始化分页控件
 }
 
 // 上传直播源文件
@@ -491,16 +555,12 @@ document.getElementById('sourceUrlTextarea').addEventListener('blur', function()
 
 // 保存编辑后的直播源信息
 function saveLiveSourceInfo() {
-    const data = Array.from(document.querySelectorAll('#liveSourceTable tbody tr')).map(row => (
-        [...row.querySelectorAll('td')].slice(1, 7).map(cell => cell.textContent)
-    ));
-
     fetch('manage.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
             save_source_info: 'true',
-            content: JSON.stringify(data)
+            content: JSON.stringify(allLiveData)
         })
     })
     .then(response => response.json())
@@ -532,7 +592,10 @@ function copyText(text) {
     input.select();
     document.execCommand('copy');
     document.body.removeChild(input);
-    showMessageModal(`<a href="${text}" target="_blank" style="color: blue; text-decoration: none;">${text}</a><br>地址已复制，可直接粘贴。`);
+    const fileName = text.includes('live=txt') ? 'tv.txt' : text.includes('live=m3u') ? 'tv.m3u' : 'file.txt';
+    showMessageModal(`${text}<br>地址已复制，可直接粘贴。&ensp;
+        <a href="${text}" target="_blank" style="color: blue; text-decoration: none;">查看&ensp;</a>
+        <a href="${text}" download="${fileName}" style="color: blue; text-decoration: none;">下载</a>`);
 }
 
 // 搜索频道
@@ -824,6 +887,8 @@ async function parseSource() {
 
 // 解析 txt、m3u 直播源，并生成直播列表（包含分组、地址等信息）
 function parseSourceInfo() {
+    showMessageModal("在线源解析较慢<br>请耐心等待");
+
     fetch('manage.php?parse_source_info=true')
     .then(response => response.json())
     .then(data => {
