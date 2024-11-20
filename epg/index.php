@@ -213,7 +213,7 @@ function liveFetchHandler($query_params) {
 
         if (file_exists($filePath)) {
             $content = file_get_contents($filePath);
-            $tvgUrl = $serverUrl . dirname($_SERVER['SCRIPT_NAME']) . ($query_params['live'] === 'm3u' ? '/t.xml.gz' : '/');
+            $tvgUrl = $serverUrl . ($query_params['live'] === 'm3u' ? '/t.xml.gz' : '/');
             if ($query_params['live'] === 'm3u') {
                 $content = preg_replace('/(#EXTM3U x-tvg-url=")(.*?)(")/', '$1' . $tvgUrl . '$3', $content, 1);
             } elseif ($query_params['live'] === 'txt') {

@@ -42,8 +42,8 @@ RUN apk --no-cache --update \
     php83-pecl-memcached \
     && mkdir /htdocs
 
-# 复制 ./epg 文件夹到 /htdocs
-COPY ./epg /htdocs/epg
+# 复制 ./epg 文件夹内容到 /htdocs
+COPY ./epg/* /htdocs
 
 EXPOSE 80 443
 

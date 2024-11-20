@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
     <title>管理配置</title>
-    <link rel="stylesheet" type="text/css" href="assets/css/manage.css?ver=20241119">
+    <link rel="stylesheet" type="text/css" href="assets/css/manage.css?ver=20241121">
 </head>
 <body>
 <div class="container">
@@ -269,7 +269,7 @@
             <textarea id="sourceUrlTextarea" placeholder="支持 .txt 和 .m3u 格式，光标离开后自动保存。
 地址前面加 # 可以临时停用，后面加 # 可以备注并作为分组前缀。快捷键： Ctrl+/  。
 示例：https://xxx.xx/xx.m3u #前缀1:
-可通过 http(s)://xxx.xx/epg/?live&token=xxx&url=xxx 访问单个直播源地址。" style="height: 102px;"></textarea>
+可通过 <?php echo $serverUrl . '/?live&token=' . $Config['live_token']; ?>&url=xxx 访问单个直播源地址。" style="height: 102px;"></textarea>
         </div>
         <br>
         
@@ -278,8 +278,8 @@
             <input type="file" name="liveSourceFile" id="liveSourceFile" style="display: none;" accept=".m3u, .txt">
             <button id="uploadSourceBtn" onclick="document.getElementById('liveSourceFile').click()">上传源</button>
             <button id="parseSourceInfoBtn" onclick="parseSourceInfo()">解析源</button>
-            <button id="copyM3UBtn" onclick="copyText(`<?php echo $serverUrl . dirname($_SERVER['SCRIPT_NAME']) . '/?live=m3u&token=' . $Config['live_token']; ?>`)">m3u地址</button>
-            <button id="copyTXTBtn" onclick="copyText(`<?php echo $serverUrl . dirname($_SERVER['SCRIPT_NAME']) . '/?live=txt&token=' . $Config['live_token']; ?>`)">txt地址</button>            
+            <button id="copyM3UBtn" onclick="copyText(`<?php echo $serverUrl . '/?live=m3u&token=' . $Config['live_token']; ?>`)">m3u地址</button>
+            <button id="copyTXTBtn" onclick="copyText(`<?php echo $serverUrl . '/?live=txt&token=' . $Config['live_token']; ?>`)">txt地址</button>            
             <div class="tooltip" style="width: 120%;">
                 <button id="toggleLiveSourceSyncBtn" onclick="toggleLiveSourceSync()">
                     同步:<?php echo (isset($Config['live_source_auto_sync']) && $Config['live_source_auto_sync'] == 1 ? '是' : '否'); ?>
@@ -441,6 +441,6 @@
         <button id="saveConfig" type="button" onclick="saveAndUpdateConfig();">保存配置</button>
     </div>
 </div>
-<script src="assets/js/manage.js?ver=20241119"></script>
+<script src="assets/js/manage.js?ver=20241121"></script>
 </body>
 </html>

@@ -21,12 +21,12 @@ cat <<EOF >> /etc/apache2/httpd.conf
     Require all granted
 </Directory>
 
-# Block access to /htdocs/epg/data except for /htdocs/epg/data/icon
-<Directory "/htdocs/epg/data">
+# Block access to /htdocs/data except for /htdocs/data/icon
+<Directory "/htdocs/data">
     Require all denied
 </Directory>
 
-<Location "/epg/data/icon">
+<Location "/data/icon">
     Require all granted
 </Location>
 EOF
@@ -65,11 +65,11 @@ sed -i "s/post_max_size = .*/post_max_size = 100M/" /etc/php83/php.ini
 
 echo 'Running cron.php and Apache'
 
-# Change ownership of /htdocs/epg
-chown -R apache:apache /htdocs/epg
+# Change ownership of /htdocs/
+chown -R apache:apache /htdocs/
 
 # Start cron.php
-cd /htdocs/epg
+cd /htdocs/
 su -s /bin/sh -c "php cron.php &" "apache"
 
 # Start Memcached and Apache

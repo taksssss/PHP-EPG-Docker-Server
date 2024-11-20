@@ -550,7 +550,7 @@ try {
                 $fileName = $file['name'];
                 $uploadFile = $iconDir . $fileName;
                 if ($file['type'] === 'image/png' && move_uploaded_file($file['tmp_name'], $uploadFile)) {
-                    $iconUrl = $serverUrl . dirname($_SERVER['SCRIPT_NAME']) . '/data/icon/' . basename($fileName);
+                    $iconUrl = $serverUrl . '/data/icon/' . basename($fileName);
                     echo json_encode(['success' => true, 'iconUrl' => $iconUrl]);
                 } else {
                     echo json_encode(['success' => false, 'message' => '文件上传失败']);

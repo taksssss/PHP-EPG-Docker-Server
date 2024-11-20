@@ -22,7 +22,9 @@ file_exists($iconList_path = __DIR__ . '/data/iconList.json') || file_put_conten
 ($iconList = json_decode(file_get_contents($iconList_path), true)) !== null || die("图标列表文件解析失败: " . json_last_error_msg());
 $iconListDefault = json_decode(file_get_contents(__DIR__ . '/assets/defaultIconList.json'), true) or die("默认图标列表文件解析失败: " . json_last_error_msg());
 $iconListMerged = array_merge($iconListDefault, $iconList); // 同一个键，以 iconList 的为准
-$serverUrl = (($_SERVER['HTTPS'] ?? '') === 'on' ? 'https://' : 'http://') . ($_SERVER['HTTP_HOST'] ?? '');
+$serverUrl = (($_SERVER['HTTPS'] ?? '') === 'on' ? 'https://' : 'http://') 
+            . ($_SERVER['HTTP_X_FORWARDED_HOST'] ?? $_SERVER['HTTP_HOST']) 
+            . rtrim(dirname($_SERVER['HTTP_X_ORIGINAL_URI'] ?? $_SERVER['REQUEST_URI']), '/');
 
 $Config = json_decode(file_get_contents($config_path), true) or die("配置文件解析失败: " . json_last_error_msg());
 
@@ -176,7 +178,7 @@ function logMessage(&$log_messages, $message) {
 function downloadJSONData($json_url, $db, &$log_messages, $channel_name, $replaceFlag = true) {
     $json_data = downloadData($json_url);
     $json_data = mb_convert_encoding($json_data, 'UTF-8', 'GBK');
-    if ($json_data !== false && stripos($json_data, '"data":[]') === false) {
+    if (!empty(json_decode($json_data, true)['data'])) {
         $db->beginTransaction();
         try {
             processJsonData($json_data, $db, $channel_name, $replaceFlag);
@@ -249,7 +251,8 @@ function insertDataToDatabase($channelsData, $db, $sourceUrl, $replaceFlag = tru
         $channelName = $channelData['channel_name'];
         foreach ($channelData['diyp_data'] as $date => $diypProgrammes) {
             // 检查是否全天只有一个节目
-            if (count(array_unique(array_column($diypProgrammes, 'title'))) === 1) {
+            if (count($title = array_unique(array_column($diypProgrammes, 'title'))) === 1) {
+                echo basename($sourceUrl) . "，${date}，${channelName}：全天仅《${title[0]}》，已过滤。<br>";
                 continue; // 跳过后续处理
             }
             // 生成 epg_diyp 数据内容

@@ -4,7 +4,7 @@ services:
     container_name: php-epg
     # 数据持久化
     volumes:
-      - ./epg/data:/htdocs/epg/data
+      - ./epg/data:/htdocs/data
     # 默认端口5678
     ports:
       - "5678:80"

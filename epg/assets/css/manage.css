@@ -339,28 +339,20 @@ input[type="text"] {
 
 /* 分页控件样式 */
 #paginationContainer button {
-    width: 35px;
-    height: 25px;
+    width: 25px;
+    height: 20px;
     margin: 0 2px;
     padding: 0 0;
-    color: #888888;
-    border: 1px solid #ccc;
-    background-color: #f4f4f4;
+    color: #aaaaaa;
+    background-color: #ffffff00;
     cursor: pointer;
-    border-radius: 4px;
-    font-size: 14px;
+    font-size: 15px;
 }
-#paginationContainer button.active {
-    background-color: #007bff;
-    color: white;
-    border-color: #0056b3;
-}
+#paginationContainer button.active, 
 #paginationContainer button:hover {
-    color: white;
-    background-color: #007bffb5;
+    color: rgb(0, 0, 0);
 }
 #paginationContainer button[disabled] {
-    background-color: #e0e0e0;
     color: #bbb;
     cursor: not-allowed;
 }
