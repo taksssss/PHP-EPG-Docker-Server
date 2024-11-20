@@ -43,7 +43,7 @@ RUN apk --no-cache --update \
     && mkdir /htdocs
 
 # 复制 ./epg 文件夹内容到 /htdocs
-COPY ./epg/* /htdocs
+COPY ./epg /htdocs
 
 EXPOSE 80 443
 
