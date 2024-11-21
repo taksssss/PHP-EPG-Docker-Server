@@ -60,7 +60,7 @@ $default_timezone = 'Asia/Shanghai'; // Asia/Shanghai
 // Root path for file manager
 // use absolute path of directory i.e: '/var/www/folder' or $_SERVER['DOCUMENT_ROOT'].'/folder'
 //make sure update $root_url in next section
-$root_path = $_SERVER['DOCUMENT_ROOT'].'/epg';
+$root_path = $_SERVER['DOCUMENT_ROOT'];
 
 // Root url for links in file manager.Relative to $http_host. Variants: '', 'path/to/subfolder'
 // Will not working if $root_path will be outside of server document root
