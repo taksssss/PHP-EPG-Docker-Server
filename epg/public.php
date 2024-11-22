@@ -251,7 +251,8 @@ function insertDataToDatabase($channelsData, $db, $sourceUrl, $replaceFlag = tru
         $channelName = $channelData['channel_name'];
         foreach ($channelData['diyp_data'] as $date => $diypProgrammes) {
             // 检查是否全天只有一个节目
-            if (count($title = array_unique(array_column($diypProgrammes, 'title'))) === 1) {
+            if (count($title = array_unique(array_column($diypProgrammes, 'title'))) === 1 
+                && preg_match('/节目|節目/u', $title[0])) {
                 echo basename($sourceUrl) . "，${date}，${channelName}：全天仅《${title[0]}》，已过滤。<br>";
                 continue; // 跳过后续处理
             }

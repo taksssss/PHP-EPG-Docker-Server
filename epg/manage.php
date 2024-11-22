@@ -395,11 +395,10 @@ try {
                     return parse_url($url, PHP_URL_PATH);
                 }, array_values($iconList));
                 $iconPath = __DIR__ . '/data/icon';
-                $parentRltPath = '/' . basename(__DIR__) . '/data/icon/';
                 $deletedCount = 0;
                 foreach (scandir($iconPath) as $file) {
                     if ($file === '.' || $file === '..') continue;
-                    $iconRltPath = $parentRltPath . $file;
+                    $iconRltPath = '/data/icon/' . $file;
                     if (!in_array($iconRltPath, $iconUrls)) {
                         if (@unlink($iconPath . '/' . $file)) {
                             $deletedCount++;

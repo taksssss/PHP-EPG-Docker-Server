@@ -33,10 +33,17 @@ PHP 实现的 EPG（电子节目指南）服务端， `Docker` 部署，自带�
 
 🌐 **界面设置**：包含简单易用的网页设置页面，便于操作和管理。
 
+> [!WARNING]
+> 
+> ⚠️ 项目访问路径从 `http://{服务器IP地址}:5678/epg/` 修改为 `http://{服务器IP地址}:5678/`（旧路径自动重定向）
+> 
+> ⚠️ 项目映射路径从 `-v ./data:/htdocs/epg/data` 修改为 `-v ./data:/htdocs/data`
+> 
+
 > [!TIP]
+> 
 > `xmltv` 用户搭配 [【一键生成】匹配 M3U 文件的 XML 节目单](https://www.right.com.cn/forum/thread-8392662-1-1.html) 使用。
 > 
-> ⚠️ 项目访问路径从 `http://{服务器IP地址}:5678/epg/` 修改为 `http://{服务器IP地址}:5678/`
 
 ![设置页面](/pic/management.png)
 

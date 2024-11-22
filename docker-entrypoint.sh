@@ -29,6 +29,13 @@ cat <<EOF >> /etc/apache2/httpd.conf
 <Location "/data/icon">
     Require all granted
 </Location>
+
+# Enable mod_rewrite for compatibility
+<Directory "/htdocs">
+    RewriteEngine On
+    RewriteCond %{REQUEST_URI} ^/epg/(.*)\$ 
+    RewriteRule ^epg/(.*)\$ /\$1 [L,R=301]
+</Directory>
 EOF
 
 # Change Server Admin, Name, Document Root

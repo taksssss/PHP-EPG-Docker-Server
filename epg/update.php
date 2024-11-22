@@ -9,6 +9,9 @@
  * GitHub: https://github.com/taksssss/EPG-Server
  */
 
+// 显示 favicon
+echo '<link rel="icon" href="assets/html/favicon.ico" type="image/x-icon">';
+
 // 引入公共脚本
 require_once 'public.php';
 
@@ -42,7 +45,8 @@ function deleteOldData($db, $keep_days, &$log_messages) {
 }
 
 // 格式化时间函数，同时转化为 UTC+8 时间
-function getFormatTime($time) {
+function getFormatTime($time, $overwrite_time_zone) {
+    $time = $overwrite_time_zone ? substr($time, 0, -5) . $overwrite_time_zone : $time;
     $time = str_replace(' ', '', $time);
     $date = DateTime::createFromFormat('YmdHisO', $time)->setTimezone(new DateTimeZone('+0800'));
     return [
@@ -199,10 +203,13 @@ function processXmlData($xml_url, $xml_data, $db, $gen_list) {
     $currentChannelProgrammes = [];
     $crossDayProgrammes = []; // 保存跨天的节目数据
     
+    // 修正 epg.pw 时区错误
+    $overwrite_time_zone = strpos($xml_data, 'epg.pw') !== false ? '+0800' : '';
+
     while ($reader->name === 'programme') {
         $programme = new SimpleXMLElement($reader->readOuterXML());
-        $start = getFormatTime((string)$programme['start']);
-        $end = getFormatTime((string)$programme['stop']);
+        $start = getFormatTime((string)$programme['start'], $overwrite_time_zone);
+        $end = getFormatTime((string)$programme['stop'], $overwrite_time_zone);
         $channelId = (string)$programme['channel'];
         $channelName = $channelNamesMap[$channelId] ?? null;
         $recordKey = $channelName . '-' . $start['date'];
@@ -333,13 +340,37 @@ function generateXmlFromEpgData($db, $include_future_only, $gen_list_mapping, &$
         $xmlWriter->endElement(); // channel
 
         // 写入该频道的所有节目数据
-        foreach ($programs as $program) {
+        foreach ($programs as $programIndex => &$program) {
             $data = json_decode($program['epg_diyp'], true);
-            foreach ($data['epg_data'] as $item) {
+            $dataCount = count($data['epg_data']);
+            $end_date = $program['date'];
+        
+            for ($index = 0; $index < $dataCount; $index++) {
+                $item = $data['epg_data'][$index];
+                $end_time = $item['end'];
+        
+                // 如果结束时间为 00:00，切换到第二天的日期
+                if ($end_time == '00:00') {
+                    $end_date = date('Ymd', strtotime($end_date . ' +1 day'));  // 切换日期
+        
+                    // 合并下一个节目
+                    if (isset($programs[$programIndex + 1])) {
+                        $nextData = json_decode($programs[$programIndex + 1]['epg_diyp'], true);
+                        $nextItem = $nextData['epg_data'][0] ?? null;
+    
+                        if ($nextItem && $nextItem['title'] == $item['title']) {
+                            $end_time = $nextItem['end'];
+                            array_splice($nextData['epg_data'], 0, 1); // 删除下一个节目的第一个项目
+                            $programs[$programIndex + 1]['epg_diyp'] = json_encode($nextData);
+                        }
+                    }
+                }
+        
+                // 写入当前节目
                 $xmlWriter->startElement('programme');
                 $xmlWriter->writeAttribute('channel', htmlspecialchars($originalChannel, ENT_XML1, 'UTF-8'));
                 $xmlWriter->writeAttribute('start', formatTime($program['date'], $item['start']));
-                $xmlWriter->writeAttribute('stop', formatTime($program['date'], $item['end']));
+                $xmlWriter->writeAttribute('stop', formatTime($end_date, $end_time));
                 $xmlWriter->startElement('title');
                 $xmlWriter->writeAttribute('lang', 'zh');
                 $xmlWriter->text(htmlspecialchars($item['title'], ENT_XML1, 'UTF-8'));
