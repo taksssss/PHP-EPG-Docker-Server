@@ -172,7 +172,8 @@ try {
             'get_update_logs', 'get_cron_logs', 'get_channel', 'get_epg_by_channel',
              'get_icon', 'get_channel_bind_epg', 'get_channel_match', 'get_gen_list',
              'get_live_data', 'parse_source_info', 'toggle_live_source_sync', 
-             'download_data', 'delete_unused_icons', 'delete_unused_source'
+             'download_data', 'delete_unused_icons', 'delete_unused_source',
+             'get_version_log'
         ];
         $action = key(array_intersect_key($_GET, array_flip($action_map))) ?: '';
 
@@ -431,6 +432,19 @@ try {
                     }
                 }
                 $dbResponse = ['success' => true, 'message' => "共清理了 $deletedCount 个文件"];
+                break;
+
+            case 'get_version_log':
+                // 获取更新日志
+                $url = 'https://gitee.com/taksssss/EPG-Server/raw/main/CHANGELOG.md';
+                $markdownContent = file_get_contents($url);
+                if ($markdownContent === false) {
+                    echo json_encode(['status' => 'error', 'message' => '无法获取版本日志']);
+                    return;
+                }
+                require_once 'assets/Parsedown.php';
+                $htmlContent = Parsedown::instance()->text($markdownContent);
+                $dbResponse = ['success' => true, 'content' => $htmlContent];
                 break;
 
             default:

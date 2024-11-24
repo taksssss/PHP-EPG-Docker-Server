@@ -1,5 +1,5 @@
+// 页面加载时预加载数据，减少等待时间
 document.addEventListener('DOMContentLoaded', function() {
-    // 页面加载时预加载数据，减少等待时间
     showModal('live', $popup = false);
     showModal('channel', $popup = false);
     showModal('update', $popup = false);
@@ -130,12 +130,14 @@ function handleKeydown(event) {
     }
 }
 
+// 格式化时间
 function formatTime(seconds) {
     const formattedHours = String(Math.floor(seconds / 3600)).padStart(2, '0');
     const formattedMinutes = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
     return `${formattedHours}:${formattedMinutes}`;
 }
 
+// 更新 MySQL 按钮状态
 function updateMySQLFields() {
     var dbType = document.getElementById('db_type').value;
     var isSQLite = (dbType === 'sqlite');
@@ -145,11 +147,12 @@ function updateMySQLFields() {
     document.getElementById('mysql_password').disabled = isSQLite;
 }
 
+// 显示消息模态框
 function showMessageModal(message) {
     var modal = document.getElementById("messageModal");
-    var modalMessage = document.getElementById("modalMessage");
+    var messageModalMessage = document.getElementById("messageModalMessage");
 
-    modalMessage.innerHTML = message;
+    messageModalMessage.innerHTML = message;
     modal.style.zIndex = 9999; // 确保 modal 在最上层
     modal.style.display = "block";
 
@@ -160,6 +163,23 @@ function showMessageModal(message) {
     };
 }
 
+// 显示版本更新日志模态框
+function showVersionLogModal(message) {
+    var modal = document.getElementById("VersionLogModal");
+    var VersionLogMessage = document.getElementById("VersionLogMessage");
+
+    VersionLogMessage.innerHTML = message;
+    modal.style.zIndex = 9999; // 确保 modal 在最上层
+    modal.style.display = "block";
+
+    window.onclick = function(event) {
+        if (event.target == modal) {
+            modal.style.display = "none";
+        }
+    };
+}
+
+// 显示模态框公共函数
 function showModal(type, $popup = true, $data = '') {
     var modal, logSpan, logContent;
     switch (type) {
@@ -265,6 +285,23 @@ function fetchData(endpoint, callback) {
         .catch(error => {
             console.error('Error fetching log:', error);
             callback([]);
+        });
+}
+
+// 显示版本更新日志
+function showVersionLog() {
+    fetch('manage.php?get_version_log=true')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showVersionLogModal(data.content);
+            } else {
+                showMessageModal(data.message || '获取版本日志失败');
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching version log:', error);
+            showMessageModal('无法获取版本日志，请稍后重试');
         });
 }
 

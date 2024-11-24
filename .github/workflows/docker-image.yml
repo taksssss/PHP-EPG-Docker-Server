@@ -11,6 +11,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v3  # 拉取代码
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
         
@@ -49,9 +52,16 @@ jobs:
           fi
           echo "TAG=${NEW_TAG}" >> $GITHUB_ENV # 将新标签保存为环境变量
 
+      - name: Update version in manage.html
+        run: |
+          VERSION=$(TZ="Asia/Shanghai" date +"v%Y%m%d")  # 获取北京时间，并转换为 v20241124 格式
+          sed -i "s|<span id=\"version\" style=\"color: #888;\">.*</span>|<span id=\"version\" style=\"color: #888;\">${VERSION}</span>|" epg/assets/html/manage.html
+
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
+          context: .
+          file: ./Dockerfile
           push: true
           platforms: linux/amd64, linux/arm64, linux/arm/v7
           tags: taksss/php-epg:${{ env.TAG }}, 

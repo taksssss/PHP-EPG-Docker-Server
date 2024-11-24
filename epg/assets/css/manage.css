@@ -194,6 +194,10 @@ input[type="text"] {
 .icon-modal-content {
     width: 700px;
 }
+.version-update-message {
+    height: 460px;
+    overflow: auto;
+}
 .close {
     color: #aaa;
     float: right;

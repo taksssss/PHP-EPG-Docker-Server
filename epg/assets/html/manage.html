@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
     <title>管理配置</title>
-    <link rel="stylesheet" type="text/css" href="assets/css/manage.css?ver=20241121">
+    <link rel="stylesheet" type="text/css" href="assets/css/manage.css?ver=20241124">
     <link rel="icon" href="assets/html/favicon.ico" type="image/x-icon">
 </head>
 <body>
@@ -89,18 +89,26 @@
 
 <!-- 底部显示 -->
 <div class="footer">
-    <a href="https://github.com/taksssss/EPG-Server" style="color: #888; text-decoration: none;">
+    <span id="version" style="color: #888;"></span>
+    <a onclick="showVersionLog();" style="color: #888; cursor: pointer;">更新日志</a>
+    <br>
+    <a href="https://github.com/taksssss/EPG-Server" target="_blank" style="color: #888; text-decoration: none;">
         https://github.com/taksssss/EPG-Server
     </a>
 </div>
 
-<!-- 配置消息模态框 -->
+<!-- 消息模态框 -->
 <div id="messageModal" class="modal">
     <div class="modal-content message-modal-content">
-        <p id="modalMessage"></p>
-        <div class="modal-footer">
-            <!-- 这里的按钮将在 JavaScript 中动态添加 -->
-        </div>
+        <p id="messageModalMessage"></p>
+    </div>
+</div>
+
+<!-- 版本更新日志模态框 -->
+<div id="VersionLogModal" class="modal">
+    <div class="modal-content version-update-modal-content">        
+        <h2>版本更新日志</h2>
+        <p id="VersionLogMessage" class="version-update-message"></p>
     </div>
 </div>
 
@@ -442,6 +450,6 @@
         <button id="saveConfig" type="button" onclick="saveAndUpdateConfig();">保存配置</button>
     </div>
 </div>
-<script src="assets/js/manage.js?ver=20241121"></script>
+<script src="assets/js/manage.js?ver=20241124"></script>
 </body>
 </html>
