@@ -384,7 +384,7 @@ try {
             case 'toggle_status':
                 // 切换状态
                 $toggleField = $_GET['toggle_button'] === 'toggleLiveSourceSyncBtn' ? 'live_source_auto_sync'
-                            : $_GET['toggle_button'] === 'toggleLiveChannelNameProcessBtn' ? 'live_channel_name_process' : '';
+                            : ($_GET['toggle_button'] === 'toggleLiveChannelNameProcessBtn' ? 'live_channel_name_process' : '');
                 $currentStatus = isset($Config[$toggleField]) && $Config[$toggleField] == 1 ? 1 : 0;
                 $newStatus = ($currentStatus == 1) ? 0 : 1;
                 $Config[$toggleField] = $newStatus;
