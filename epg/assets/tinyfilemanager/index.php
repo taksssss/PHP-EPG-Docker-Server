@@ -94,7 +94,7 @@ $allowed_upload_extensions = '';
 // Favicon path. This can be either a full url to an .PNG image, or a path based on the document root.
 // full path, e.g http://example.com/favicon.png
 // local path, e.g images/icons/favicon.png
-$favicon_path = '';
+$favicon_path = '../html/favicon.ico';
 
 // Files and folders to excluded from listing
 // e.g. array('myfile.html', 'personal-folder', '*.php', ...)
@@ -155,11 +155,11 @@ $external = array(
     'css-dropzone' => '<link href="assets/css/dropzone.min.css" rel="stylesheet">',
     'css-font-awesome' => '<link rel="stylesheet" href="assets/css/font-awesome.min.css" crossorigin="anonymous">',
     'css-highlightjs' => '<link rel="stylesheet" href="assets/css/' . $highlightjs_style . '.min.css">',
-    'js-ace' => '<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.2/ace.js"></script>',
-    'js-bootstrap' => '<script src="assets/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>',
+    'js-ace' => '<script src="assets/js/ace-min/ace.js"></script>',
+    'js-bootstrap' => '<script src="assets/js/bootstrap.bundle.min.js"></script>',
     'js-dropzone' => '<script src="assets/js/dropzone.min.js"></script>',
-    'js-jquery' => '<script src="assets/js/jquery-3.6.1.min.js" integrity="sha256-o88AwQnZB+VDvE9tvIXrMQaPlFFSUTR+nldQm1LuPXQ=" crossorigin="anonymous"></script>',
-    'js-jquery-datatables' => '<script src="assets/js/jquery.dataTables.min.js" crossorigin="anonymous" defer></script>',
+    'js-jquery' => '<script src="assets/js/jquery-3.6.1.min.js"></script>',
+    'js-jquery-datatables' => '<script src="assets/js/jquery.dataTables.min.js"></script>',
     'js-highlightjs' => '<script src="assets/js/highlight.min.js"></script>',
     'pre-jsdelivr' => '<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin/><link rel="dns-prefetch" href="https://cdn.jsdelivr.net"/>',
     'pre-cloudflare' => '<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin/><link rel="dns-prefetch" href="https://cdnjs.cloudflare.com"/>'

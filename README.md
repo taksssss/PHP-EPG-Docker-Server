@@ -163,7 +163,7 @@ PHP 实现的 EPG（电子节目指南）服务端， `Docker` 部署，自带�
 - `DIYP&百川` 接口： `http://{服务器IP地址}:5678/index.php?ch=CCTV1`
 - `超级直播` 接口： `http://{服务器IP地址}:5678/index.php?channel=CCTV1`
 
-1. 将 **`http://{服务器IP地址}:5678/index.php`** 填入 `DIYP`、`TiviMate` 等软件的 `EPG 地址栏`
+8. 将 **`http://{服务器IP地址}:5678/index.php`** 填入 `DIYP`、`TiviMate` 等软件的 `EPG 地址栏`
 
 - ⚠️ 直接使用 `docker run` 运行的话，可以将 `:5678/index.php` 替换为 **`:5678/`**。
 - ⚠️ 部分软件不支持跳转解析 `xmltv` 文件，可直接使用 **`:5678/t.xml.gz`** 或 **`:5678/t.xml`** 访问。

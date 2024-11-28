@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
     <title>管理配置</title>
-    <link rel="stylesheet" type="text/css" href="assets/css/manage.css?ver=20241124">
+    <link rel="stylesheet" type="text/css" href="assets/css/manage.css">
     <link rel="icon" href="assets/html/favicon.ico" type="image/x-icon">
 </head>
 <body>
@@ -89,26 +89,29 @@
 
 <!-- 底部显示 -->
 <div class="footer">
-    <span id="version" style="color: #888;"></span>
-    <a onclick="showVersionLog();" style="color: #888; cursor: pointer;">更新日志</a>
-    <br>
     <a href="https://github.com/taksssss/EPG-Server" target="_blank" style="color: #888; text-decoration: none;">
         https://github.com/taksssss/EPG-Server
+    </a>
+    <a onclick="showVersionLog();" style="color: #888; cursor: pointer;">
+        <span id="version">v2024.11.25</span>
+        查看版本日志
     </a>
 </div>
 
 <!-- 消息模态框 -->
 <div id="messageModal" class="modal">
     <div class="modal-content message-modal-content">
+        <span class="close" style="position: absolute; top: 0px;right: 10px;">&times;</span>
         <p id="messageModalMessage"></p>
     </div>
 </div>
 
 <!-- 版本更新日志模态框 -->
-<div id="VersionLogModal" class="modal">
-    <div class="modal-content version-update-modal-content">        
+<div id="versionLogModal" class="modal">
+    <div class="modal-content version-update-modal-content">
+        <span class="close">&times;</span>
         <h2>版本更新日志</h2>
-        <p id="VersionLogMessage" class="version-update-message"></p>
+        <p id="versionLogMessage" class="version-update-message"></p>
     </div>
 </div>
 
@@ -217,7 +220,7 @@
             </table>
         </div>
         <br>
-        <button id="saveConfig" type="button" onclick="saveAndUpdateConfig();">保存配置</button>
+        <button id="saveConfig" type="button" onclick="updateIconListJsonFile(notify = true);">保存配置</button>
     </div>
 </div>
 
@@ -240,7 +243,7 @@
             </table>
         </div>
         <br>
-        <button id="saveConfig" type="button" onclick="saveAndUpdateConfig();">保存配置</button>
+        <button id="saveConfig" type="button" onclick="updateConfig();">保存配置</button>
     </div>
 </div>
 
@@ -283,17 +286,23 @@
         <br>
         
         <!-- 中间按钮区 -->
-        <div class="button-container" style="width: 85%;">
+        <div class="button-container" style="width: 95%;">
             <input type="file" name="liveSourceFile" id="liveSourceFile" style="display: none;" accept=".m3u, .txt">
             <button id="uploadSourceBtn" onclick="document.getElementById('liveSourceFile').click()">上传源</button>
             <button id="parseSourceInfoBtn" onclick="parseSourceInfo()">解析源</button>
             <button id="copyM3UBtn" onclick="copyText(`<?php echo $serverUrl . '/?live=m3u&token=' . $Config['live_token']; ?>`)">m3u地址</button>
             <button id="copyTXTBtn" onclick="copyText(`<?php echo $serverUrl . '/?live=txt&token=' . $Config['live_token']; ?>`)">txt地址</button>            
             <div class="tooltip" style="width: 120%;">
-                <button id="toggleLiveSourceSyncBtn" onclick="toggleLiveSourceSync()">
-                    同步:<?php echo (isset($Config['live_source_auto_sync']) && $Config['live_source_auto_sync'] == 1 ? '是' : '否'); ?>
+                <button id="toggleLiveSourceSyncBtn" onclick="toggleStatus('toggleLiveSourceSyncBtn')">
+                    同步: <?php echo (isset($Config['live_source_auto_sync']) && $Config['live_source_auto_sync'] == 1 ? '是' : '否'); ?>
                 </button>
                 <span class="tooltiptext">跟随节目单更新</span>
+            </div>
+            <div class="tooltip" style="width: 120%;">
+                <button id="toggleLiveChannelNameProcessBtn" onclick="toggleStatus('toggleLiveChannelNameProcessBtn')">
+                    改名: <?php echo (isset($Config['live_channel_name_process']) && $Config['live_channel_name_process'] == 1 ? '是' : '否'); ?>
+                </button>
+                <span class="tooltiptext">解析时优化频道名</span>
             </div>
             <div class="tooltip" style="width: 120%;">
                 <button id="cleanUnusedSourceBtn" onclick="cleanUnusedSource()">清理</button>
@@ -396,6 +405,13 @@
         <!-- 第三行 -->
         <div class="row">
             <div class="column">
+                <label for="check_update">检查版本更新：</label>
+                <select id="check_update" name="check_update" required>
+                    <option value="1" <?php if (!isset($Config['check_update']) || $Config['check_update'] == 1) echo 'selected'; ?>>是</option>
+                    <option value="0" <?php if (isset($Config['check_update']) && $Config['check_update'] == 0) echo 'selected'; ?>>否</option>
+                </select>
+            </div>
+            <div class="column">
                 <div class="tooltip">
                     <label for="cache_time">缓存时间<span style="vertical-align: super;">*</span>(小时)：</label>
                     <select id="cache_time" name="cache_time" required>
@@ -412,20 +428,20 @@
                     <option value="mysql" <?php if (isset($Config['db_type']) && $Config['db_type'] == 'mysql') echo 'selected'; ?>>MySQL</option>
                 </select>
             </div>
-            <div class="column">
-                <label for="mysql_host">地址：</label>
-                <textarea id="mysql_host"><?php echo htmlspecialchars($Config['mysql']['host'] ?? ''); ?></textarea>
-            </div>
         </div>
 
         <!-- 第四行 -->
-        <div class="row">
+        <div class="row" id="db_setting">
             <div class="column">
-                <label for="mysql_dbname">数据库名：</label>
+                <label for="mysql_host">地址：</label>
+                <textarea id="mysql_host" style="width: 129px; margin-right: 20px;"><?php echo htmlspecialchars($Config['mysql']['host'] ?? ''); ?></textarea>
+            </div>
+            <div class="column">
+                <label for="mysql_dbname">库名：</label>
                 <textarea id="mysql_dbname"><?php echo htmlspecialchars($Config['mysql']['dbname'] ?? ''); ?></textarea>
             </div>
             <div class="column">
-                <label for="mysql_username">用户名：</label>
+                <label for="mysql_username">用户：</label>
                 <textarea id="mysql_username"><?php echo htmlspecialchars($Config['mysql']['username'] ?? ''); ?></textarea>
             </div>
             <div class="column">
@@ -447,9 +463,9 @@
         <br><br>
         <textarea id="gen_list_text"></textarea><br><br>
 
-        <button id="saveConfig" type="button" onclick="saveAndUpdateConfig();">保存配置</button>
+        <button id="saveConfig" type="button" onclick="setGenListAndUpdateConfig();">保存配置</button>
     </div>
 </div>
-<script src="assets/js/manage.js?ver=20241124"></script>
+<script src="assets/js/manage.js"></script>
 </body>
 </html>

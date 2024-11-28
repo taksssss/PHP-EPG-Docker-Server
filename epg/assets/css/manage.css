@@ -186,6 +186,7 @@ input[type="text"] {
     height: 630px;
 }
 .message-modal-content {
+    min-width: 150px;
     width: auto;
     height: auto;
     text-align: center;
@@ -290,6 +291,9 @@ input[type="text"] {
     flex-wrap: nowrap; /* 禁止换行 */
     gap: 35px;
     margin-bottom: 15px;
+}
+.row[id="db_setting"] {
+    gap: 15px;
 }
 .column {
     display: flex;

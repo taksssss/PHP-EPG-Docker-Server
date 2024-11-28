@@ -45,14 +45,6 @@ try {
     $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 } catch (PDOException $e) {
     echo '数据库连接失败: ' . $e->getMessage();
-    if (!$is_sqlite) {
-        // 如果是 MySQL 连接失败，则修改配置为 SQLite 并提示用户
-        $Config['db_type'] = 'sqlite';
-        file_put_contents($config_path, json_encode($Config, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
-
-        echo '<p>MySQL 配置错误，已修改为 SQLite。<br>5 秒后自动刷新...</p>';
-        echo '<meta http-equiv="refresh" content="5">';
-    }
     exit();
 }
 
@@ -123,9 +115,9 @@ function t2s($channel) {
 
 // 台标模糊匹配
 function iconUrlMatch($originalChannel) {
-    global $iconListMerged;
+    global $Config, $iconListMerged;
 
-    $iconUrl = null;
+    $iconUrl = $Config['default_icon'] ?? null;
     // 精确匹配
     if (isset($iconListMerged[$originalChannel])) {
         $iconUrl = $iconListMerged[$originalChannel];
@@ -153,6 +145,8 @@ function iconUrlMatch($originalChannel) {
 function downloadData($url, $timeout = 30, $connectTimeout = 10, $retry = 3) {
     $ch = curl_init($url);
     curl_setopt_array($ch, [
+        CURLOPT_SSL_VERIFYPEER => 0,
+        CURLOPT_SSL_VERIFYHOST => 0,
         CURLOPT_RETURNTRANSFER => 1,
         CURLOPT_FOLLOWLOCATION => 1,
         CURLOPT_TIMEOUT => $timeout,
@@ -292,20 +286,20 @@ function insertDataToDatabase($channelsData, $db, $sourceUrl, $replaceFlag = tru
 }
 
 // 解析 txt、m3u 直播源，并生成直播列表（包含分组、地址等信息）
-function do_parse_source_info() {
-    global $liveDir, $liveFileDir;
+function doParseSourceInfo() {
+    global $liveDir, $liveFileDir, $Config;
 
+    $liveChannelNameProcess = $Config['live_channel_name_process'] ?? false; // 标记是否处理频道名
     // 频道数据模糊匹配函数
-    function dbChNameMatch($channelName) {
+    function dbChannelNameMatch($channelName) {
         global $db;
         $concat = $db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql' ? "CONCAT('%', channel, '%')" : "'%' || channel || '%'";
         $stmt = $db->prepare("
-            SELECT channel FROM epg_data WHERE date = :date
-            AND (channel = :channel OR channel LIKE :like_channel OR :channel LIKE $concat)
+            SELECT channel FROM epg_data WHERE (channel = :channel OR channel LIKE :like_channel OR :channel LIKE $concat)
             ORDER BY CASE WHEN channel = :channel THEN 1 WHEN channel LIKE :like_channel THEN 2 ELSE 3 END, LENGTH(channel) DESC
             LIMIT 1
         ");
-        $stmt->execute([':date' => date('Y-m-d'), ':channel' => $channelName, ':like_channel' => $channelName . '%']);
+        $stmt->execute([':channel' => $channelName, ':like_channel' => $channelName . '%']);
         return $stmt->fetchColumn();
     }
 
@@ -335,7 +329,8 @@ function do_parse_source_info() {
         
         if (!$urlContent || stripos($urlContent, 'not found') !== false) {
             $urlContent = file_exists($localFilePath) ? file_get_contents($localFilePath) : '';
-            if (!$urlContent) { $errorLog .= "$url<br>"; continue; }
+            if (!$urlContent) { $errorLog .= "$url 解析失败<br>"; continue; }
+            else { $errorLog .= "$url 使用本地缓存<br>"; }
         } else if (stripos($url, '/data/live/file/') === false) { // 检测是否上传的文件
             file_put_contents($localFilePath, $urlContent);
         }
@@ -354,17 +349,22 @@ function do_parse_source_info() {
                     // 处理 `#EXTINF` 行，提取频道信息
                     if (preg_match('/#EXTINF:-1(.*),(.+)/', $line, $matches)) {
                         $channelInfo = $matches[1];
-                        $channelName = trim($matches[2]);
+                        $originalChannelName = trim($matches[2]);
                         $streamUrl = trim($lines[$i + 1]);
+                        $cleanChannelName = cleanChannelName($originalChannelName);
+                        $dbChannelName = dbChannelNameMatch($cleanChannelName);
+                        $channelName = $dbChannelName ?: $cleanChannelName;
+                        $iconUrl = iconUrlMatch($channelName);
+                        $tvgName = $dbChannelName ?? (preg_match('/tvg-name="([^"]+)"/', $channelInfo, $match) ? $match[1] : "");
     
                         // 将频道信息组织成数组
                         $rowData = [
                             'groupTitle' => preg_match('/group-title="([^"]+)"/', $channelInfo, $match) ? trim($groupPrefix . $match[1]) : '',
-                            'channelName' => $channelName,
+                            'channelName' => $liveChannelNameProcess ? $channelName : $originalChannelName,
                             'streamUrl' => $streamUrl,
-                            'iconUrl' => iconUrlMatch(cleanChannelName($channelName)) ?? (preg_match('/tvg-logo="([^"]+)"/', $channelInfo, $match) ? $match[1] : ''),
+                            'iconUrl' => $iconUrl ?? (preg_match('/tvg-logo="([^"]+)"/', $channelInfo, $match) ? $match[1] : ''),
                             'tvgId' => preg_match('/tvg-id="([^"]+)"/', $channelInfo, $match) ? $match[1] : '',
-                            'tvgName' => preg_match('/tvg-name="([^"]+)"/', $channelInfo, $match) ? $match[1] : '',
+                            'tvgName' => $tvgName,
                         ];
     
                         // 写入 CSV 文件
@@ -387,12 +387,14 @@ function do_parse_source_info() {
             
                     $groupTitle = trim($groupPrefix . $groupTitlePart);
                     $originalChannelName = trim($parts[0]);
-                    $dbChNameMatch = dbChNameMatch(cleanChannelName($originalChannelName));
-                    $channelName = $dbChNameMatch ?: $originalChannelName;
+                    $streamUrl = trim($parts[1]);
+                    $cleanChannelName = cleanChannelName($originalChannelName);
+                    $dbChannelName = dbChannelNameMatch($cleanChannelName);
+                    $channelName = $dbChannelName ?: $cleanChannelName;
                     $iconUrl = iconUrlMatch($channelName);
-                    $tvgName = $dbChNameMatch ? $channelName : "";
+                    $tvgName = $dbChannelName ?? "";
             
-                    fputcsv($csvFile, [$groupTitle, $originalChannelName, $parts[1], $iconUrl, "", $tvgName]);
+                    fputcsv($csvFile, [$groupTitle, $liveChannelNameProcess ? $channelName : $originalChannelName, $streamUrl, $iconUrl, "", $tvgName]);
                 }
             }   
         }

@@ -3,15 +3,16 @@ document.addEventListener('DOMContentLoaded', function() {
     showModal('live', $popup = false);
     showModal('channel', $popup = false);
     showModal('update', $popup = false);
+    showVersionLog(doCheckUpdate = true);
 });
 
-// 保存配置
+// 提交配置表单
 document.getElementById('settingsForm').addEventListener('submit', function(event) {
     event.preventDefault();  // 阻止默认表单提交
 
     const fields = ['update_config', 'gen_xml', 'include_future_only', 'ret_default', 'tvmao_default', 
         'all_chs', 'cache_time', 'db_type', 'mysql_host', 'mysql_dbname', 'mysql_username', 'mysql_password', 
-        'gen_list_enable'];
+        'gen_list_enable', 'check_update'];
 
     // 创建隐藏字段并将其添加到表单
     const form = this;
@@ -33,19 +34,31 @@ document.getElementById('settingsForm').addEventListener('submit', function(even
     })
     .then(response => response.json())
     .then(data => {
-        const { memcached_set, interval_time, start_time, end_time } = data;
-        const message = memcached_set 
-            ? interval_time === 0 
-                ? "配置已更新<br><br>已取消定时任务" 
-                : `配置已更新<br><br>已设置定时任务<br>开始时间：${start_time}<br>结束时间：${end_time}<br>间隔周期：${formatTime(interval_time)}`
-            : '配置已更新<br><br>Memcached 启用失败<br>缓存时间已设为 0';
-
-        if (!memcached_set) document.getElementById('cache_time').value = 0;
+        const { memcached_set, db_type_set, interval_time, start_time, end_time } = data;
         
+        let message = '配置已更新<br><br>';    
+        if (!memcached_set) {
+            message += 'Memcached 启用失败<br>缓存时间已设为 0<br><br>';
+            document.getElementById('cache_time').value = 0;
+        }
+        if (!db_type_set) {
+            message += 'MySQL 启用失败<br>数据库已设为 SQLite<br><br>';
+            document.getElementById('db_type').value = 'sqlite';
+            updateMySQLFields();
+        }    
+        message += interval_time === 0 
+            ? "已取消定时任务" 
+            : `已设置定时任务<br>开始时间：${start_time}<br>结束时间：${end_time}<br>间隔周期：${formatTime(interval_time)}`;
+    
         showMessageModal(message);
     })
     .catch(() => showMessageModal('发生错误，请重试。'));
 });
+
+// 保存配置
+function updateConfig(){
+    document.getElementById('update_config').click();
+}
 
 // 检查数据库状况
 function handleDbManagement() {
@@ -83,7 +96,7 @@ function logout() {
 document.addEventListener("keydown", function(event) {
     if (event.ctrlKey && event.key === "s") {
         event.preventDefault(); // 阻止默认行为，如保存页面
-        saveAndUpdateConfig();
+        setGenListAndUpdateConfig();
     }
 });
 
@@ -147,36 +160,35 @@ function updateMySQLFields() {
     document.getElementById('mysql_password').disabled = isSQLite;
 }
 
-// 显示消息模态框
-function showMessageModal(message) {
-    var modal = document.getElementById("messageModal");
-    var messageModalMessage = document.getElementById("messageModalMessage");
+// 显示带消息的模态框
+function showModalWithMessage(modalId, messageId, message) {
+    var modal = document.getElementById(modalId);
+    var messageElement = document.getElementById(messageId);
 
-    messageModalMessage.innerHTML = message;
+    messageElement.innerHTML = message;
     modal.style.zIndex = 9999; // 确保 modal 在最上层
     modal.style.display = "block";
 
-    window.onclick = function(event) {
+    function handleModalClose() {
+        modal.style.display = "none";
+    }
+    var closeBtn = modal.querySelector(".close");
+    closeBtn.onclick = handleModalClose;
+    window.onclick = function (event) {
         if (event.target == modal) {
-            modal.style.display = "none";
+            handleModalClose();
         }
     };
 }
 
+// 显示消息模态框
+function showMessageModal(message) {
+    showModalWithMessage("messageModal", "messageModalMessage", message);
+}
+
 // 显示版本更新日志模态框
 function showVersionLogModal(message) {
-    var modal = document.getElementById("VersionLogModal");
-    var VersionLogMessage = document.getElementById("VersionLogMessage");
-
-    VersionLogMessage.innerHTML = message;
-    modal.style.zIndex = 9999; // 确保 modal 在最上层
-    modal.style.display = "block";
-
-    window.onclick = function(event) {
-        if (event.target == modal) {
-            modal.style.display = "none";
-        }
-    };
+    showModalWithMessage("versionLogModal", "versionLogMessage", message);
 }
 
 // 显示模态框公共函数
@@ -185,7 +197,6 @@ function showModal(type, $popup = true, $data = '') {
     switch (type) {
         case 'epg':
             modal = document.getElementById("epgModal");
-            logSpan = document.getElementsByClassName("close")[0];
             fetchData("manage.php?get_epg_by_channel=true&channel=" + encodeURIComponent($data.channel) + "&date=" + $data.date, updateEpgContent);
 
             // 更新日期的点击事件
@@ -206,50 +217,41 @@ function showModal(type, $popup = true, $data = '') {
 
         case 'update':
             modal = document.getElementById("updatelogModal");
-            logSpan = document.getElementsByClassName("close")[1];
             fetchData('manage.php?get_update_logs=true', updateLogTable);
             break;
         case 'cron':
             modal = document.getElementById("cronlogModal");
-            logSpan = document.getElementsByClassName("close")[2];
             fetchData('manage.php?get_cron_logs=true', updateCronLogContent);
             break;
         case 'channel':
             modal = document.getElementById("channelModal");
-            logSpan = document.getElementsByClassName("close")[3];
             fetchData('manage.php?get_channel=true', updateChannelList);
             break;
         case 'icon':
             modal = document.getElementById("iconModal");
-            logSpan = document.getElementsByClassName("close")[4];
             fetchData('manage.php?get_icon=true', updateIconList);
             break;
         case 'allicon':
             modal = document.getElementById("iconModal");
-            logSpan = document.getElementsByClassName("close")[4];
             fetchData('manage.php?get_icon=true&get_all_icon=true', updateIconList);
             break;
         case 'channelbindepg':
             modal = document.getElementById("channelBindEPGModal");
-            logSpan = document.getElementsByClassName("close")[5];
             fetchData('manage.php?get_channel_bind_epg=true', updateChannelBindEPGList);
             break;
         case 'channelmatch':
             modal = document.getElementById("channelMatchModal");
-            logSpan = document.getElementsByClassName("close")[6];
             fetchData('manage.php?get_channel_match=true', updateChannelMatchList);
             document.getElementById("moreSettingModal").style.display = "none";
             break;
         case 'live':
             modal = document.getElementById("liveSourceManageModal");
-            logSpan = document.getElementsByClassName("close")[7]; // Ensure the close button is correctly selected
             fetchData('manage.php?get_live_data=true', updateLiveSourceModal);
             break;
         case 'moresetting':            
             updateMySQLFields(); // 设置 MySQL 相关输入框状态
             document.getElementById('db_type').addEventListener('change', updateMySQLFields);
             modal = document.getElementById("moreSettingModal");
-            logSpan = document.getElementsByClassName("close")[8];
             fetchData('manage.php?get_gen_list=true', updateGenList);
             break;
         default:
@@ -270,6 +272,7 @@ function showModal(type, $popup = true, $data = '') {
         }
     }
     
+    logSpan = modal.querySelector(".close");
     logSpan.onclick = handleModalClose;
     window.onmousedown = function(event) {
         if (event.target === modal) {
@@ -289,18 +292,19 @@ function fetchData(endpoint, callback) {
 }
 
 // 显示版本更新日志
-function showVersionLog() {
-    fetch('manage.php?get_version_log=true')
+function showVersionLog(doCheckUpdate = false) {
+    fetch(`manage.php?get_version_log=true&do_check_update=${doCheckUpdate}`)
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                showVersionLogModal(data.content);
+                if (!doCheckUpdate || data.is_updated) {
+                    showVersionLogModal(data.content);
+                }
             } else {
                 showMessageModal(data.message || '获取版本日志失败');
             }
         })
-        .catch(error => {
-            console.error('Error fetching version log:', error);
+        .catch(() => {
             showMessageModal('无法获取版本日志，请稍后重试');
         });
 }
@@ -560,13 +564,14 @@ document.getElementById('liveSourceFile').addEventListener('change', function() 
     this.value = ''; // 重置文件输入框的值，确保可以连续上传相同文件
 });
 
-// 设置直播源自动同步开关
-function toggleLiveSourceSync() {
-    fetch('manage.php?toggle_live_source_sync=true')
+// 设置直播源自动同步、优化频道名开关
+function toggleStatus(toggleBtn) {
+    fetch(`manage.php?toggle_status=true&toggle_button=${toggleBtn}`)
         .then(response => response.json())
         .then(data => {
             // 更新按钮显示
-            document.getElementById("toggleLiveSourceSyncBtn").innerHTML = `同步:${data.status === 1 ? "是" : "否"}`;
+            document.getElementById(toggleBtn).innerHTML = 
+                `${toggleBtn === "toggleLiveSourceSyncBtn" ? "同步" : "改名"}: ${data.status === 1 ? "是" : "否"}`;
         })
         .catch(error => console.error("Error:", error));
 }
@@ -866,7 +871,7 @@ function updateChannelMapping() {
 
     // 更新映射文本框并保存配置
     document.getElementById('channel_mappings').value = [...newMappings, ...regexMappings].join('\n');
-    saveAndUpdateConfig();
+    updateConfig();
 }
 
 // 解析 txt、m3u 直播源，并生成频道列表（仅频道）
@@ -907,19 +912,19 @@ async function parseSource() {
                 const tvgIdMatch = line.match(/tvg-id="([^"]+)"/i);
                 const tvgNameMatch = line.match(/tvg-name="([^"]+)"/i);
 
-                chName = (tvgIdMatch && /\D/.test(tvgIdMatch[1]) ? tvgIdMatch[1] : tvgNameMatch ? tvgNameMatch[1] : line.split(',').slice(-1)[0]).trim();
+                channelName = (tvgIdMatch && /\D/.test(tvgIdMatch[1]) ? tvgIdMatch[1] : tvgNameMatch ? tvgNameMatch[1] : line.split(',').slice(-1)[0]).trim();
             } else {
-                chName = line.split(',')[0].trim();
+                channelName = line.split(',')[0].trim();
             }
-            if (chName) channels.add(chName.toUpperCase());
+            if (channelName) channels.add(channelName.toUpperCase());
         }
     });
 
     // 将解析后的频道列表放回文本区域
     textarea.value = Array.from(channels).join('\n');
     
-    // 保存到数据库
-    saveAndUpdateConfig($doUpdate = false);
+    // 保存限定频道列表到数据库
+    setGenList();
 }
 
 // 解析 txt、m3u 直播源，并生成直播列表（包含分组、地址等信息）
@@ -933,43 +938,43 @@ function parseSourceInfo() {
         if (data.success == 'full') {
             showMessageModal('解析成功<br>已生成 M3U 及 TXT 文件');
         } else if (data.success == 'part') {
-            showMessageModal('已生成 M3U 及 TXT 文件<br>部分源解析失败<br>' + data.message);
+            showMessageModal('已生成 M3U 及 TXT 文件<br>部分源异常<br>' + data.message);
         }
     })
     .catch(error => showMessageModal('解析过程中发生错误：' + error));
 }
 
-// 保存数据并更新配置
-function saveAndUpdateConfig($doUpdate = true) {
-    updateIconListJsonFile();
-    const textAreaContent = document.getElementById('gen_list_text').value;
-    fetch('manage.php?set_gen_list=true', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ data: textAreaContent })
-    })
-    .then(response => response.text())
-    .then(responseText => {
-        if (responseText.trim() === 'success') {
-            if($doUpdate){
-                document.getElementById('update_config').click();
-            }
-        } else {
+// 保存限定频道列表
+async function setGenList() {
+    const genListText = document.getElementById('gen_list_text').value;
+    try {
+        const response = await fetch('manage.php?set_gen_list=true', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ data: genListText })
+        });
+
+        const responseText = await response.text();
+
+        if (responseText.trim() !== 'success') {
             console.error('服务器响应错误:', responseText);
         }
-    })
-    .catch(error => {
-        console.error('请求失败:', error);
-    });
+    } catch (error) {
+        console.error(error);
+    }
 }
 
-// 更新 iconList.json
-function updateIconListJsonFile(){
+// 保存限定频道列表并更新配置
+function setGenListAndUpdateConfig() {
+    setGenList();
+    updateConfig();
+}
+
+// 更新台标文件 iconList.json
+function updateIconListJsonFile(notify = false) {
     var iconTableElement = document.getElementById('iconTable');
     var allIcons = iconTableElement && iconTableElement.dataset.allIcons ? JSON.parse(iconTableElement.dataset.allIcons) : null;
-    if(allIcons) {
+    if (allIcons) {
         fetch('manage.php', {
             method: 'POST',
             headers: {
@@ -981,6 +986,7 @@ function updateIconListJsonFile(){
             })
         });
     }
+    if (notify) showMessageModal('保存成功');
 }
 
 // 导入配置

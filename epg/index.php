@@ -52,7 +52,7 @@ function getFormatTime($time) {
 }
 
 // 从数据库读取 diyp、lovetv 数据，兼容未安装 memcached 的情况
-function readEPGData($date, $oriChName, $cleanChName, $db, $type) {
+function readEPGData($date, $oriChannelName, $cleanChannelName, $db, $type) {
     global $Config;
     global $iconList;
 
@@ -62,7 +62,7 @@ function readEPGData($date, $oriChName, $cleanChName, $db, $type) {
     // 检查是否开启缓存并安装了 Memcached 类
     $memcached_enabled = $Config['cache_time'] && class_exists('Memcached')
         && ($memcached = new Memcached())->addServer('localhost', 11211);
-    $cache_key = base64_encode("{$date}_{$cleanChName}_{$type}");
+    $cache_key = base64_encode("{$date}_{$cleanChannelName}_{$type}");
 
     if ($memcached_enabled) {
         // 从缓存中读取数据
@@ -105,8 +105,8 @@ function readEPGData($date, $oriChName, $cleanChName, $db, $type) {
     ");
     $stmt->execute([
         ':date' => $date,
-        ':channel' => $cleanChName,
-        ':like_channel' => $cleanChName . '%'
+        ':channel' => $cleanChannelName,
+        ':like_channel' => $cleanChannelName . '%'
     ]);
     $row = $stmt->fetchColumn();
 
@@ -116,7 +116,7 @@ function readEPGData($date, $oriChName, $cleanChName, $db, $type) {
 
     // 在解码和添加 icon 后再编码为 JSON
     $rowArray = json_decode($row, true);
-    $iconUrl = iconUrlMatch($rowArray['channel_name']) ?? iconUrlMatch($cleanChName) ?? iconUrlMatch($oriChName);
+    $iconUrl = iconUrlMatch($rowArray['channel_name']) ?? iconUrlMatch($cleanChannelName) ?? iconUrlMatch($oriChannelName);
     $rowArray = array_merge(
         array_slice($rowArray, 0, array_search('source', array_keys($rowArray)) + 1),
         ['icon' => $iconUrl],
@@ -155,7 +155,7 @@ function readEPGData($date, $oriChName, $cleanChName, $db, $type) {
 
         // 生成 lovetv 数据
         $lovetv_data = [
-            $oriChName => [
+            $oriChannelName => [
                 'isLive' => $current_programme ? $current_programme['t'] : '',
                 'liveSt' => $current_programme ? $current_programme['st'] : 0,
                 'channelName' => $diyp_data['channel_name'],
@@ -245,13 +245,13 @@ function fetchHandler() {
     }
 
     // 获取并清理频道名称，繁体转换成简体
-    $oriChName = $query_params['ch'] ?? $query_params['channel'] ?? '';
-    $cleanChName = cleanChannelName($oriChName, $t2s = true);
+    $oriChannelName = $query_params['ch'] ?? $query_params['channel'] ?? '';
+    $cleanChannelName = cleanChannelName($oriChannelName, $t2s = true);
 
     $date = isset($query_params['date']) ? getFormatTime(preg_replace('/\D+/', '', $query_params['date']))['date'] : getNowDate();
 
     // 频道参数为空时，直接重定向到 t.xml 文件
-    if (empty($cleanChName)) {
+    if (empty($cleanChannelName)) {
         if ($Config['gen_xml'] === 1) {
             header('Content-Type: application/xml');
             header('Content-Disposition: attachment; filename="t.xml"');
@@ -266,9 +266,9 @@ function fetchHandler() {
 
     // 返回 diyp、lovetv 数据
     if (isset($query_params['ch']) || isset($query_params['channel'])) {
-        function processResponse($response, $oriChName, $date, $type, $init) {
+        function processResponse($response, $oriChannelName, $date, $type, $init) {
             $responseData = json_decode($response, true);
-            $resDate = ($type === 'diyp') ? $responseData['date'] : date('Y-m-d', $responseData[$oriChName]['program'][0]['st']);
+            $resDate = ($type === 'diyp') ? $responseData['date'] : date('Y-m-d', $responseData[$oriChannelName]['program'][0]['st']);
             if ($resDate === $date) {
                 makeRes($response, $init['status'], $init['headers']);
                 exit;
@@ -277,25 +277,25 @@ function fetchHandler() {
         }
 
         $type = isset($query_params['ch']) ? 'diyp' : 'lovetv';
-        $response = readEPGData($date, $oriChName, $cleanChName, $db, $type);
+        $response = readEPGData($date, $oriChannelName, $cleanChannelName, $db, $type);
 
         // 频道在列表中但无当天数据，尝试通过 tvmao 接口获取数据
-        $retry = $response && !processResponse($response, $oriChName, $date, $type, $init);
+        $retry = $response && !processResponse($response, $oriChannelName, $date, $type, $init);
         if ($retry && $Config['tvmao_default'] === 1 && $date >= date('Y-m-d')) {
-            $matchChannelName = json_decode($response, true)['channel_name'] ?? $oriChName;
+            $matchChannelName = json_decode($response, true)['channel_name'] ?? $oriChannelName;
             $json_url = "https://sp0.baidu.com/8aQDcjqpAAV3otqbppnN2DJv/api.php?query=$matchChannelName&resource_id=12520&format=json";
             downloadJSONData($json_url, $db, $log_messages, $matchChannelName, $replaceFlag = false); // 只更新无数据的日期
-            $newResponse = readEPGData($date, $oriChName, $matchChannelName, $db, $type);
-            processResponse($newResponse, $oriChName, $date, $type, $init);
+            $newResponse = readEPGData($date, $oriChannelName, $matchChannelName, $db, $type);
+            processResponse($newResponse, $oriChannelName, $date, $type, $init);
         }
 
         // 返回默认数据
         $ret_default = !isset($Config['ret_default']) || $Config['ret_default'];
-        $iconUrl = iconUrlMatch($cleanChName) ?? iconUrlMatch($oriChName);
+        $iconUrl = iconUrlMatch($cleanChannelName) ?? iconUrlMatch($oriChannelName);
         if ($type === 'diyp') {
             // 无法获取到数据时返回默认 diyp 数据
             $default_diyp_program_info = [
-                'channel_name' => $cleanChName,
+                'channel_name' => $cleanChannelName,
                 'date' => $date,
                 'url' => "https://github.com/taksssss/EPG-Server",
                 'icon' => $iconUrl,
@@ -312,10 +312,10 @@ function fetchHandler() {
         } else {
             // 无法获取到数据时返回默认 lovetv 数据
             $default_lovetv_program_info = [
-                $cleanChName => [
+                $cleanChannelName => [
                     'isLive' => '',
                     'liveSt' => 0,
-                    'channelName' => $cleanChName,
+                    'channelName' => $cleanChannelName,
                     'lvUrl' => 'https://github.com/taksssss/EPG-Server',
                     'icon' => $iconUrl,
                     'program' => !$ret_default ? '' : array_map(function($hour) {

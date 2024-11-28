@@ -473,9 +473,9 @@ if ($Config['gen_xml']) {
 
 // 判断是否同步更新直播源
 if (isset($Config['live_source_auto_sync']) && $Config['live_source_auto_sync'] == 1) {
-    $errorLog = do_parse_source_info();
+    $errorLog = doParseSourceInfo();
     if ($errorLog) {
-        logMessage($log_messages, "【直播源】 部分更新失败：" . rtrim(str_replace('<br>', '、', $errorLog), '、'));
+        logMessage($log_messages, "【直播源】 部分更新异常：" . rtrim(str_replace('<br>', '、', $errorLog), '、'));
     } else {
         logMessage($log_messages, "【直播源】 已同步更新");
     }

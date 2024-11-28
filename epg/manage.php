@@ -16,7 +16,7 @@ initialDB();
 session_start();
 
 // 首次进入界面，检查 cron.php 是否运行正常
-if($Config['interval_time']!=0) {
+if ($Config['interval_time'] !== 0) {
     $output = [];
     exec("ps aux | grep '[c]ron.php'", $output);
     if(!$output) {
@@ -84,7 +84,7 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
 }
 
 // 更新配置
-function updateConfig() {
+function updateConfigFields() {
     global $Config, $config_path;
 
     // 获取和过滤表单数据
@@ -137,12 +137,24 @@ function updateConfig() {
         }
     }
 
-    $memcached_set = true;
-    
     // 检查 Memcache 有效性
+    $memcached_set = true;
     if (!empty($Config['cache_time']) && (!class_exists('Memcached') || !(new Memcached())->addServer('localhost', 11211))) {
         $Config['cache_time'] = 0;
         $memcached_set = false;
+    }
+
+    // 检查 MySQL 有效性
+    $db_type_set = true;
+    if ($Config['db_type'] === 'mysql') {
+        try {
+            $dsn = "mysql:host={$Config['mysql']['host']};dbname={$Config['mysql']['dbname']};charset=utf8mb4";
+            $db = new PDO($dsn, $Config['mysql']['username'] ?? null, $Config['mysql']['password'] ?? null);
+            $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        } catch (PDOException $e) {
+            $Config['db_type'] = 'sqlite';
+            $db_type_set = false;
+        }
     }
 
     // 将新配置写回 config.json
@@ -153,14 +165,10 @@ function updateConfig() {
         exec('php cron.php > /dev/null 2>/dev/null &');
     }
 
-    return $memcached_set;
+    return ['memcached_set' => $memcached_set, 'db_type_set' => $db_type_set];
 }
 
-// 连接数据库并获取日志表中的数据
-$logData = [];
-$cronLogData = [];
-$channels = [];
-
+// 处理服务器请求
 try {
     $requestMethod = $_SERVER['REQUEST_METHOD'];
     $dbResponse = null;
@@ -171,7 +179,7 @@ try {
         $action_map = [
             'get_update_logs', 'get_cron_logs', 'get_channel', 'get_epg_by_channel',
              'get_icon', 'get_channel_bind_epg', 'get_channel_match', 'get_gen_list',
-             'get_live_data', 'parse_source_info', 'toggle_live_source_sync', 
+             'get_live_data', 'parse_source_info', 'toggle_status', 
              'download_data', 'delete_unused_icons', 'delete_unused_source',
              'get_version_log'
         ];
@@ -240,19 +248,27 @@ try {
                 if(isset($_GET['get_all_icon'])) {
                     $iconList = $iconListMerged;
                 }
+                
                 // 获取并合并数据库中的频道和 $iconList 中的频道，去重后按字母排序
                 $allChannels = array_unique(array_merge(
                     $db->query("SELECT DISTINCT channel FROM epg_data ORDER BY channel ASC")->fetchAll(PDO::FETCH_COLUMN),
                     array_keys($iconList)
                 ));
                 sort($allChannels);
+
+                // 将默认台标插入到频道列表的开头
+                $defaultIcon = [
+                    ['channel' => '【默认台标】', 'icon' => $Config['default_icon'] ?? '']
+                ];
+
                 $channelsInfo = array_map(function($channel) use ($iconList) {
                     return ['channel' => $channel, 'icon' => $iconList[$channel] ?? ''];
                 }, $allChannels);
                 $withIcons = array_filter($channelsInfo, function($c) { return !empty($c['icon']);});
                 $withoutIcons = array_filter($channelsInfo, function($c) { return empty($c['icon']);});
+
                 $dbResponse = [
-                    'channels' => array_merge($withIcons, $withoutIcons),
+                    'channels' => array_merge($defaultIcon, $withIcons, $withoutIcons),
                     'count' => count($allChannels)
                 ];
                 break;
@@ -357,7 +373,7 @@ try {
 
             case 'parse_source_info':
                 // 解析直播源
-                $errorLog = do_parse_source_info();
+                $errorLog = doParseSourceInfo();
                 if ($errorLog) {
                     $dbResponse = ['success' => 'part', 'message' => $errorLog];
                 } else {
@@ -365,11 +381,13 @@ try {
                 }
                 break;
 
-            case 'toggle_live_source_sync':
-                // 切换 live_source_auto_sync 状态
-                $currentStatus = isset($Config['live_source_auto_sync']) && $Config['live_source_auto_sync'] == 1 ? 1 : 0;
+            case 'toggle_status':
+                // 切换状态
+                $toggleField = $_GET['toggle_button'] === 'toggleLiveSourceSyncBtn' ? 'live_source_auto_sync'
+                            : $_GET['toggle_button'] === 'toggleLiveChannelNameProcessBtn' ? 'live_channel_name_process' : '';
+                $currentStatus = isset($Config[$toggleField]) && $Config[$toggleField] == 1 ? 1 : 0;
                 $newStatus = ($currentStatus == 1) ? 0 : 1;
-                $Config['live_source_auto_sync'] = $newStatus;
+                $Config[$toggleField] = $newStatus;
                 file_put_contents($config_path, json_encode($Config, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
                 
                 $dbResponse = ['status' => $newStatus];
@@ -436,15 +454,40 @@ try {
 
             case 'get_version_log':
                 // 获取更新日志
-                $url = 'https://gitee.com/taksssss/EPG-Server/raw/main/CHANGELOG.md';
-                $markdownContent = file_get_contents($url);
-                if ($markdownContent === false) {
-                    echo json_encode(['status' => 'error', 'message' => '无法获取版本日志']);
+                $checkUpdateEnable = !isset($Config['check_update']) || $Config['check_update'] == 1;
+                $checkUpdate = isset($_GET['do_check_update']) && $_GET['do_check_update'] === 'true';
+                if (!$checkUpdateEnable && $checkUpdate) {
+                    echo json_encode(['success' => true, 'is_updated' => false]);
                     return;
                 }
+
+                $localFile = 'assets/CHANGELOG.md';
+                $url = 'https://gitee.com/taksssss/EPG-Server/raw/main/CHANGELOG.md';
+                $isUpdated = false;
+                $updateMessage = '';
+                if ($checkUpdate) {
+                    $remoteContent = @file_get_contents($url);
+                    if ($remoteContent === false) {
+                        echo json_encode(['success' => false, 'message' => '无法获取远程版本日志']);
+                        return;
+                    }
+                    $localContent = file_exists($localFile) ? file_get_contents($localFile) : '';
+                    if (strtok($localContent, "\n") !== strtok($remoteContent, "\n")) {
+                        file_put_contents($localFile, $remoteContent);
+                        $isUpdated = !empty($localContent) ? true : false;
+                        $updateMessage = '<h3 style="color: red;">🔔 检测到新版本，请自行更新。（该提醒仅显示一次）</h3>';
+                    }
+                }
+
+                $markdownContent = file_exists($localFile) ? file_get_contents($localFile) : false;
+                if ($markdownContent === false) {
+                    echo json_encode(['success' => false, 'message' => '无法读取版本日志']);
+                    return;
+                }
+
                 require_once 'assets/Parsedown.php';
-                $htmlContent = Parsedown::instance()->text($markdownContent);
-                $dbResponse = ['success' => true, 'content' => $htmlContent];
+                $htmlContent = (new Parsedown())->text($markdownContent);
+                $dbResponse = ['success' => true, 'content' => $updateMessage . $htmlContent, 'is_updated' => $isUpdated];
                 break;
 
             default:
@@ -483,9 +526,10 @@ try {
         switch ($action) {
             case 'update_config':
                 // 更新配置
-                $memcached_set = updateConfig();
+                ['memcached_set' => $memcached_set, 'db_type_set' => $db_type_set] = updateConfigFields();
                 echo json_encode([
                     'memcached_set' => $memcached_set,
+                    'db_type_set' => $db_type_set,
                     'interval_time' => $Config['interval_time'],
                     'start_time' => $Config['start_time'],
                     'end_time' => $Config['end_time']
@@ -574,9 +618,18 @@ try {
                 // 更新图标
                 $iconList = [];
                 $updatedIcons = json_decode($_POST['updatedIcons'], true);
+                
+                // 遍历更新数据
                 foreach ($updatedIcons as $channelData) {
                     $channelName = strtoupper(trim($channelData['channel']));
-                    $iconList[$channelName] = $channelData['icon'];
+                    if ($channelName === '【默认台标】') {
+                        // 保存默认台标到 config.json
+                        $Config['default_icon'] = $channelData['icon'] ?? '';
+                        file_put_contents($config_path, json_encode($Config, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+                    } else {
+                        // 处理普通台标数据
+                        $iconList[$channelName] = $channelData['icon'];
+                    }
                 }
 
                 // 过滤掉图标值为空和频道名为空的条目
@@ -650,9 +703,6 @@ try {
     }
 } catch (Exception $e) {
     // 处理数据库连接错误
-    $logData = [];
-    $cronLogData = [];
-    $channels = [];
 }
 
 // 生成配置管理表单
