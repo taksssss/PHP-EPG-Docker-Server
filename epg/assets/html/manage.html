@@ -13,7 +13,8 @@
         <label for="xml_urls">【EPG源地址】（支持 .xml 跟 .xml.gz 格式， # 为注释，支持获取 猫 数据）</label>
         <span id="channelbind" onclick="showModal('channelbindepg')" style="color: blue; cursor: pointer;">（频道指定EPG源）</span>
         <br><br>
-        <textarea placeholder="一行一个，地址前面加 # 可以临时停用，后面加 # 可以备注。快捷键： Ctrl+/  。
+        <textarea placeholder="地址前 # 临时停用，后 # 备注。快捷键：Ctrl+/ 。
+源限定频道：频道名1, 频道名2 => EPG源地址
 猫示例1：tvmao, 猫频道名1, 猫频道名2,...
 猫示例2：tvmao, 自定义1:猫频道名1, 自定义2:猫频道名2, ..." id="xml_urls" name="xml_urls" style="height: 122px;"><?php echo implode("\n", array_map('trim', $Config['xml_urls'])); ?></textarea>
         <br><br>
@@ -279,14 +280,14 @@
         <div class="input-container">
             <label for="sourceUrlTextarea">【直播源地址】</label><br>
             <textarea id="sourceUrlTextarea" placeholder="支持 .txt 和 .m3u 格式，光标离开后自动保存。
-地址前面加 # 可以临时停用，后面加 # 可以备注并作为分组前缀。快捷键： Ctrl+/  。
+地址前 # 临时停用，后 # 备注并作为分组前缀。快捷键：Ctrl+/ 。
 示例：https://xxx.xx/xx.m3u #前缀1:
 可通过 <?php echo $serverUrl . '/?live&token=' . $Config['live_token']; ?>&url=xxx 访问单个直播源地址。" style="height: 102px;"></textarea>
         </div>
         <br>
         
         <!-- 中间按钮区 -->
-        <div class="button-container" style="width: 95%;">
+        <div class="button-container" style="width: 90%;">
             <input type="file" name="liveSourceFile" id="liveSourceFile" style="display: none;" accept=".m3u, .txt">
             <button id="uploadSourceBtn" onclick="document.getElementById('liveSourceFile').click()">上传源</button>
             <button id="parseSourceInfoBtn" onclick="parseSourceInfo()">解析源</button>
@@ -434,7 +435,7 @@
         <div class="row" id="db_setting">
             <div class="column">
                 <label for="mysql_host">地址：</label>
-                <textarea id="mysql_host" style="width: 129px; margin-right: 20px;"><?php echo htmlspecialchars($Config['mysql']['host'] ?? ''); ?></textarea>
+                <textarea id="mysql_host" style="width: 145px; margin-right: 20px;"><?php echo htmlspecialchars($Config['mysql']['host'] ?? ''); ?></textarea>
             </div>
             <div class="column">
                 <label for="mysql_dbname">库名：</label>

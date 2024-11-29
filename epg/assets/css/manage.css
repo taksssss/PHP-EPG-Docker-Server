@@ -12,7 +12,7 @@ body {
     padding: 30px;
     box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
     border-radius: 5px;
-    width: 850px;
+    width: 900px;
     margin: auto;
 }
 textarea {
@@ -40,7 +40,7 @@ textarea[id="gen_list_text"] {
     width: 98px;
 }
 .custom-margin1 {
-    margin-left: 139px;
+    margin-left: 189px;
 }
 .custom-margin2,
 .custom-margin3 {
@@ -64,7 +64,7 @@ textarea[id="gen_list_text"] {
     margin-right: 0px;
 }
 .form-row input[id="start_time"] {
-    margin-left: 242px;
+    margin-left: 292px;
 }
 .form-row input[id="end_time"],
 select[id="interval_hour"]{
@@ -172,17 +172,17 @@ input[type="text"] {
     box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2);
     top: 50%;
     transform: translateY(-50%);
-    width: 600px;
+    width: 650px;
     height: 530px;
 }
 .cron-log-modal-content {
     width: 400px;
 }
 .update-log-modal-content {
-    width: 830px;
+    width: 880px;
 }
 .live-source-modal-content {
-    width: 830px;
+    width: 880px;
     height: 630px;
 }
 .message-modal-content {

@@ -17,17 +17,17 @@ use Overtrue\PHPOpenCC\OpenCC; // 使用 OpenCC 库
 $iconDir = __DIR__ . '/data/icon/'; @mkdir($iconDir, 0755, true);
 $liveDir = __DIR__ . '/data/live/'; @mkdir($liveDir, 0755, true);
 $liveFileDir = __DIR__ . '/data/live/file/'; @mkdir($liveFileDir, 0755, true);
-file_exists($config_path = __DIR__ . '/data/config.json') || copy(__DIR__ . '/assets/defaultConfig.json', $config_path);
-file_exists($iconList_path = __DIR__ . '/data/iconList.json') || file_put_contents($iconList_path, json_encode(new stdClass(), JSON_PRETTY_PRINT));
-($iconList = json_decode(file_get_contents($iconList_path), true)) !== null || die("图标列表文件解析失败: " . json_last_error_msg());
+file_exists($configPath = __DIR__ . '/data/config.json') || copy(__DIR__ . '/assets/defaultConfig.json', $configPath);
+file_exists($iconListPath = __DIR__ . '/data/iconList.json') || file_put_contents($iconListPath, json_encode(new stdClass(), JSON_PRETTY_PRINT));
+($iconList = json_decode(file_get_contents($iconListPath), true)) !== null || die("图标列表文件解析失败: " . json_last_error_msg());
 $iconListDefault = json_decode(file_get_contents(__DIR__ . '/assets/defaultIconList.json'), true) or die("默认图标列表文件解析失败: " . json_last_error_msg());
 $iconListMerged = array_merge($iconListDefault, $iconList); // 同一个键，以 iconList 的为准
-$Config = json_decode(file_get_contents($config_path), true) or die("配置文件解析失败: " . json_last_error_msg());
+$Config = json_decode(file_get_contents($configPath), true) or die("配置文件解析失败: " . json_last_error_msg());
 
 // 获取 serverUrl
 $protocol = ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? (($_SERVER['HTTPS'] ?? '') === 'on' ? 'https' : 'http'));
-$host = $_SERVER['HTTP_X_FORWARDED_HOST'] ?? $_SERVER['HTTP_HOST'];
-$uri = rtrim(dirname($_SERVER['HTTP_X_ORIGINAL_URI'] ?? $_SERVER['REQUEST_URI']), '/');
+$host = $_SERVER['HTTP_X_FORWARDED_HOST'] ?? $_SERVER['HTTP_HOST'] ?? '';
+$uri = rtrim(dirname($_SERVER['HTTP_X_ORIGINAL_URI'] ?? $_SERVER['REQUEST_URI']) ?? '', '/');
 $serverUrl = $protocol . '://' . $host . $uri;
 
 // 设置时区为亚洲/上海
@@ -168,6 +168,7 @@ function downloadData($url, $timeout = 30, $connectTimeout = 10, $retry = 3) {
 // 日志记录函数
 function logMessage(&$log_messages, $message) {
     $log_messages[] = date("[y-m-d H:i:s]") . " " . $message;
+    echo date("[y-m-d H:i:s]") . " " . $message . "<br>";
 }
 
 // 下载 JSON 数据并存入数据库
@@ -177,9 +178,9 @@ function downloadJSONData($json_url, $db, &$log_messages, $channel_name, $replac
     if (!empty(json_decode($json_data, true)['data'])) {
         $db->beginTransaction();
         try {
-            processJsonData($json_data, $db, $channel_name, $replaceFlag);
+            $processCount = processJsonData($json_data, $db, $channel_name, $replaceFlag);
             $db->commit();
-            logMessage($log_messages, "【tvmao】 $channel_name 更新成功");
+            logMessage($log_messages, "【tvmao】 $channel_name 更新成功，共 {$processCount} 条");
         } catch (Exception $e) {
             $db->rollBack();
             logMessage($log_messages, "【tvmao】 " . $e->getMessage());
@@ -187,6 +188,7 @@ function downloadJSONData($json_url, $db, &$log_messages, $channel_name, $replac
     } else {
         logMessage($log_messages, "【tvmao】 $channel_name 下载失败！！！");
     }
+    echo "<br>";
 }
 
 // 处理 JSON 数据并逐步存入数据库
@@ -236,6 +238,9 @@ function processJsonData($json_data, $db, $channel_name, $replaceFlag) {
     }}}}}
     $channelProgrammes[$channelId]['channel_name'] = $channel_name;
     insertDataToDatabase($channelProgrammes, $db, 'tvmao', $replaceFlag);
+    
+    $processCount = count($data);
+    return $processCount;
 }
 
 // 插入数据到数据库
@@ -249,7 +254,6 @@ function insertDataToDatabase($channelsData, $db, $sourceUrl, $replaceFlag = tru
             // 检查是否全天只有一个节目
             if (count($title = array_unique(array_column($diypProgrammes, 'title'))) === 1 
                 && preg_match('/节目|節目/u', $title[0])) {
-                echo basename($sourceUrl) . "，{$channelName}，{$date}：全天仅《{$title[0]}》，已跳过。<br>";
                 continue; // 跳过后续处理
             }
             // 生成 epg_diyp 数据内容

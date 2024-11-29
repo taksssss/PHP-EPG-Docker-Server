@@ -32,7 +32,7 @@ if (!preg_match('/^[a-f0-9]{32}$/i', $Config['manage_password']) || empty($Confi
     if (empty($Config['live_token'])) {
         $Config['live_token'] = substr(bin2hex(random_bytes(5)), 0, 10);  // 生成 10 位随机字符串
     }
-    file_put_contents($config_path, json_encode($Config, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+    file_put_contents($configPath, json_encode($Config, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
 }
 
 // 处理密码更新请求
@@ -46,7 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['change_password'])) {
         $Config['manage_password'] = $newPassword;
 
         // 将新配置写回 config.json
-        file_put_contents($config_path, json_encode($Config, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        file_put_contents($configPath, json_encode($Config, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
 
         // 设置密码更改成功的标志变量
         $passwordChanged = true;
@@ -85,7 +85,7 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
 
 // 更新配置
 function updateConfigFields() {
-    global $Config, $config_path;
+    global $Config, $configPath;
 
     // 获取和过滤表单数据
     $config_keys = array_keys(array_filter($_POST, function($key) {
@@ -158,7 +158,7 @@ function updateConfigFields() {
     }
 
     // 将新配置写回 config.json
-    file_put_contents($config_path, json_encode($Config, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+    file_put_contents($configPath, json_encode($Config, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
 
     // 重新启动 cron.php ，设置新的定时任务
     if ($oldConfig['start_time'] !== $start_time || $oldConfig['end_time'] !== $end_time || $oldConfig['interval_time'] !== $interval_time) {
@@ -178,10 +178,10 @@ try {
         // 确定操作类型
         $action_map = [
             'get_update_logs', 'get_cron_logs', 'get_channel', 'get_epg_by_channel',
-             'get_icon', 'get_channel_bind_epg', 'get_channel_match', 'get_gen_list',
-             'get_live_data', 'parse_source_info', 'toggle_status', 
-             'download_data', 'delete_unused_icons', 'delete_unused_source',
-             'get_version_log'
+            'get_icon', 'get_channel_bind_epg', 'get_channel_match', 'get_gen_list',
+            'get_live_data', 'parse_source_info', 'toggle_status', 
+            'download_data', 'delete_unused_icons', 'delete_unused_source',
+            'get_version_log'
         ];
         $action = key(array_intersect_key($_GET, array_flip($action_map))) ?: '';
 
@@ -279,7 +279,7 @@ try {
                 $channelBindEpg = $Config['channel_bind_epg'] ?? [];
                 $xmlUrls = $Config['xml_urls'];
                 $dbResponse = array_map(function($epgSrc) use ($channelBindEpg) {
-                    $cleanEpgSrc = trim(explode('#', ltrim($epgSrc, '# '))[0]);
+                    $cleanEpgSrc = trim(explode('#', strpos($epgSrc, '=>') !== false ? explode('=>', $epgSrc)[1] : ltrim($epgSrc, '# '))[0]);
                     $isInactive = strpos(trim($epgSrc), '#') === 0;
                     return [
                         'epg_src' => ($isInactive ? '【已停用】' : '') . $cleanEpgSrc,
@@ -287,7 +287,7 @@ try {
                     ];
                 }, array_filter($xmlUrls, function($epgSrc) {
                     // 去除空行和包含 "tvmao" 的行
-                    return !empty(trim($epgSrc)) && strpos($epgSrc, 'tvmao') === false;
+                    return !empty(ltrim($epgSrc, '# ')) && strpos($epgSrc, 'tvmao') === false;
                 }));
                 $dbResponse = array_merge(
                     array_filter($dbResponse, function($item) { return strpos($item['epg_src'], '【已停用】') === false; }),
@@ -388,7 +388,7 @@ try {
                 $currentStatus = isset($Config[$toggleField]) && $Config[$toggleField] == 1 ? 1 : 0;
                 $newStatus = ($currentStatus == 1) ? 0 : 1;
                 $Config[$toggleField] = $newStatus;
-                file_put_contents($config_path, json_encode($Config, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+                file_put_contents($configPath, json_encode($Config, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
                 
                 $dbResponse = ['status' => $newStatus];
                 break;
@@ -410,9 +410,10 @@ try {
 
             case 'delete_unused_icons':
                 // 清理未在使用的台标
-                $iconUrls = array_map(function($url) {
-                    return parse_url($url, PHP_URL_PATH);
-                }, array_values($iconList));
+                $iconUrls = array_merge(
+                    array_map(function($url) { return parse_url($url, PHP_URL_PATH); }, $iconList),
+                    [parse_url($Config["default_icon"], PHP_URL_PATH)]
+                );
                 $iconPath = __DIR__ . '/data/icon';
                 $deletedCount = 0;
                 foreach (scandir($iconPath) as $file) {
@@ -625,7 +626,7 @@ try {
                     if ($channelName === '【默认台标】') {
                         // 保存默认台标到 config.json
                         $Config['default_icon'] = $channelData['icon'] ?? '';
-                        file_put_contents($config_path, json_encode($Config, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+                        file_put_contents($configPath, json_encode($Config, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
                     } else {
                         // 处理普通台标数据
                         $iconList[$channelName] = $channelData['icon'];
@@ -637,7 +638,7 @@ try {
                     return !empty($icon) && !empty($channel);
                 }, ARRAY_FILTER_USE_BOTH);
 
-                if (file_put_contents($iconList_path, json_encode($iconList, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)) === false) {
+                if (file_put_contents($iconListPath, json_encode($iconList, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)) === false) {
                     echo json_encode(['success' => false, 'message' => '更新 iconList.json 时发生错误']);
                 } else {
                     echo json_encode(['success' => true]);

@@ -9,6 +9,16 @@
  * GitHub: https://github.com/taksssss/EPG-Server
  */
 
+// 禁用 PHP 输出缓冲
+ob_implicit_flush(true); // 自动刷新输出缓冲
+ob_end_flush(); // 关闭默认缓冲
+flush(); // 确保浏览器接收到内容
+
+// 设置 header，防止浏览器缓存输出
+header("Content-Type: text/html; charset=UTF-8");
+header('Cache-Control: no-cache');
+header('X-Accel-Buffering: no');
+
 // 显示 favicon
 echo '<link rel="icon" href="assets/html/favicon.ico" type="image/x-icon">';
 
@@ -41,7 +51,8 @@ function deleteOldData($db, $keep_days, &$log_messages) {
         $stmt->bindValue(':threshold_date', $threshold_date, PDO::PARAM_STR);
         $stmt->execute();
         logMessage($log_messages, "【{$logMessage}】 共 {$stmt->rowCount()} 条。");
-    }
+    }    
+    echo "<br>";
 }
 
 // 格式化时间函数，同时转化为 UTC+8 时间
@@ -115,11 +126,10 @@ function getChannelBindEPG() {
 }
 
 // 下载 XML 数据并存入数据库
-function downloadXmlData($xml_url, $db, &$log_messages, $gen_list) {
+function downloadXmlData($xml_url, $db, &$log_messages, $gen_list, $gen_list_enable) {
     global $Config;
     $xml_data = downloadData($xml_url);
     if ($xml_data !== false && stripos($xml_data, 'not found') === false) {
-        logMessage($log_messages, "【下载】 成功");
         if (substr($xml_data, 0, 2) === "\x1F\x8B") { // 通过魔数判断 .gz 文件
             $xml_data = gzdecode($xml_data);
             if ($xml_data === false) {
@@ -127,27 +137,38 @@ function downloadXmlData($xml_url, $db, &$log_messages, $gen_list) {
                 return;
             }
         }
+        // 获取文件大小（字节）并转换为 KB/MB
+        $fileSize = strlen($xml_data);
+        $fileSizeReadable = $fileSize >= 1048576 
+            ? round($fileSize / 1048576, 2) . ' MB' 
+            : round($fileSize / 1024, 2) . ' KB';
+        logMessage($log_messages, "【下载】 成功：xml 文件 {$fileSizeReadable}");
+
         $xml_data = preg_replace('/[\x00-\x1F]/u', ' ', $xml_data); // 清除所有控制字符
         if (isset($Config['all_chs']) && $Config['all_chs']) { $xml_data = t2s($xml_data); }
         $db->beginTransaction();
         try {
-            processXmlData($xml_url, $xml_data, $db, $gen_list);
+            $processCount = processXmlData($xml_url, $xml_data, $db, $gen_list, $gen_list_enable);
             $db->commit();
-            logMessage($log_messages, "【更新】 成功");
+            logMessage($log_messages, "【更新】 成功：共 {$processCount} 条");
         } catch (Exception $e) {
             $db->rollBack();
             logMessage($log_messages, "【处理数据出错！！！】 " . $e->getMessage());
         }
     } else {
         logMessage($log_messages, "【下载】 失败！！！");
-    }
+    }    
+    echo "<br>";
 }
 
 // 处理 XML 数据并逐步存入数据库
-function processXmlData($xml_url, $xml_data, $db, $gen_list) {
+function processXmlData($xml_url, $xml_data, $db, $gen_list, $gen_list_enable) {
     global $Config;
     global $processedRecords;
     global $channel_bind_epg;
+
+    // 统计处理数据量
+    $processCount = 0;
 
     $reader = new XMLReader();
     if (!$reader->XML($xml_data)) {
@@ -180,7 +201,7 @@ function processXmlData($xml_url, $xml_data, $db, $gen_list) {
         }
 
         // 当 gen_list_enable 为 0 时，插入所有数据
-        if (empty($Config['gen_list_enable'])) {
+        if (!$gen_list_enable) {
             $channelNamesMap[$channelId] = $channelNameSimplified;
             continue;
         }
@@ -207,6 +228,7 @@ function processXmlData($xml_url, $xml_data, $db, $gen_list) {
     $overwrite_time_zone = strpos($xml_data, 'epg.pw') !== false ? '+0800' : '';
 
     while ($reader->name === 'programme') {
+        $processCount++;
         $programme = new SimpleXMLElement($reader->readOuterXML());
         $start = getFormatTime((string)$programme['start'], $overwrite_time_zone);
         $end = getFormatTime((string)$programme['stop'], $overwrite_time_zone);
@@ -263,11 +285,13 @@ function processXmlData($xml_url, $xml_data, $db, $gen_list) {
     }
     
     $reader->close();
+    
+    return $processCount;
 }
 
 // 从 epg_data 表生成 XML 数据并逐个频道写入 t.xml 文件
 function generateXmlFromEpgData($db, $include_future_only, $gen_list_mapping, &$log_messages) {
-    global $Config, $iconList, $iconList_path;
+    global $Config, $iconList, $iconListPath;
 
     $currentDate = date('Y-m-d'); // 获取当前日期
     $dateCondition = $include_future_only ? "WHERE date >= '$currentDate'" : '';
@@ -395,7 +419,7 @@ function generateXmlFromEpgData($db, $include_future_only, $gen_list_mapping, &$
     compressXmlFile('t.xml');
 
     // 更新 iconList.json 文件中的数据
-    if (file_put_contents($iconList_path, json_encode($iconList, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)) === false) {
+    if (file_put_contents($iconListPath, json_encode($iconList, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)) === false) {
         logMessage($log_messages, "【台标列表】 更新 iconList.json 时发生错误！！！");
     } else {
         logMessage($log_messages, "【台标列表】 已更新 iconList.json");
@@ -458,11 +482,17 @@ foreach ($Config['xml_urls'] as $xml_url) {
     }
 
     // 更新 XML 数据
-    $url_parts = explode('#', $xml_url);
-    $cleaned_url = trim($url_parts[0]);
+    $cleaned_url = trim(explode('#', strpos($xml_url, '=>') !== false ? explode('=>', $xml_url)[1] : $xml_url)[0]);
+    logMessage($log_messages, "【地址】 $cleaned_url");
 
-    logMessage($log_messages, "【更新地址】 $cleaned_url");
-    downloadXmlData($cleaned_url, $db, $log_messages, $gen_list);
+    // 判断是否有限定频道列表并下载数据
+    if (strpos($xml_url, '=>') !== false) {
+        $tmp_gen_list = array_map('trim', explode(",", explode('=>', $xml_url)[0]));
+        logMessage($log_messages, "【临时】 限定频道：" . implode(", ", $tmp_gen_list));
+        downloadXmlData($cleaned_url, $db, $log_messages, $tmp_gen_list, 1);
+    } else {
+        downloadXmlData($cleaned_url, $db, $log_messages, $gen_list, !empty($Config['gen_list_enable']));
+    }
 }
 
 // 判断是否生成 xmltv 文件
@@ -484,12 +514,13 @@ if (isset($Config['live_source_auto_sync']) && $Config['live_source_auto_sync'] 
 // 统计更新后数据条数
 $finalCount = $db->query("SELECT COUNT(*) FROM epg_data")->fetchColumn();
 $dif = $finalCount - $initialCount;
-$msg = $dif > 0 ? " 增加 {$dif} 条。" : ($dif < 0 ? " 减少 " . abs($dif) . " 条。" : "");
+$msg = $dif != 0 ? ($dif > 0 ? " 增加 $dif 。" : " 减少 " . abs($dif) . " 。") : "";
 // 记录结束时间
 $endTime = microtime(true);
 // 计算运行时间（以秒为单位）
 $executionTime = round($endTime - $startTime, 1);
-logMessage($log_messages, "【更新完成】 {$executionTime} 秒。 更新前：{$initialCount} 条，更新后：{$finalCount} 条。" . $msg);
+echo "<br>";
+logMessage($log_messages, "【更新完成】 {$executionTime} 秒。节目天数：更新前 {$initialCount} ，更新后 {$finalCount} 。" . $msg);
 
 // 将日志信息写入数据库
 $log_message_str = implode("<br>", $log_messages);
@@ -498,7 +529,5 @@ $stmt = $db->prepare('INSERT INTO update_log (timestamp, log_message) VALUES (:t
 $stmt->bindValue(':timestamp', $timestamp, PDO::PARAM_STR);
 $stmt->bindValue(':log_message', $log_message_str, PDO::PARAM_STR);
 $stmt->execute();
-
-echo implode("<br>", $log_messages);
 
 ?>

@@ -759,6 +759,7 @@ function handleIconFileUpload(event, item, row, allData) {
     } else {
         showMessageModal('请选择PNG文件上传');
     }
+    event.target.value = ''; // 重置文件输入框的值，确保可以连续上传相同文件
 }
 
 // 转存所有台标到服务器
@@ -984,9 +985,18 @@ function updateIconListJsonFile(notify = false) {
                 update_icon_list: true,
                 updatedIcons: JSON.stringify(allIcons) // 传递更新后的图标数据
             })
-        });
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && notify) {
+                showModal('icon');
+                showMessageModal('保存成功');
+            } else if (data.success == false) {
+                showMessageModal(data.message);
+            }
+        })
+        .catch(error => showMessageModal('更新过程中发生错误：' + error));
     }
-    if (notify) showMessageModal('保存成功');
 }
 
 // 导入配置
