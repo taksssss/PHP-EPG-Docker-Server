@@ -24,13 +24,13 @@ if ($Config['interval_time'] !== 0) {
     }
 }
 
-// 过渡到新的 md5 密码并生成 live_token（如果不存在或为空）
-if (!preg_match('/^[a-f0-9]{32}$/i', $Config['manage_password']) || empty($Config['live_token'])) {
+// 过渡到新的 md5 密码并生成 token（如果不存在或为空）
+if (!preg_match('/^[a-f0-9]{32}$/i', $Config['manage_password']) || empty($Config['token'])) {
     if (!preg_match('/^[a-f0-9]{32}$/i', $Config['manage_password'])) {
         $Config['manage_password'] = md5($Config['manage_password']);
     }
-    if (empty($Config['live_token'])) {
-        $Config['live_token'] = substr(bin2hex(random_bytes(5)), 0, 10);  // 生成 10 位随机字符串
+    if (empty($Config['token'])) {
+        $Config['token'] = substr(bin2hex(random_bytes(5)), 0, 10);  // 生成 10 位随机字符串
     }
     file_put_contents($configPath, json_encode($Config, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
 }
@@ -358,12 +358,15 @@ try {
                     $header = fgetcsv($csvFile); // 跳过表头
                     while (($row = fgetcsv($csvFile)) !== false) {
                         $channelsData[] = [
-                            'group' => $row[0] ?? '',
-                            'name' => $row[1] ?? '',
-                            'url' => $row[2] ?? '',
-                            'logo' => $row[3] ?? '',
-                            'tvg_id' => $row[4] ?? '',
-                            'tvg_name' => $row[5] ?? '',
+                            'groupTitle' => $row[0] ?? '',
+                            'channelName' => $row[1] ?? '',
+                            'streamUrl' => $row[2] ?? '',
+                            'iconUrl' => $row[3] ?? '',
+                            'tvgId' => $row[4] ?? '',
+                            'tvgName' => $row[5] ?? '',
+                            'disable' => $row[6] ?? '',
+                            'modified' => $row[7] ?? '',
+                            'tag' => $row[8] ?? '',
                         ];
                     }
                     fclose($csvFile);
@@ -516,6 +519,7 @@ try {
             'upload_source_file' => isset($_FILES['liveSourceFile']),
             'save_source_url' => isset($_POST['save_source_url']),
             'save_source_info' => isset($_POST['save_source_info']),
+            'save_token' => isset($_POST['save_token']),
         ];
 
         // 确定操作类型
@@ -684,20 +688,29 @@ try {
                     echo json_encode(['success' => false, 'message' => '无效的数据']);
                     exit;
                 }
-                $filePath = $liveDir . 'channels.csv';            
+                $filePath = $liveDir . 'channels.csv';
                 if (($file = fopen($filePath, 'w')) !== false) {
-                    fputcsv($file, ['分组', '频道名', '直播地址', '台标地址', 'tvg-id', 'tvg-name']);
+                    fputcsv($file, ['groupTitle', 'channelName', 'streamUrl', 'iconUrl', 'tvgId', 'tvgName', 'disable', 'modified', 'tag']);
                     foreach ($content as $row) {
                         fputcsv($file, array_values($row));
                     }
                     fclose($file);
-
-                    // 重新生成 M3U 和 TXT 文件
-                    generateLiveFiles($liveDir . 'channels.csv', $liveDir);
-                    
+                    generateLiveFiles(); // 重新生成 M3U 和 TXT 文件
                     echo json_encode(['success' => true]);
                 } else {
                     echo json_encode(['success' => false, 'message' => '无法打开文件']);
+                }
+                exit;
+
+            case 'save_token':
+                // 保存 token
+                $token = $_POST['content'] ?? '';
+                $Config['token'] = $token;
+                if (file_put_contents($configPath, json_encode($Config, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)) !== false) {
+                    echo json_encode(['success' => true]);
+                } else {
+                    http_response_code(500);
+                    echo '保存失败';
                 }
                 exit;
         }

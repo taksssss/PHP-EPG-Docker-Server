@@ -24,7 +24,8 @@
     },
     "live_source_auto_sync": 0,
     "live_channel_name_process": 0,
-    "live_token": "",
+    "token": "",
+    "token_range": 1,
     "default_icon": "",
     "check_update": 1,
     "manage_password": ""

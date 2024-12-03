@@ -10,13 +10,10 @@
  */
 
 // 禁用 PHP 输出缓冲
-ob_implicit_flush(true); // 自动刷新输出缓冲
-ob_end_flush(); // 关闭默认缓冲
-flush(); // 确保浏览器接收到内容
+ob_implicit_flush(true);
+ob_end_flush();
 
 // 设置 header，防止浏览器缓存输出
-header("Content-Type: text/html; charset=UTF-8");
-header('Cache-Control: no-cache');
 header('X-Accel-Buffering: no');
 
 // 显示 favicon
@@ -291,7 +288,7 @@ function processXmlData($xml_url, $xml_data, $db, $gen_list, $gen_list_enable) {
 
 // 从 epg_data 表生成 XML 数据并逐个频道写入 t.xml 文件
 function generateXmlFromEpgData($db, $include_future_only, $gen_list_mapping, &$log_messages) {
-    global $Config, $iconList, $iconListPath;
+    global $Config, $iconList;
 
     $currentDate = date('Y-m-d'); // 获取当前日期
     $dateCondition = $include_future_only ? "WHERE date >= '$currentDate'" : '';
@@ -351,7 +348,7 @@ function generateXmlFromEpgData($db, $include_future_only, $gen_list_mapping, &$
             $xmlWriter->endElement(); // display-name
         }
 
-        $iconUrl = iconUrlMatch($originalChannel);
+        $iconUrl = iconUrlMatch($originalChannel, $getDefault = false);
 
         if ($iconUrl) {
             $iconList[strtoupper($originalChannel)] = $iconUrl;
@@ -417,13 +414,6 @@ function generateXmlFromEpgData($db, $include_future_only, $gen_list_mapping, &$
 
     // 所有频道数据写入完成后，生成 t.xml.gz 文件
     compressXmlFile('t.xml');
-
-    // 更新 iconList.json 文件中的数据
-    if (file_put_contents($iconListPath, json_encode($iconList, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)) === false) {
-        logMessage($log_messages, "【台标列表】 更新 iconList.json 时发生错误！！！");
-    } else {
-        logMessage($log_messages, "【台标列表】 已更新 iconList.json");
-    }
 }
 
 // 生成 t.xml.gz 压缩文件
@@ -498,16 +488,23 @@ foreach ($Config['xml_urls'] as $xml_url) {
 // 判断是否生成 xmltv 文件
 if ($Config['gen_xml']) {
     generateXmlFromEpgData($db, $Config['include_future_only'], $gen_list_mapping, $log_messages);
-    logMessage($log_messages, "【xmltv文件】 已生成 t.xml、t.xml.gz");
+    logMessage($log_messages, "【预告文件】 已生成 t.xml、t.xml.gz");
+}
+
+// 更新 iconList.json 文件中的数据
+if (file_put_contents($iconListPath, json_encode($iconList, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)) === false) {
+    logMessage($log_messages, "【台标列表】 更新 iconList.json 时发生错误！！！");
+} else {
+    logMessage($log_messages, "【台标列表】 已更新 iconList.json");
 }
 
 // 判断是否同步更新直播源
 if (isset($Config['live_source_auto_sync']) && $Config['live_source_auto_sync'] == 1) {
     $errorLog = doParseSourceInfo();
     if ($errorLog) {
-        logMessage($log_messages, "【直播源】 部分更新异常：" . rtrim(str_replace('<br>', '、', $errorLog), '、'));
+        logMessage($log_messages, "【直播文件】 部分更新异常：" . rtrim(str_replace('<br>', '、', $errorLog), '、'));
     } else {
-        logMessage($log_messages, "【直播源】 已同步更新");
+        logMessage($log_messages, "【直播文件】 已同步更新");
     }
 }
 

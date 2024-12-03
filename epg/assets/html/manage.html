@@ -282,7 +282,7 @@
             <textarea id="sourceUrlTextarea" placeholder="支持 .txt 和 .m3u 格式，光标离开后自动保存。
 地址前 # 临时停用，后 # 备注并作为分组前缀。快捷键：Ctrl+/ 。
 示例：https://xxx.xx/xx.m3u #前缀1:
-可通过 <?php echo $serverUrl . '/?live&token=' . $Config['live_token']; ?>&url=xxx 访问单个直播源地址。" style="height: 102px;"></textarea>
+可通过 <?php echo $serverUrl . '/?token=' . $Config['token']; ?>&live&url=xxx 访问单个直播源地址。" style="height: 102px;"></textarea>
         </div>
         <br>
         
@@ -291,8 +291,8 @@
             <input type="file" name="liveSourceFile" id="liveSourceFile" style="display: none;" accept=".m3u, .txt">
             <button id="uploadSourceBtn" onclick="document.getElementById('liveSourceFile').click()">上传源</button>
             <button id="parseSourceInfoBtn" onclick="parseSourceInfo()">解析源</button>
-            <button id="copyM3UBtn" onclick="copyText(`<?php echo $serverUrl . '/?live=m3u&token=' . $Config['live_token']; ?>`)">m3u地址</button>
-            <button id="copyTXTBtn" onclick="copyText(`<?php echo $serverUrl . '/?live=txt&token=' . $Config['live_token']; ?>`)">txt地址</button>            
+            <button id="copyM3UBtn" onclick="copyText(`<?php echo $serverUrl . '/?token=' . $Config['token'] . '&live=m3u'; ?>`)">m3u地址</button>
+            <button id="copyTXTBtn" onclick="copyText(`<?php echo $serverUrl . '/?token=' . $Config['token'] . '&live=txt'; ?>`)">txt地址</button>            
             <div class="tooltip" style="width: 120%;">
                 <button id="toggleLiveSourceSyncBtn" onclick="toggleStatus('toggleLiveSourceSyncBtn')">
                     同步: <?php echo (isset($Config['live_source_auto_sync']) && $Config['live_source_auto_sync'] == 1 ? '是' : '否'); ?>
@@ -325,6 +325,8 @@
                         <th style='width: 20%'>台标地址</th>
                         <th style='width: 8%'>tvg-id</th>
                         <th style='width: 10%'>tvg-name</th>
+                        <th style='width: 30px'>停用</th>
+                        <th style='width: 30px'>保持</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -406,13 +408,6 @@
         <!-- 第三行 -->
         <div class="row">
             <div class="column">
-                <label for="check_update">检查版本更新：</label>
-                <select id="check_update" name="check_update" required>
-                    <option value="1" <?php if (!isset($Config['check_update']) || $Config['check_update'] == 1) echo 'selected'; ?>>是</option>
-                    <option value="0" <?php if (isset($Config['check_update']) && $Config['check_update'] == 0) echo 'selected'; ?>>否</option>
-                </select>
-            </div>
-            <div class="column">
                 <div class="tooltip">
                     <label for="cache_time">缓存时间<span style="vertical-align: super;">*</span>(小时)：</label>
                     <select id="cache_time" name="cache_time" required>
@@ -429,14 +424,14 @@
                     <option value="mysql" <?php if (isset($Config['db_type']) && $Config['db_type'] == 'mysql') echo 'selected'; ?>>MySQL</option>
                 </select>
             </div>
+            <div class="column">
+                <label for="mysql_host">地址：</label>
+                <textarea id="mysql_host"><?php echo htmlspecialchars($Config['mysql']['host'] ?? ''); ?></textarea>
+            </div>
         </div>
 
         <!-- 第四行 -->
-        <div class="row" id="db_setting">
-            <div class="column">
-                <label for="mysql_host">地址：</label>
-                <textarea id="mysql_host" style="width: 145px; margin-right: 20px;"><?php echo htmlspecialchars($Config['mysql']['host'] ?? ''); ?></textarea>
-            </div>
+        <div class="row">
             <div class="column">
                 <label for="mysql_dbname">库名：</label>
                 <textarea id="mysql_dbname"><?php echo htmlspecialchars($Config['mysql']['dbname'] ?? ''); ?></textarea>
@@ -451,6 +446,28 @@
             </div>
         </div>
 
+        <!-- 第五行 -->
+        <div class="row">
+            <div class="column">
+                <label for="check_update">检查版本更新：</label>
+                <select id="check_update" name="check_update" required>
+                    <option value="1" <?php if (!isset($Config['check_update']) || $Config['check_update'] == 1) echo 'selected'; ?>>是</option>
+                    <option value="0" <?php if (isset($Config['check_update']) && $Config['check_update'] == 0) echo 'selected'; ?>>否</option>
+                </select>
+            </div>
+            <div class="column">
+                <label for="token_range"><span id="change_token_span" onclick="changeToken(`<?php echo $Config['token']; ?>`)" style="color: blue; cursor: pointer;">token</span> 范围：</label>
+                <select id="token_range" name="token_range" required onchange="showTokenRangeMessage(`<?php echo $Config['token']; ?>`, `<?php echo $serverUrl; ?>`)">
+                    <option value="0" <?php if (isset($Config['token_range']) && $Config['token_range'] == 0) echo 'selected'; ?>>无</option>
+                    <option value="1" <?php if (!isset($Config['token_range']) || $Config['token_range'] == 1) echo 'selected'; ?>>直播源</option>
+                    <option value="2" <?php if (isset($Config['token_range']) && $Config['token_range'] == 2) echo 'selected'; ?>>EPG</option>
+                    <option value="3" <?php if (isset($Config['token_range']) && $Config['token_range'] == 3) echo 'selected'; ?>>全部</option>
+                </select>
+            </div>            
+            <div class="column">
+            </div>
+        </div>
+
         <!-- 其他设置 -->
         <label for="gen_list_text">仅生成以下频道数据：</label>
         <select id="gen_list_enable" name="gen_list_enable" style="width: 50px; margin-right: 0px;" required>
@@ -461,8 +478,8 @@
             （粘贴m3u、txt地址或内容，<span onclick="parseSource()" style="color: blue; cursor: pointer; text-decoration: underline;">解析</span> 后
             <span onclick="showModal('channelmatch')" style="color: blue; cursor: pointer; text-decoration: underline;">查看匹配</span>）
         </span>
-        <br><br>
-        <textarea id="gen_list_text"></textarea><br><br>
+        <br>
+        <textarea id="gen_list_text" style="margin-top: 12px; margin-bottom: 12px;"></textarea><br>
 
         <button id="saveConfig" type="button" onclick="setGenListAndUpdateConfig();">保存配置</button>
     </div>

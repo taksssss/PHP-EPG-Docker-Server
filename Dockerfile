@@ -13,6 +13,7 @@ RUN apk --no-cache --update \
     apache2-ssl \
     curl \
     memcached \
+    tzdata \
     php83-apache2 \
     php83-bcmath \
     php83-bz2 \

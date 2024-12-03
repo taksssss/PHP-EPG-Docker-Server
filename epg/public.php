@@ -114,31 +114,41 @@ function t2s($channel) {
 }
 
 // 台标模糊匹配
-function iconUrlMatch($originalChannel) {
+function iconUrlMatch($originalChannel, $getDefault = true) {
     global $Config, $iconListMerged;
 
-    $iconUrl = $Config['default_icon'] ?? null;
     // 精确匹配
     if (isset($iconListMerged[$originalChannel])) {
-        $iconUrl = $iconListMerged[$originalChannel];
-    } else {
-        $bestMatch = null;
-        // 正向模糊匹配
+        return $iconListMerged[$originalChannel];
+    }
+
+    $bestMatch = null;
+    $iconUrl = null;
+
+    // 正向模糊匹配（原始频道名包含在列表中的频道名中）
+    foreach ($iconListMerged as $channelName => $icon) {
+        if (stripos($channelName, $originalChannel) !== false) {
+            if ($bestMatch === null || strlen($channelName) < strlen($bestMatch)) {
+                $bestMatch = $channelName;
+                $iconUrl = $icon;
+            }
+        }
+    }
+
+    // 反向模糊匹配（列表中的频道名包含在原始频道名中）
+    if (!$iconUrl) {
         foreach ($iconListMerged as $channelName => $icon) {
-            if (stripos($channelName, $originalChannel) !== false) {
-                if ($bestMatch === null || strlen($channelName) < strlen($bestMatch)) {
+            if (stripos($originalChannel, $channelName) !== false) {
+                if ($bestMatch === null || strlen($channelName) > strlen($bestMatch)) {
                     $bestMatch = $channelName;
                     $iconUrl = $icon;
-        }}}
-        if(!$iconUrl) {
-        // 反向模糊匹配
-            foreach ($iconListMerged as $channelName => $icon) {
-                if (stripos($originalChannel, $channelName) !== false) {
-                    if ($bestMatch === null || strlen($channelName) > strlen($bestMatch)) {
-                        $bestMatch = $channelName;
-                        $iconUrl = $icon;
-    }}}}}
-    return $iconUrl;
+                }
+            }
+        }
+    }
+
+    // 如果没有找到匹配的图标，使用默认图标（如果配置中存在）
+    return $iconUrl ?: ($getDefault && !empty($Config['default_icon']) ? $Config['default_icon'] : null);
 }
 
 // 下载文件
@@ -294,6 +304,7 @@ function doParseSourceInfo() {
     global $liveDir, $liveFileDir, $Config;
 
     $liveChannelNameProcess = $Config['live_channel_name_process'] ?? false; // 标记是否处理频道名
+    
     // 频道数据模糊匹配函数
     function dbChannelNameMatch($channelName) {
         global $db;
@@ -307,14 +318,28 @@ function doParseSourceInfo() {
         return $stmt->fetchColumn();
     }
 
+    // 读取现有的 CSV 文件，建立 tag 映射
+    $existingData = [];
+    $csvFilePath = $liveDir . 'channels.csv';
+    if (file_exists($csvFilePath)) {
+        $csvFile = fopen($csvFilePath, 'r');
+        $header = fgetcsv($csvFile); // 读取表头
+        while ($row = fgetcsv($csvFile)) {
+            $rowData = array_combine($header, $row);
+            if ($rowData['modified'] == 1) { // 只保留 modified 为 1 的行
+                $existingData[$rowData['tag']] = $rowData; // 使用 tag 作为映射的键
+            }
+        }
+        fclose($csvFile);
+    }
+
     // 读取 source.txt 内容，处理每行 URL
     $sourceContent = file_get_contents($liveDir . 'source.txt');
     $lines = array_filter(array_map('ltrim', explode("\n", $sourceContent)));
 
-    // 写入表头
-    $csvFilePath = $liveDir . 'channels.csv';
+    // 打开 CSV 文件写入新数据
     $csvFile = fopen($csvFilePath, 'w');
-    fputcsv($csvFile, ['频道分组', '频道名', '直播地址', '台标地址', 'tvg-id', 'tvg-name']);
+    fputcsv($csvFile, ['groupTitle', 'channelName', 'streamUrl', 'iconUrl', 'tvgId', 'tvgName', 'disable', 'modified', 'tag']);
     $errorLog = '';
 
     foreach ($lines as $line) {
@@ -353,74 +378,99 @@ function doParseSourceInfo() {
                     // 处理 `#EXTINF` 行，提取频道信息
                     if (preg_match('/#EXTINF:-1(.*),(.+)/', $line, $matches)) {
                         $channelInfo = $matches[1];
+                        $groupTitle = preg_match('/group-title="([^"]+)"/', $channelInfo, $match) ? trim($match[1]) : '';
                         $originalChannelName = trim($matches[2]);
                         $streamUrl = trim($lines[$i + 1]);
+                        // 使用 dbChannelNameMatch 来检查频道名
                         $cleanChannelName = cleanChannelName($originalChannelName);
                         $dbChannelName = dbChannelNameMatch($cleanChannelName);
                         $channelName = $dbChannelName ?: $cleanChannelName;
                         $iconUrl = iconUrlMatch($channelName);
                         $tvgName = $dbChannelName ?? (preg_match('/tvg-name="([^"]+)"/', $channelInfo, $match) ? $match[1] : "");
-    
-                        // 将频道信息组织成数组
-                        $rowData = [
-                            'groupTitle' => preg_match('/group-title="([^"]+)"/', $channelInfo, $match) ? trim($groupPrefix . $match[1]) : '',
+                        $tag = md5($url . $groupTitle . $originalChannelName . $streamUrl);
+
+                        // 检查该行是否已经修改
+                        $existingRow = isset($existingData[$tag]) ? $existingData[$tag] : null;
+                        $rowData = $existingRow ? $existingRow : [
+                            'groupTitle' => trim($groupPrefix . $groupTitle),
                             'channelName' => $liveChannelNameProcess ? $channelName : $originalChannelName,
                             'streamUrl' => $streamUrl,
                             'iconUrl' => $iconUrl ?? (preg_match('/tvg-logo="([^"]+)"/', $channelInfo, $match) ? $match[1] : ''),
                             'tvgId' => preg_match('/tvg-id="([^"]+)"/', $channelInfo, $match) ? $match[1] : '',
                             'tvgName' => $tvgName,
+                            'disable' => 0,
+                            'modified' => 0,
+                            'tag' => $tag,
                         ];
-    
-                        // 写入 CSV 文件
+
+                        // 将频道信息写入 CSV 文件
                         fputcsv($csvFile, $rowData);
                     }
                 }
             }
         } else {
             // 处理 TXT 格式的直播源
-            $groupTitlePart = '';
+            $groupTitle = '';
             foreach ($lines as $line) {
                 $line = trim($line);
                 $parts = explode(',', $line);
             
                 if (count($parts) == 2) {
                     if ($parts[1] === '#genre#') {
-                        $groupTitlePart = trim($parts[0]); // 更新 group-title
+                        $groupTitle = trim($parts[0]); // 更新 group-title
                         continue;
                     }
             
-                    $groupTitle = trim($groupPrefix . $groupTitlePart);
                     $originalChannelName = trim($parts[0]);
                     $streamUrl = trim($parts[1]);
+                    // 使用 dbChannelNameMatch 来检查频道名
                     $cleanChannelName = cleanChannelName($originalChannelName);
                     $dbChannelName = dbChannelNameMatch($cleanChannelName);
                     $channelName = $dbChannelName ?: $cleanChannelName;
                     $iconUrl = iconUrlMatch($channelName);
                     $tvgName = $dbChannelName ?? "";
+                    $tag = md5($url . $groupTitle . $originalChannelName . $streamUrl);
+
+                    // 检查该行是否已经修改
+                    $existingRow = isset($existingData[$tag]) ? $existingData[$tag] : null;
+                    $rowData = $existingRow ? $existingRow : [
+                        'groupTitle' => trim($groupPrefix . $groupTitle),
+                        'channelName' => $liveChannelNameProcess ? $channelName : $originalChannelName,
+                        'streamUrl' => $streamUrl,
+                        'iconUrl' => $iconUrl,
+                        'tvgId' => '',
+                        'tvgName' => $tvgName,
+                        'disable' => 0,
+                        'modified' => 0,
+                        'tag' => $tag,
+                    ];
             
-                    fputcsv($csvFile, [$groupTitle, $liveChannelNameProcess ? $channelName : $originalChannelName, $streamUrl, $iconUrl, "", $tvgName]);
+                    fputcsv($csvFile, $rowData);
                 }
-            }   
+            }
         }
     }
     
     fclose($csvFile);
 
     // 执行文件生成
-    generateLiveFiles($csvFilePath, $liveDir);
+    generateLiveFiles();
 
     return $errorLog;
 }
 
 // 生成 M3U 和 TXT 文件
-function generateLiveFiles($csvFilePath, $liveDir) {
+function generateLiveFiles() {
+    global $liveDir;
+
     $m3uContent = "#EXTM3U x-tvg-url=\"\"\n";
     $groups = [];
-    $csvFile = fopen($csvFilePath, 'r');
+    $csvFile = fopen($liveDir . 'channels.csv', 'r');
     fgetcsv($csvFile);  // 跳过表头
 
     while ($row = fgetcsv($csvFile)) {
-        list($groupTitle, $channelName, $streamUrl, $iconUrl, $tvgId, $tvgName) = $row;
+        list($groupTitle, $channelName, $streamUrl, $iconUrl, $tvgId, $tvgName, $disable) = $row;
+        if ($disable) continue;
         $extInfLine = "#EXTINF:-1" .
             ($tvgId ? " tvg-id=\"$tvgId\"" : "") .
             ($tvgName ? " tvg-name=\"$tvgName\"" : "") .

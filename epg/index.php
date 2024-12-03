@@ -13,6 +13,29 @@
 // 引入公共脚本
 require_once 'public.php';
 
+// 获取当前完整的 URL
+$requestUrl = $_SERVER['REQUEST_URI'];
+
+// 修正 URL 格式：如果存在多个 `?`，将后续的 `?` 替换为 `&`
+if (substr_count($requestUrl, '?') > 1) {
+    $requestUrl = preg_replace('/&/', '?', preg_replace('/\?/', '&', $requestUrl), 1);
+}
+
+// 解析 URL 中的查询参数
+parse_str(parse_url($requestUrl, PHP_URL_QUERY), $query_params);
+
+// 获取 URL 中的 token 参数并验证
+$tokenRange = $Config['token_range'] ?? 1;
+$token = $query_params['token'] ?? '';
+$live = !empty($query_params['live']);
+if ($tokenRange !== 0 && $token !== $Config['token']) {
+    if (($tokenRange !== 2 && $live) || ($tokenRange !== 1 && !$live)) {
+        http_response_code(403);
+        echo '访问被拒绝：无效的 Token。';
+        exit;
+    }
+}
+
 // 禁止输出错误提示
 error_reporting(0);
 
@@ -194,50 +217,40 @@ function findCurrentProgramme($programmes) {
 function liveFetchHandler($query_params) {
     global $Config, $liveDir, $serverUrl, $liveFileDir;
 
-    if ($query_params['token'] === $Config['live_token']) {
-        header('Content-Type: text/plain');
+    header('Content-Type: text/plain');
 
-        // 如果存在 'url' 参数
-        if (!empty($query_params['url'])) {
-            $url = $query_params['url'];
-            $filePath = (stripos($url, '/data/live/file/') !== false) 
-                ? $liveFileDir . basename($url)
-                : $liveFileDir . '/' . md5(urlencode($url)) . '.txt';
+    // 如果存在 'url' 参数
+    if (!empty($query_params['url'])) {
+        $url = $query_params['url'];
+        $filePath = (stripos($url, '/data/live/file/') !== false) 
+            ? $liveFileDir . basename($url)
+            : $liveFileDir . '/' . md5(urlencode($url)) . '.txt';
 
-            echo file_exists($filePath) ? file_get_contents($filePath) : "文件不存在";
-            exit;
+        echo file_exists($filePath) ? file_get_contents($filePath) : "文件不存在";
+        exit;
+    }
+
+    // 处理 'live' 参数
+    $filePath = $liveDir . (($query_params['live'] === 'txt') ? 'tv.txt' : ($query_params['live'] === 'm3u' ? 'tv.m3u' : ''));
+
+    if (file_exists($filePath)) {
+        $content = file_get_contents($filePath);
+        $tvgUrl = $serverUrl . ($query_params['live'] === 'm3u' ? '/t.xml.gz' : '/');
+        if ($query_params['live'] === 'm3u') {
+            $content = preg_replace('/(#EXTM3U x-tvg-url=")(.*?)(")/', '$1' . $tvgUrl . '$3', $content, 1);
+        } elseif ($query_params['live'] === 'txt') {
+            $content = preg_replace('/#genre#/', '#genre#,' . $tvgUrl, $content, 1);
         }
-
-        // 处理 'live' 参数
-        $filePath = $liveDir . (($query_params['live'] === 'txt') ? 'tv.txt' : ($query_params['live'] === 'm3u' ? 'tv.m3u' : ''));
-
-        if (file_exists($filePath)) {
-            $content = file_get_contents($filePath);
-            $tvgUrl = $serverUrl . ($query_params['live'] === 'm3u' ? '/t.xml.gz' : '/');
-            if ($query_params['live'] === 'm3u') {
-                $content = preg_replace('/(#EXTM3U x-tvg-url=")(.*?)(")/', '$1' . $tvgUrl . '$3', $content, 1);
-            } elseif ($query_params['live'] === 'txt') {
-                $content = preg_replace('/#genre#/', '#genre#,' . $tvgUrl, $content, 1);
-            }
-            echo $content;
-        } else {
-            echo "文件不存在或无效的 live 类型";
-        }        
+        echo $content;
     } else {
-        echo "无效的 token";
+        echo "文件不存在或无效的 live 类型";
     }
     exit;
 }
 
 // 处理请求
-function fetchHandler() {
+function fetchHandler($query_params) {
     global $init, $db, $Config;
-
-    $uri = parse_url($_SERVER['REQUEST_URI']);
-    $query_params = [];
-    if (isset($uri['query'])) {
-        parse_str($uri['query'], $query_params);
-    }
 
     // 处理直播源请求    
     if (isset($query_params['live'])) {
@@ -285,6 +298,7 @@ function fetchHandler() {
             $matchChannelName = json_decode($response, true)['channel_name'] ?? $oriChannelName;
             $json_url = "https://sp0.baidu.com/8aQDcjqpAAV3otqbppnN2DJv/api.php?query=$matchChannelName&resource_id=12520&format=json";
             downloadJSONData($json_url, $db, $log_messages, $matchChannelName, $replaceFlag = false); // 只更新无数据的日期
+            ob_end_clean(); // 清除缓存内容，避免显示
             $newResponse = readEPGData($date, $oriChannelName, $matchChannelName, $db, $type);
             processResponse($newResponse, $oriChannelName, $date, $type, $init);
         }
@@ -335,6 +349,6 @@ function fetchHandler() {
 }
 
 // 执行请求处理
-fetchHandler();
+fetchHandler($query_params);
 
 ?>

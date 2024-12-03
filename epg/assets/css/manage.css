@@ -29,7 +29,7 @@ textarea {
     word-break: break-all; /* 允许单词内断行 */
 }
 textarea[id="gen_list_text"] {
-    height: 157px;
+    height: 140px;
 }
 .form-row {
     display: flex;
@@ -289,11 +289,8 @@ input[type="text"] {
 .row {
     display: flex;
     flex-wrap: nowrap; /* 禁止换行 */
-    gap: 35px;
-    margin-bottom: 15px;
-}
-.row[id="db_setting"] {
-    gap: 15px;
+    gap: 45px;
+    margin-bottom: 12px;
 }
 .column {
     display: flex;

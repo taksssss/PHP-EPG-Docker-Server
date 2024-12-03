@@ -12,7 +12,7 @@ document.getElementById('settingsForm').addEventListener('submit', function(even
 
     const fields = ['update_config', 'gen_xml', 'include_future_only', 'ret_default', 'tvmao_default', 
         'all_chs', 'cache_time', 'db_type', 'mysql_host', 'mysql_dbname', 'mysql_username', 'mysql_password', 
-        'gen_list_enable', 'check_update'];
+        'gen_list_enable', 'check_update', 'token_range'];
 
     // 创建隐藏字段并将其添加到表单
     const form = this;
@@ -327,7 +327,7 @@ function updateLogTable(logData) {
     logData.forEach(log => {
         var row = document.createElement("tr");
         row.innerHTML = `
-            <td>${new Date(log.timestamp).toLocaleString('zh-CN')}</td>
+            <td>${new Date(log.timestamp).toLocaleString('zh-CN').replace(' ', '<br>')}</td>
             <td>${log.log_message}</td>
         `;
         logTableBody.appendChild(row);
@@ -443,19 +443,38 @@ function displayPage(data, page) {
     const end = Math.min(start + rowsPerPage, data.length);
 
     if (data.length === 0) {
-        tableBody.innerHTML = '<tr><td colspan="7">暂无数据</td></tr>';
+        tableBody.innerHTML = '<tr><td colspan="8">暂无数据</td></tr>';
         return;
     }
 
     // 列索引和对应字段的映射
-    const columns = ['group', 'name', 'url', 'logo', 'tvg_id', 'tvg_name'];
+    const columns = ['groupTitle', 'channelName', 'streamUrl', 'iconUrl', 'tvgId', 'tvgName', 'disable', 'modified'];
 
     // 填充当前页的表格数据
     data.slice(start, end).forEach((item, index) => {
         const row = document.createElement('tr');
         row.innerHTML = `
             <td>${start + index + 1}</td>
-            ${columns.map(col => `<td contenteditable="true">${item[col] || ''}</td>`).join('')}
+            ${columns.map((col, columnIndex) => {
+                let cellContent = item[col] || '';
+                let cellStyle = '';
+            
+                // 处理 disable 和 modified 列
+                if (col === 'disable' || col === 'modified') {
+                    cellContent = item[col] == 1 ? '是' : '否';
+                    cellStyle = (col === 'disable' && item[col] == 1) 
+                        ? 'font-weight: bold; color: red; background-color: #FFFFE0; cursor: pointer; user-select: none;' 
+                        : (col === 'modified' && item[col] == 1) 
+                        ? 'font-weight: bold; color: red; background-color: #DEFAFF; cursor: pointer; user-select: none;' 
+                        : 'cursor: pointer; user-select: none;';
+                }
+                const editable = (col === 'disable' || col === 'modified') ? '' : 'contenteditable="true"';
+                const clickableClass = (col === 'disable' || col === 'modified') ? 'clickable' : '';
+            
+                return `<td ${editable} class="${clickableClass}" style="${cellStyle}">
+                            ${cellContent}
+                        </td>`;
+            }).join('')}
         `;
 
         // 为每个单元格添加事件监听器
@@ -464,10 +483,39 @@ function displayPage(data, page) {
                 const dataIndex = (currentPage - 1) * rowsPerPage + index;
                 if (dataIndex < allLiveData.length) {
                     allLiveData[dataIndex][columns[columnIndex]] = cell.textContent.trim();
+                    
+                    allLiveData[dataIndex]['modified'] = 1; // 标记修改位
+                    const lastCell = cell.closest('tr').lastElementChild;
+                    lastCell.textContent = '是';
+                    lastCell.style = 'font-weight: bold; color: red; background-color: #DEFAFF; cursor: pointer; user-select: none;';
                 }
             });
         });
-
+    
+        // 为 disable 和 modified 列添加点击事件，切换 "是/否"
+        row.querySelectorAll('td.clickable').forEach((cell, columnIndex) => {
+            cell.addEventListener('click', () => {
+                const dataIndex = (currentPage - 1) * rowsPerPage + index;
+                if (dataIndex < allLiveData.length) {
+                    const isDisable = columnIndex === 0;
+                    const field = isDisable ? 'disable' : 'modified';
+                    const newValue = allLiveData[dataIndex][field] == 1 ? 0 : 1;
+                    allLiveData[dataIndex][field] = newValue;
+                    cell.textContent = newValue == 1 ? '是' : '否';
+                    cell.style.fontWeight = newValue == 1 ? 'bold' : 'normal';
+                    cell.style.color = newValue == 1 ? 'red' : 'black';
+                    cell.style.backgroundColor = newValue == 1 ? (isDisable ? '#FFFFE0' : '#DEFAFF') : '';
+            
+                    if(isDisable) {
+                        allLiveData[dataIndex]['modified'] = 1; // 标记修改位
+                        const lastCell = cell.closest('tr').lastElementChild;
+                        lastCell.textContent = '是';
+                        lastCell.style = 'font-weight: bold; color: red; background-color: #DEFAFF; cursor: pointer; user-select: none;';
+                    }
+                }
+            });
+        });
+    
         tableBody.appendChild(row);
     });
 }
@@ -606,7 +654,7 @@ function saveLiveSourceInfo() {
         })
     })
     .then(response => response.json())
-    .then(data => showMessageModal(data.success ? '保存成功<br>⚠️注意：重新解析会覆盖所有修改！' : '保存失败'))
+    .then(data => showMessageModal(data.success ? '保存成功<br>已生成 M3U 及 TXT 文件<br>设置保持后重新解析不变' : '保存失败'))
     .catch(error => showMessageModal('保存过程中出现错误: ' + error));
 }
 
@@ -1028,3 +1076,59 @@ document.getElementById('importFile').addEventListener('change', function() {
 
     this.value = ''; // 重置文件输入框的值，确保可以连续上传相同文件
 });
+
+// 修改 token 对话框
+function changeToken(currentToken) {
+    showMessageModal('');
+    document.getElementById('messageModalMessage').innerHTML = `
+        <div style="width: 180px; height: 125px;">
+            <h3>修改 token</h3>
+            <input type="text" value="${currentToken}" id="newToken" style="text-align: center; font-size: 15px; margin-bottom: 15px;" />
+            <button onclick="updateToken()">确认</button>
+        </div>
+    `;
+}
+
+// 更新 token 到 config.json
+function updateToken() {
+    var newToken = document.getElementById('newToken').value;
+
+    // 内容写入 config.json 文件
+    fetch('manage.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+            save_token: 'true',
+            content: newToken
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('修改成功');
+            window.location.href = 'manage.php';
+        } else {
+            showMessageModal('修改失败');
+        }
+    })
+    .catch(error => showMessageModal('保存过程中出现错误: ' + error));
+}
+
+// token_range 更变后进行提示
+function showTokenRangeMessage(token, serverUrl) {
+    var tokenRange = document.getElementById("token_range").value;
+    var message = '';
+    var baseUrl = serverUrl + '/?token=' + token;
+    if (tokenRange == "1" || tokenRange == "3") {
+        message += '直播源地址：<br><a href="' + baseUrl + '&live=m3u" target="_blank">' + baseUrl + '&live=m3u</a><br>' + 
+                   '<a href="' + baseUrl + '&live=txt" target="_blank">' + baseUrl + '&live=txt</a>';
+    }
+    if (tokenRange == "2" || tokenRange == "3") {
+        if (message) message += '<br>';
+        message += 'EPG地址：<br><a href="' + baseUrl + '" target="_blank">' + baseUrl + '</a>';
+    }
+    if (message) {
+        showMessageModal('');
+        document.getElementById('messageModalMessage').innerHTML = `<div style="text-align: left">${message}</div>`;
+    }
+}
