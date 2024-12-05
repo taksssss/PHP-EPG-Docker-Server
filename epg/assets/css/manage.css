@@ -7,10 +7,13 @@ body {
     font-family: Tahoma, sans-serif;
     background-color: #f0f0f0;
 }
+body.theme-transition {
+    transition: background-color 0.5s ease, color 0.5s ease;
+}
 .container {
     background: white;
     padding: 30px;
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
     border-radius: 5px;
     width: 900px;
     margin: auto;
@@ -48,7 +51,7 @@ textarea[id="gen_list_text"] {
 }
 .form-row select, 
 .modal-content select,
-.form-row input[type="time"] {
+input[type="time"] {
     font-family: "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", Arial, sans-serif;
     font-size: 15px;
     border: 1px solid #ccc;
@@ -59,7 +62,7 @@ textarea[id="gen_list_text"] {
     margin-right: 12px;
     text-align: center;
 }
-.form-row input[type="time"] {
+input[type="time"] {
     width: 90px;
     margin-right: 0px;
 }
@@ -82,7 +85,8 @@ select[id="interval_hour"]{
     text-align: center;
     justify-content: space-between;
 }
-.button-container a, .button-container button {
+.button-container a, .button-container button,
+.modal-content button, input[type="submit"] {
     padding: 10px;
     background-color: #2196F3;
     color: white;
@@ -92,41 +96,34 @@ select[id="interval_hour"]{
     text-align: center;
     cursor: pointer;
     box-sizing: border-box;
-    width: 32%;
+    align-items: center;
+    width: 100%;
     font-size: 16px;
+    font-weight: bold;
 }
-.button-container a:hover, .button-container button:hover {
+.button-container a:hover, .button-container button:hover,
+.modal-content button:hover, input[type="submit"]:hover {
     background-color: #0b7dda;
 }
 input[type="submit"],
 .button-container button[name="logoutbtn"],
 .modal-content button {
-    width: 100%;
-    padding: 10px;
     background-color: #FF9800;
-    color: white;
-    border: none;
     border-radius: 5px;
-    cursor: pointer;
-    box-sizing: border-box;
-    align-items: center;
-    font-size: 16px;
-    font-weight: bold;
-}
-button[id="deleteUnusedIcons"], button[id="uploadAllIcons"], 
-button[id="showAllIcons"] {
-    display: flex;
-    height: 36px;
 }
 input[type="submit"]:hover,
 .button-container button[name="logoutbtn"]:hover,
 .modal-content button:hover {
     background-color: #e68900;
 }
-.button-container button[name="logoutbtn"] {    
-    font-weight: normal;
+button[id="deleteUnusedIcons"], button[id="uploadAllIcons"], 
+button[id="showAllIcons"] {
+    display: flex;
+    height: 36px;
+}
+.button-container button[name="logoutbtn"] {
     border-radius: 10px;
-    width: 105px;
+    width: 300px;
 }
 input[type="text"] {
     width: calc(100% - 22px);
@@ -333,7 +330,7 @@ input[type="text"] {
     left: 50%;
     margin-left: -60px;
     opacity: 0;
-    transition: opacity 0.3s;
+    transition: opacity 0.5s;
     font-size: 14px; /* 设置字体大小 */
 }
 /* 显示工具提示 */
@@ -360,4 +357,211 @@ input[type="text"] {
 #paginationContainer button[disabled] {
     color: #bbb;
     cursor: not-allowed;
+}
+.blue-span {
+    color: blue;
+    cursor: pointer;
+    font-size: 16px;
+}
+.blue-span:hover {
+    color: #0056b3;
+}
+
+/* 自定义滚动条样式 */
+::-webkit-scrollbar {
+    width: 10px;
+}
+::-webkit-scrollbar-thumb {
+    background-color: #ddd;
+    border-radius: 4px;
+    cursor: default;
+}
+::-webkit-scrollbar-thumb:hover {
+    background-color: #ccc;
+}
+::-webkit-scrollbar-track {
+    background-color: #f5f5f5;
+    cursor: default;
+}
+
+.table-cell-disable {
+    font-weight: bold;
+    color: red;
+    background-color: #FFFFE0;
+}
+.table-cell-modified {
+    font-weight: bold;
+    color: red;
+    background-color: #DEFAFF;
+}
+.table-cell-clickable {
+    cursor: pointer;
+    user-select: none;
+}
+
+/* 主题切换按钮 */
+.checkbox {
+    opacity: 0;
+    position: absolute;
+}
+.checkbox-label {
+    float: right;
+    margin-right: 5px;
+    margin-top: 20px;
+    background-color: #444;
+    width: 40px;
+    height: 16px;
+    border-radius: 50px;
+    position: relative;
+    padding: 5px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: background-color 0.5s ease;
+}
+.checkbox-label i {
+    font-size: 18px;
+    color: #f39c12;
+    user-select: none;
+    transition: opacity 0.5s ease;
+}
+.checkbox-label .ball {
+    background-color: #fff;
+    width: 22px;
+    height: 22px;
+    position: absolute;
+    right: 2px; /* 小球保持在右边 */
+    top: 2px;
+    border-radius: 50%;
+    transition: transform 0.5s ease;
+}
+.checkbox-label .label-text {
+    font-size: 7px;
+    color: #444;
+    font-weight: bold;
+    position: absolute;
+    top: 50%;
+    left: 75%;
+    transform: translateX(-50%) translateY(-50%);
+    z-index: 1; /* 文字位于小球上面 */
+    user-select: none;
+    transition: opacity 0.5s ease;
+}
+
+
+/* 暗色模式 */
+body.dark {
+    background-color: #121212;
+    color: #e0e0e0;
+}
+  
+body.dark .container,
+body.dark .modal-content {
+    background-color: #1e1e1e;
+    box-shadow: 0 0 15px rgba(255, 255, 255, 0.2);
+}
+
+body.dark textarea,
+body.dark input[type="text"],
+body.dark select,
+body.dark input[type="time"] {
+    background-color: #333;
+    color: #e0e0e0;
+    border: 1px solid #555;
+}
+
+body.dark a,
+body.dark .blue-span {
+    color: #80bfff;
+}
+
+body.dark a:hover,
+body.dark .blue-span:hover {
+    color: #3399ff;
+}
+
+body.dark .button-container a,
+body.dark .button-container button {
+    background-color: #2d78b9;
+    color: #e0e0e0;
+}
+
+body.dark .button-container a:hover,
+body.dark .button-container button:hover {
+    background-color: #1565c0;
+}
+
+body.dark input[type="submit"],
+body.dark .button-container button[name="logoutbtn"],
+body.dark .modal-content button {
+    background-color: #cb5800;
+    color: #e0e0e0;
+}
+
+body.dark input[type="submit"]:hover,
+body.dark .button-container button[name="logoutbtn"]:hover,
+body.dark .modal-content button:hover {
+    background-color: #e16500;
+}
+
+body.dark #paginationContainer button {
+    background-color: #1e1e1e;
+    color: #aaa;
+}
+
+body.dark #paginationContainer button.active,
+body.dark #paginationContainer button:hover {
+    background-color: #333;
+    color: #fff;
+}
+
+body.dark #logTable th, body.dark #logTable td,
+body.dark #channelTable th,
+body.dark #iconTable th, body.dark #iconTable td,
+body.dark #channelBindEPGTable th, body.dark #channelBindEPGTable td,
+body.dark #channelMatchTable th, body.dark #channelMatchTable td,
+body.dark #liveSourceTable th {
+    background-color: #2c2c2c;
+    color: #e0e0e0;
+}
+
+body.dark .close:hover,
+body.dark .close:focus {
+    color: #e0e0e0;
+}
+
+body.dark img{
+    filter: brightness(0.9);
+}
+
+body.dark ::-webkit-scrollbar-thumb {
+    background-color: #555;
+}
+
+body.dark ::-webkit-scrollbar-thumb:hover {
+    background-color: #666;
+}
+
+body.dark ::-webkit-scrollbar-track {
+    background-color: #2a2a2a;
+}
+
+body.dark .table-cell-disable {
+    color: #ff7f7f;
+    background-color: #4a4a32;
+}
+
+body.dark .table-cell-modified {
+    color: #ff7f7f;
+    background-color: #3b616b;
+}
+
+body.dark .checkbox-label i,
+body.dark .checkbox-label .label-text {
+    color: #eee;
+}
+
+body.dark .checkbox-label .ball {
+    background-color: #222;
 }

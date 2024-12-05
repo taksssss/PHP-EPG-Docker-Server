@@ -27,7 +27,7 @@ $Config = json_decode(file_get_contents($configPath), true) or die("配置文件
 // 获取 serverUrl
 $protocol = ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? (($_SERVER['HTTPS'] ?? '') === 'on' ? 'https' : 'http'));
 $host = $_SERVER['HTTP_X_FORWARDED_HOST'] ?? $_SERVER['HTTP_HOST'] ?? '';
-$uri = rtrim(dirname($_SERVER['HTTP_X_ORIGINAL_URI'] ?? $_SERVER['REQUEST_URI']) ?? '', '/');
+$uri = rtrim(dirname($_SERVER['HTTP_X_ORIGINAL_URI'] ?? @$_SERVER['REQUEST_URI']) ?? '', '/');
 $serverUrl = $protocol . '://' . $host . $uri;
 
 // 设置时区为亚洲/上海

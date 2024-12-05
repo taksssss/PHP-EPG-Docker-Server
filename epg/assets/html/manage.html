@@ -3,20 +3,48 @@
 <head>
     <title>管理配置</title>
     <link rel="stylesheet" type="text/css" href="assets/css/manage.css">
+    <link rel="stylesheet" type="text/css" href="assets/css/fas-5-15-4-all-min.css">
     <link rel="icon" href="assets/html/favicon.ico" type="image/x-icon">
 </head>
 <body>
+<script>
+(function() {
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
+        document.body.classList.add(savedTheme);
+    } else {
+        if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            document.body.classList.add('dark');
+        }
+    }
+})();
+</script>
 <div class="container">
+    <div>
+        <input type="checkbox" class="checkbox" id="themeSwitcher">
+        <label for="themeSwitcher" class="checkbox-label">
+            <i id="themeIcon"></i>
+            <span class="label-text"></span>
+            <span class="ball"></span>
+        </label>
+        <script>
+            const theme = localStorage.getItem('theme');
+            document.getElementById("themeIcon").className = `fas ${theme === 'dark' ? 'fa-moon' : theme === 'light' ? 'fa-sun' : 'fa-adjust'}`;
+            document.querySelector('.label-text').textContent = (theme === 'dark' ? 'Dark' : theme === 'light' ? 'Light' : 'Auto');
+        </script>
+    </div>
     <h2>管理配置</h2>
     <form method="POST" id="settingsForm">
 
         <label for="xml_urls">【EPG源地址】（支持 .xml 跟 .xml.gz 格式， # 为注释，支持获取 猫 数据）</label>
-        <span id="channelbind" onclick="showModal('channelbindepg')" style="color: blue; cursor: pointer;">（频道指定EPG源）</span>
+        <span class="blue-span" id="channelbind" onclick="showModal('channelbindepg')">（频道指定EPG源）</span>
         <br><br>
         <textarea placeholder="地址前 # 临时停用，后 # 备注。快捷键：Ctrl+/ 。
 源限定频道：频道名1, 频道名2 => EPG源地址
 猫示例1：tvmao, 猫频道名1, 猫频道名2,...
-猫示例2：tvmao, 自定义1:猫频道名1, 自定义2:猫频道名2, ..." id="xml_urls" name="xml_urls" style="height: 122px;"><?php echo implode("\n", array_map('trim', $Config['xml_urls'])); ?></textarea>
+猫示例2：tvmao, 自定义1:猫频道名1, 自定义2:猫频道名2, ..."
+            id="xml_urls" name="xml_urls" style="height: 122px;"><?php echo implode("\n", array_map('trim', $Config['xml_urls'])); ?>
+        </textarea>
         <br><br>
 
         <div class="form-row">
@@ -58,9 +86,9 @@
             <div class="flex-item" style="width: 100%;">
                 <label>
                     【频道别名】（数据库频道名 => 频道别名1, 频道别名2, ...）
-                    <span id="channelInfi" onclick="showModal('channel')" style="color: blue; cursor: pointer;">（频道管理）</span>
-                    <span id="iconInfo" onclick="showModal('icon')" style="color: blue; cursor: pointer;">（台标管理）</span>
-                    <span id="liveInfo" onclick="showModal('live')" style="color: blue; cursor: pointer;">（直播源管理）</span>
+                    <span class="blue-span" id="channelInfi" onclick="showModal('channel')">（频道管理）</span>
+                    <span class="blue-span" id="iconInfo" onclick="showModal('icon')">（台标管理）</span>
+                    <span class="blue-span" id="liveInfo" onclick="showModal('live')">（直播源管理）</span>
                 </label>
                 <br><br>
                 <textarea id="channel_mappings" name="channel_mappings" style="height: 142px;"><?php 
@@ -124,8 +152,8 @@
         <span id="epgSource" style="word-break: break-all;">来源</span>
         <br><br>
         <span id="epgDate">日期</span>
-        <span id="prevDate" style="cursor: pointer; color: blue; user-select: none; margin-left: 10px;">&#9664; 前一天</span>
-        <span id="nextDate" style="cursor: pointer; color: blue; user-select: none; margin-left: 10px;">后一天 &#9654;</span>
+        <span class="blue-span" id="prevDate" style="user-select: none; margin-left: 10px;">&#9664; 前一天</span>
+        <span class="blue-span" id="nextDate" style="user-select: none; margin-left: 10px;">后一天 &#9654;</span>
         <br><br>
         <textarea id="epgContent" readonly style="width: 100%; height: 380px;"></textarea>
     </div>
@@ -368,8 +396,8 @@
                 <form id="importForm" method="post" enctype="multipart/form-data" style="display: inline-block;">
                     <input type="file" name="importFile" id="importFile" style="display: none;" accept=".gz">
                     <input type="hidden" name="importExport" id="formImportExport" value="">
-                    <span id="import" onclick="document.getElementById('importFile').click()" style="color: blue; cursor: pointer; margin-right: 20px;">数据导入</span>
-                    <span id="export" onclick="document.getElementById('importForm').submit()" style="color: blue; cursor: pointer;">数据导出</span>
+                    <span class="blue-span" id="import" onclick="document.getElementById('importFile').click()" style="margin-right: 20px;">数据导入</span>
+                    <span class="blue-span" id="export" onclick="document.getElementById('importForm').submit()">数据导出</span>
                 </form>
             </div>
         </div>
@@ -456,7 +484,7 @@
                 </select>
             </div>
             <div class="column">
-                <label for="token_range"><span id="change_token_span" onclick="changeToken(`<?php echo $Config['token']; ?>`)" style="color: blue; cursor: pointer;">token</span> 范围：</label>
+                <label for="token_range"><span class="blue-span" id="change_token_span" onclick="changeToken(`<?php echo $Config['token']; ?>`)">token</span> 范围：</label>
                 <select id="token_range" name="token_range" required onchange="showTokenRangeMessage(`<?php echo $Config['token']; ?>`, `<?php echo $serverUrl; ?>`)">
                     <option value="0" <?php if (isset($Config['token_range']) && $Config['token_range'] == 0) echo 'selected'; ?>>无</option>
                     <option value="1" <?php if (!isset($Config['token_range']) || $Config['token_range'] == 1) echo 'selected'; ?>>直播源</option>
@@ -475,8 +503,8 @@
             <option value="0" <?php if (!isset($Config['gen_list_enable']) || $Config['gen_list_enable'] == 0) echo 'selected'; ?>>否</option>
         </select>
         <span>
-            （粘贴m3u、txt地址或内容，<span onclick="parseSource()" style="color: blue; cursor: pointer; text-decoration: underline;">解析</span> 后
-            <span onclick="showModal('channelmatch')" style="color: blue; cursor: pointer; text-decoration: underline;">查看匹配</span>）
+            （粘贴m3u、txt地址或内容，<span class="blue-span" onclick="parseSource()">解析</span> 后
+            <span class="blue-span" onclick="showModal('channelmatch')">查看匹配</span>）
         </span>
         <br>
         <textarea id="gen_list_text" style="margin-top: 12px; margin-bottom: 12px;"></textarea><br>

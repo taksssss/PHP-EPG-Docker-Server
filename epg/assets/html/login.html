@@ -6,10 +6,22 @@
     <link rel="icon" href="assets/html/favicon.ico" type="image/x-icon">
 </head>
 <body>
+<script>
+(function() {
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
+        document.body.classList.add(savedTheme);
+    } else {
+        if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            document.body.classList.add('dark');
+        }
+    }
+})();
+</script>
 <div class="container">
     <h2>登录</h2>
     <form method="POST">
-        <label for="password">管理密码:</label><br><br>
+        <label for="password">管理密码：</label><br><br>
         <input type="password" id="password" name="password"><br><br>
         <input type="hidden" name="login" value="1">
         <input type="submit" value="登录">
@@ -32,7 +44,7 @@
 <!-- 修改密码模态框 -->
 <div id="changePasswordModal" class="modal">
     <div class="passwd-modal-content">
-        <span class="close-password">&times;</span>
+        <span class="close">&times;</span>
         <h2>更改登录密码</h2>
         <form method="POST">
             <div class="form-group">
@@ -44,14 +56,14 @@
                 <input type="password" id="new_password" name="new_password">
             </div>
             <input type="hidden" name="change_password" value="1">
-            <input type="submit" value="更改密码">
+            <input type="submit" value="更改密码" style="margin-top: 15px;">
         </form>
     </div>
 </div>
 <script>
     function showChangePasswordForm() {
         var changePasswordModal = document.getElementById("changePasswordModal");
-        var changePasswordSpan = document.getElementsByClassName("close-password")[0];
+        var changePasswordSpan = document.getElementsByClassName("close")[0];
 
         changePasswordModal.style.display = "block";
 

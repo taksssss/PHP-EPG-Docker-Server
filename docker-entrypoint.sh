@@ -68,6 +68,10 @@ sed -i "s#^;date.timezone =\$#date.timezone = \"${TZ}\"#" /etc/php83/php.ini
 sed -i "s/upload_max_filesize = .*/upload_max_filesize = 100M/" /etc/php83/php.ini
 sed -i "s/post_max_size = .*/post_max_size = 100M/" /etc/php83/php.ini
 
+# Modify system timezone
+if [ -e /etc/localtime ]; then rm -f /etc/localtime; fi
+ln -s /usr/share/zoneinfo/${TZ} /etc/localtime
+
 echo 'Running cron.php and Apache'
 
 # Change ownership of /htdocs/

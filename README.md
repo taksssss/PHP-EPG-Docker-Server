@@ -36,7 +36,9 @@ PHP 实现的 EPG（电子节目指南）服务端， `Docker` 部署，自带�
 > [!TIP]
 > `xmltv` 用户搭配 [【一键生成】匹配 M3U 文件的 XML 节目单](https://www.right.com.cn/forum/thread-8392662-1-1.html) 使用。
 
-![设置页面](/pic/management.png)
+![设置页面](/pic/management.png#gh-light-mode-only)
+
+![设置页面](/pic/management-dark.png#gh-dark-mode-only)
 
 > **内置正则表达式说明：**
 > - 包含 `regex:`

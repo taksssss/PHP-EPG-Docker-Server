@@ -10,7 +10,7 @@ body {
 .container {
     background: white;
     padding: 30px;
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
     border-radius: 5px;
     width: 200px;
 }
@@ -23,7 +23,8 @@ input[type="password"] {
     border-radius: 5px;
     box-sizing: border-box;
 }
-input[type="submit"] {
+input[type="submit"],
+.button-container button {
     width: 100%;
     padding: 8px;
     background-color: #FF9800;
@@ -36,17 +37,15 @@ input[type="submit"] {
     font-weight: bold;
     margin-bottom: 5px;
 }
+input[type="submit"]:hover {
+    background-color: #e68900;
+}
 .button-container button {
-    width: 100%;
-    padding: 8px;
     background-color: #2196F3;
-    color: white;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    box-sizing: border-box;
-    font-size: 15px;
     margin-top: 5px;
+}
+.button-container button:hover {
+    background-color: #0b7dda;
 }
 .form-group {
     display: flex;
@@ -92,9 +91,60 @@ input[type="submit"] {
     transform: translateY(-50%);
     box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2);
 }
+.close {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+}
+.close:hover,
+.close:focus {
+    color: black;
+    text-decoration: none;
+    cursor: pointer;
+}
 .footer {
     position: fixed;
     bottom: 10px;
     width: 100%;
     text-align: center;
+}
+
+/* 暗色模式 */
+body.dark {
+    background-color: #121212;
+    color: #e0e0e0;
+}
+
+body.dark .container,
+body.dark .passwd-modal-content {
+    background-color: #1e1e1e;
+    box-shadow: 0 0 15px rgba(255, 255, 255, 0.2);
+}
+
+body.dark input[type="password"],
+body.dark .button-container button {
+    background-color: #333;
+    color: #e0e0e0;
+    border: 1px solid #555;
+}
+
+body.dark input[type="submit"] {
+    background-color: #cb5800;
+    color: #e0e0e0;
+}
+body.dark input[type="submit"]:hover {
+    background-color: #e16500;
+}
+
+body.dark .button-container button {
+    background-color: #2d78b9;
+}
+body.dark .button-container button:hover {
+    background-color: #1565c0;
+}
+
+body.dark .close:hover,
+body.dark .close:focus {
+    color: #e0e0e0;
 }
