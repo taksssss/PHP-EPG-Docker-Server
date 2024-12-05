@@ -171,7 +171,9 @@ PHP 实现的 EPG（电子节目指南）服务端， `Docker` 部署，自带�
 > - `Ctrl + /`：对选中 EPG 地址设置（取消）注释
 
 ## ⭐ Star History
-[![Star History Chart](https://api.star-history.com/svg?repos=taksssss/EPG-Server&type=Date)](https://star-history.com/#taksssss/EPG-Server&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=taksssss/EPG-Server&type=Date)](https://star-history.com/#taksssss/EPG-Server&Date#gh-light-mode-only)
+
+[![Star History Chart](https://api.star-history.com/svg?repos=taksssss/EPG-Server&type=Date&theme=dark)](https://star-history.com/#taksssss/EPG-Server&Date&theme=dark#gh-dark-mode-only)
 
 ## 👍 特别鸣谢
 - [ChatGPT](https://chatgpt.com/)
