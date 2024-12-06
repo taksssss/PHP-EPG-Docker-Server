@@ -7,7 +7,7 @@ PHP 实现的 EPG（电子节目指南）服务端， `Docker` 部署，自带�
 
 ## 💻 主要功能
 
-📡 **多种直播格式**：支持返回 DIYP & 百川、超级直播以及 xmltv 格式文件。
+📡 **多直播格式**：支持返回 DIYP & 百川、超级直播以及 xmltv 格式文件。
   
 🐳 **多架构支持**：提供适用于 amd64、arm64 和 armv7 架构的 Docker 镜像，兼容电视盒子等设备使用。
 
@@ -15,9 +15,13 @@ PHP 实现的 EPG（电子节目指南）服务端， `Docker` 部署，自带�
 
 🗃️ **数据库管理**：采用先构建后存数据库的策略，减少冗余、提升读取速度。支持 SQLite 和 MySQL 数据库，内置 phpLiteAdmin 管理工具。
 
-⏱️ **缓存支持**：集成 Memcached，可自定义缓存时间。
-
 🖼️ **台标管理**：支持台标模糊匹配，便于匹配台标资源。
+
+➰ **直播源管理**：支持聚合 TXT/M3U 直播源，并定时更新。
+
+🔒 **访问权限控制**：支持设置 TOKEN ，限制访问 EPG 服务及直播源。
+
+⏱️ **缓存支持**：集成 Memcached，可自定义缓存时间。
 
 🔄 **频道匹配**：支持繁体中文频道匹配，可进行双向模糊匹配；支持频道别名（可使用正则表达式）和指定 EPG 源。
 
@@ -25,9 +29,7 @@ PHP 实现的 EPG（电子节目指南）服务端， `Docker` 部署，自带�
 
 📝 **节目单生成**：支持生成指定频道节目单并匹配 M3U 的 xmltv 格式文件。
 
-➰ **直播源管理**：支持聚合 TXT/M3U 直播源，并定时更新。
-
-🗂️ **兼容多种格式**：支持不同格式的 XMLTV 文件。
+🗂️ **兼容多种格式**：支持不同标准格式的 XMLTV 文件。
 
 🛠️ **文件管理**：集成 tinyfilemanager 以便于文件管理。
 
@@ -36,9 +38,20 @@ PHP 实现的 EPG（电子节目指南）服务端， `Docker` 部署，自带�
 > [!TIP]
 > `xmltv` 用户搭配 [【一键生成】匹配 M3U 文件的 XML 节目单](https://www.right.com.cn/forum/thread-8392662-1-1.html) 使用。
 
-![设置页面](/pic/management.png#gh-light-mode-only)
-
-![设置页面](/pic/management-dark.png#gh-dark-mode-only)
+<picture>
+  <source
+    media="(prefers-color-scheme: dark)"
+    srcset="/pic/management-dark.png"
+  />
+  <source
+    media="(prefers-color-scheme: light)"
+    srcset="/pic/management.png"
+  />
+  <img
+    alt="设置页面"
+    src="/pic/management.png"
+  />
+</picture>
 
 > **内置正则表达式说明：**
 > - 包含 `regex:`
@@ -82,9 +95,11 @@ PHP 实现的 EPG（电子节目指南）服务端， `Docker` 部署，自带�
      taksss/php-epg:latest
    ```
 
-   > 默认端口为 `5678` ，根据需要自行修改（注意端口占用）
-   > 
-   > 无法正常拉取镜像的，可使用同步更新的 `腾讯云容器镜像`（`ccr.ccs.tencentyun.com/taksss/php-epg:latest`）
+    > 默认端口为 `5678` ，根据需要自行修改（注意端口占用）
+    > 
+    > 可选参数：`-e PHP_MEMORY_LIMIT=512M` ，设置 PHP 内存限制，默认 `512M`
+    > 
+    > 无法正常拉取镜像的，可使用同步更新的 `腾讯云容器镜像`（`ccr.ccs.tencentyun.com/taksss/php-epg:latest`）
 
 <details>
 
@@ -100,7 +115,7 @@ PHP 实现的 EPG（电子节目指南）服务端， `Docker` 部署，自带�
       taksss/php-epg:latest
     ```
 
- </details>
+</details>
 
 <details>
 
@@ -140,7 +155,7 @@ PHP 实现的 EPG（电子节目指南）服务端， `Docker` 部署，自带�
       taksss/php-epg:latest
     ```
  
-  </details>
+</details>
 
 ## 🛠️ 使用步骤
 
@@ -171,9 +186,21 @@ PHP 实现的 EPG（电子节目指南）服务端， `Docker` 部署，自带�
 > - `Ctrl + /`：对选中 EPG 地址设置（取消）注释
 
 ## ⭐ Star History
-[![Star History Chart](https://api.star-history.com/svg?repos=taksssss/EPG-Server&type=Date)](https://star-history.com/#taksssss/EPG-Server&Date#gh-light-mode-only)
 
-[![Star History Chart](https://api.star-history.com/svg?repos=taksssss/EPG-Server&type=Date&theme=dark)](https://star-history.com/#taksssss/EPG-Server&Date&theme=dark#gh-dark-mode-only)
+<picture>
+  <source
+    media="(prefers-color-scheme: dark)"
+    srcset="https://api.star-history.com/svg?repos=taksssss/EPG-Server&type=Date&theme=dark"
+  />
+  <source
+    media="(prefers-color-scheme: light)"
+    srcset="https://api.star-history.com/svg?repos=taksssss/EPG-Server&type=Date"
+  />
+  <img
+    alt="Star History Chart"
+    src="https://api.star-history.com/svg?repos=taksssss/EPG-Server&type=Date"
+  />
+</picture>
 
 ## 👍 特别鸣谢
 - [ChatGPT](https://chatgpt.com/)
