@@ -11,7 +11,7 @@ document.getElementById('settingsForm').addEventListener('submit', function(even
     event.preventDefault();  // 阻止默认表单提交
 
     const fields = ['update_config', 'gen_xml', 'include_future_only', 'ret_default', 'tvmao_default', 
-        'all_chs', 'cache_time', 'db_type', 'mysql_host', 'mysql_dbname', 'mysql_username', 'mysql_password', 
+        'all_chs', 'db_type', 'mysql_host', 'mysql_dbname', 'mysql_username', 'mysql_password', 
         'gen_list_enable', 'check_update', 'token_range'];
 
     // 创建隐藏字段并将其添加到表单
@@ -34,18 +34,14 @@ document.getElementById('settingsForm').addEventListener('submit', function(even
     })
     .then(response => response.json())
     .then(data => {
-        const { memcached_set, db_type_set, interval_time, start_time, end_time } = data;
+        const { db_type_set, interval_time, start_time, end_time } = data;
         
-        let message = '配置已更新<br><br>';    
-        if (!memcached_set) {
-            message += 'Memcached 启用失败<br>缓存时间已设为 0<br><br>';
-            document.getElementById('cache_time').value = 0;
-        }
+        let message = '配置已更新<br><br>';
         if (!db_type_set) {
             message += 'MySQL 启用失败<br>数据库已设为 SQLite<br><br>';
             document.getElementById('db_type').value = 'sqlite';
             updateMySQLFields();
-        }    
+        }
         message += interval_time === 0 
             ? "已取消定时任务" 
             : `已设置定时任务<br>开始时间：${start_time}<br>结束时间：${end_time}<br>间隔周期：${formatTime(interval_time)}`;
@@ -443,7 +439,7 @@ function displayPage(data, page) {
     const end = Math.min(start + rowsPerPage, data.length);
 
     if (data.length === 0) {
-        tableBody.innerHTML = '<tr><td colspan="8">暂无数据</td></tr>';
+        tableBody.innerHTML = '<tr><td colspan="9">暂无数据</td></tr>';
         return;
     }
 
@@ -1122,12 +1118,12 @@ function showTokenRangeMessage(token, serverUrl) {
     var message = '';
     var baseUrl = serverUrl + '/?token=' + token;
     if (tokenRange == "1" || tokenRange == "3") {
-        message += '直播源地址：<br><a href="' + baseUrl + '&live=m3u" target="_blank">' + baseUrl + '&live=m3u</a><br>' + 
-                   '<a href="' + baseUrl + '&live=txt" target="_blank">' + baseUrl + '&live=txt</a>';
+        message += `直播源地址：<br><a href="${baseUrl}&live=m3u" target="_blank">${baseUrl}&live=m3u</a><br>
+                    <a href="${baseUrl}&live=txt" target="_blank">${baseUrl}&live=txt</a>`;
     }
     if (tokenRange == "2" || tokenRange == "3") {
         if (message) message += '<br>';
-        message += 'EPG地址：<br><a href="' + baseUrl + '" target="_blank">' + baseUrl + '</a>';
+        message += `EPG地址：<br><a href="${baseUrl}" target="_blank">${baseUrl}</a>`;
     }
     if (message) {
         showMessageModal('');

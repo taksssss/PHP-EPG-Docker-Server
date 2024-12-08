@@ -441,7 +441,7 @@ input[type="text"] {
     color: #444;
     font-weight: bold;
     position: absolute;
-    top: 50%;
+    top: 48%;
     left: 75%;
     transform: translateX(-50%) translateY(-50%);
     z-index: 1; /* 文字位于小球上面 */
@@ -495,14 +495,14 @@ body.dark .button-container button:hover {
 body.dark input[type="submit"],
 body.dark .button-container button[name="logoutbtn"],
 body.dark .modal-content button {
-    background-color: #cb5800;
+    background-color: #ce7c00;
     color: #e0e0e0;
 }
 
 body.dark input[type="submit"]:hover,
 body.dark .button-container button[name="logoutbtn"]:hover,
 body.dark .modal-content button:hover {
-    background-color: #e16500;
+    background-color: #ba7000;
 }
 
 body.dark #paginationContainer button {

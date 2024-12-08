@@ -101,7 +101,6 @@ function updateConfigFields() {
         return preg_replace('/^#\s*(\S+)(\s*#.*)?$/', '# $1$2', trim(str_replace(["，", "："], [",", ":"], $url)));
     }, explode("\n", $xml_urls)));
     
-    $cache_time *= 3600;
     $interval_time = $interval_hour * 3600 + $interval_minute * 60;
     $mysql = ["host" => $mysql_host, "dbname" => $mysql_dbname, "username" => $mysql_username, "password" => $mysql_password];
 
@@ -137,13 +136,6 @@ function updateConfigFields() {
         }
     }
 
-    // 检查 Memcache 有效性
-    $memcached_set = true;
-    if (!empty($Config['cache_time']) && (!class_exists('Memcached') || !(new Memcached())->addServer('localhost', 11211))) {
-        $Config['cache_time'] = 0;
-        $memcached_set = false;
-    }
-
     // 检查 MySQL 有效性
     $db_type_set = true;
     if ($Config['db_type'] === 'mysql') {
@@ -165,7 +157,7 @@ function updateConfigFields() {
         exec('php cron.php > /dev/null 2>/dev/null &');
     }
 
-    return ['memcached_set' => $memcached_set, 'db_type_set' => $db_type_set];
+    return ['db_type_set' => $db_type_set];
 }
 
 // 处理服务器请求
@@ -531,9 +523,8 @@ try {
         switch ($action) {
             case 'update_config':
                 // 更新配置
-                ['memcached_set' => $memcached_set, 'db_type_set' => $db_type_set] = updateConfigFields();
+                ['db_type_set' => $db_type_set] = updateConfigFields();
                 echo json_encode([
-                    'memcached_set' => $memcached_set,
                     'db_type_set' => $db_type_set,
                     'interval_time' => $Config['interval_time'],
                     'start_time' => $Config['start_time'],

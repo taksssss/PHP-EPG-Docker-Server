@@ -79,12 +79,11 @@ function readEPGData($date, $oriChannelName, $cleanChannelName, $db, $type) {
     global $Config;
     global $iconList;
 
-    // 如果传入的日期小于当前日期，设置 cache_time 为 7 天
-    $cache_time = ($date < date('Y-m-d')) ? 7 * 24 * 3600 : $Config['cache_time'];
+    // 默认缓存 24 小时，更新数据时清空
+    $cache_time = 24 * 3600;
 
-    // 检查是否开启缓存并安装了 Memcached 类
-    $memcached_enabled = $Config['cache_time'] && class_exists('Memcached')
-        && ($memcached = new Memcached())->addServer('localhost', 11211);
+    // 检查 Memcached 状态
+    $memcached_enabled = class_exists('Memcached') && ($memcached = new Memcached())->addServer('localhost', 11211);
     $cache_key = base64_encode("{$date}_{$cleanChannelName}_{$type}");
 
     if ($memcached_enabled) {
@@ -263,7 +262,7 @@ function fetchHandler($query_params) {
 
     $date = isset($query_params['date']) ? getFormatTime(preg_replace('/\D+/', '', $query_params['date']))['date'] : getNowDate();
 
-    // 频道参数为空时，直接重定向到 t.xml 文件
+    // 频道参数为空时，直接返回 t.xml 文件数据
     if (empty($cleanChannelName)) {
         if ($Config['gen_xml'] === 1) {
             header('Content-Type: application/xml');

@@ -130,11 +130,11 @@ body.dark .button-container button {
 }
 
 body.dark input[type="submit"] {
-    background-color: #cb5800;
+    background-color: #ce7c00;
     color: #e0e0e0;
 }
 body.dark input[type="submit"]:hover {
-    background-color: #e16500;
+    background-color: #ba7000;
 }
 
 body.dark .button-container button {

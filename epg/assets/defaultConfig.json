@@ -12,7 +12,6 @@
     "ret_default": 0,
     "tvmao_default": 0,
     "all_chs": 0,
-    "cache_time": 0,
     "db_type": "sqlite",
     "gen_list_enable": 0,
     "interval_time": 21600,

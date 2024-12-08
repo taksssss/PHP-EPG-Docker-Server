@@ -3,7 +3,7 @@
 <head>
     <title>管理配置</title>
     <link rel="stylesheet" type="text/css" href="assets/css/manage.css">
-    <link rel="stylesheet" type="text/css" href="assets/css/fas-5-15-4-all-min.css">
+    <link rel="stylesheet" type="text/css" href="assets/css/fa-5-15-4-all-min.css">
     <link rel="icon" href="assets/html/favicon.ico" type="image/x-icon">
 </head>
 <body>
@@ -436,14 +436,13 @@
         <!-- 第三行 -->
         <div class="row">
             <div class="column">
-                <div class="tooltip">
-                    <label for="cache_time">缓存时间<span style="vertical-align: super;">*</span>(小时)：</label>
-                    <select id="cache_time" name="cache_time" required>
-                        <?php for ($h = 0; $h < 24; $h++): ?><option value="<?php echo $h; ?>" <?php echo $Config['cache_time'] / 3600 == $h ? 'selected' : ''; ?>><?php echo $h; ?></option>
-                        <?php endfor; ?>
-                    </select>
-                    <span class="tooltiptext">Memcached 缓存</span>
-                </div>
+                <label for="token_range"><span class="blue-span" id="change_token_span" onclick="changeToken(`<?php echo $Config['token']; ?>`)">token</span> 范围：</label>
+                <select id="token_range" name="token_range" required onmouseup="showTokenRangeMessage(`<?php echo $Config['token']; ?>`, `<?php echo $serverUrl; ?>`)">
+                    <option value="0" <?php if (isset($Config['token_range']) && $Config['token_range'] == 0) echo 'selected'; ?>>无</option>
+                    <option value="1" <?php if (!isset($Config['token_range']) || $Config['token_range'] == 1) echo 'selected'; ?>>直播源</option>
+                    <option value="2" <?php if (isset($Config['token_range']) && $Config['token_range'] == 2) echo 'selected'; ?>>EPG</option>
+                    <option value="3" <?php if (isset($Config['token_range']) && $Config['token_range'] == 3) echo 'selected'; ?>>全部</option>
+                </select>
             </div>
             <div class="column">
                 <label for="db_type">数据库：</label>
@@ -484,14 +483,7 @@
                 </select>
             </div>
             <div class="column">
-                <label for="token_range"><span class="blue-span" id="change_token_span" onclick="changeToken(`<?php echo $Config['token']; ?>`)">token</span> 范围：</label>
-                <select id="token_range" name="token_range" required onchange="showTokenRangeMessage(`<?php echo $Config['token']; ?>`, `<?php echo $serverUrl; ?>`)">
-                    <option value="0" <?php if (isset($Config['token_range']) && $Config['token_range'] == 0) echo 'selected'; ?>>无</option>
-                    <option value="1" <?php if (!isset($Config['token_range']) || $Config['token_range'] == 1) echo 'selected'; ?>>直播源</option>
-                    <option value="2" <?php if (isset($Config['token_range']) && $Config['token_range'] == 2) echo 'selected'; ?>>EPG</option>
-                    <option value="3" <?php if (isset($Config['token_range']) && $Config['token_range'] == 3) echo 'selected'; ?>>全部</option>
-                </select>
-            </div>            
+            </div>
             <div class="column">
             </div>
         </div>

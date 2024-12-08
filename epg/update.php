@@ -32,8 +32,10 @@ function deleteOldData($db, $keep_days, &$log_messages) {
 
     // 删除 t.xml 和 t.xml.gz 文件
     if (!$Config['gen_xml']) {
-        @unlink('./t.xml');
-        @unlink('./t.xml.gz');
+        @unlink(__DIR__ . '/t.xml');
+        @unlink(__DIR__ . '/t.xml.gz');
+        @unlink(__DIR__ . '/data/t.xml');
+        @unlink(__DIR__ . '/data/t.xml.gz');
     }
 
     // 循环清理过期数据
@@ -49,7 +51,16 @@ function deleteOldData($db, $keep_days, &$log_messages) {
         $stmt->bindValue(':threshold_date', $threshold_date, PDO::PARAM_STR);
         $stmt->execute();
         logMessage($log_messages, "【{$logMessage}】 共 {$stmt->rowCount()} 条。");
-    }    
+    }
+    
+    // 清理 memcached 数据
+    if (class_exists('Memcached') && ($memcached = new Memcached())->addServer('localhost', 11211)) {
+        $memcached->flush();
+        logMessage($log_messages, "【Memcached】 已清空。");
+    } else {
+        logMessage($log_messages, "【Memcached】 状态异常。");
+    }
+
     echo "<br>";
 }
 
@@ -330,8 +341,9 @@ function processIconListAndXMLTV($db, $gen_list_mapping, &$log_messages) {
     }
     
     // 创建 XMLWriter 实例
+    $xmlFilePath = __DIR__ . '/data/t.xml';
     $xmlWriter = new XMLWriter();
-    $xmlWriter->openUri('t.xml');
+    $xmlWriter->openUri($xmlFilePath);
     $xmlWriter->startDocument('1.0', 'UTF-8');
     $xmlWriter->startElement('tv');
     $xmlWriter->writeAttribute('generator-info-name', 'Tak');
@@ -426,17 +438,23 @@ function processIconListAndXMLTV($db, $gen_list_mapping, &$log_messages) {
     $xmlWriter->flush();
 
     // 所有频道数据写入完成后，生成 t.xml.gz 文件
-    compressXmlFile('t.xml');
+    compressXmlFile($xmlFilePath);
     
+    // 建立 xmltv 软链接
+    if (!file_exists($xmlLinkPath = __DIR__ . '/t.xml')) {
+        symlink($xmlFilePath, $xmlLinkPath);
+        symlink($xmlFilePath . '.gz', $xmlLinkPath . '.gz');
+    }
+
     logMessage($log_messages, "【预告文件】 已生成 t.xml、t.xml.gz");
 }
 
 // 生成 t.xml.gz 压缩文件
-function compressXmlFile($filePath) {
-    $gzFilePath = $filePath . '.gz';
+function compressXmlFile($xmlFilePath) {
+    $gzFilePath = $xmlFilePath . '.gz';
 
     // 打开原文件和压缩文件
-    $file = fopen($filePath, 'rb');
+    $file = fopen($xmlFilePath, 'rb');
     $gzFile = gzopen($gzFilePath, 'wb9'); // 最高压缩等级
 
     // 将文件内容写入到压缩文件中
