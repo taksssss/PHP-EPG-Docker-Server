@@ -31,6 +31,9 @@ textarea {
     white-space: pre-wrap; /* 保持空白字符和换行符，同时在内容超出容器宽度时换行 */
     word-break: break-all; /* 允许单词内断行 */
 }
+textarea:disabled {
+    opacity: 0.8;
+}
 textarea[id="gen_list_text"] {
     height: 140px;
 }
@@ -469,6 +472,11 @@ body.dark input[type="time"] {
     background-color: #333;
     color: #e0e0e0;
     border: 1px solid #555;
+}
+
+body.dark textarea:disabled {
+    background-color: #222;
+    color: #888;
 }
 
 body.dark a,

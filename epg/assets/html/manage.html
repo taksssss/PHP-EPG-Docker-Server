@@ -43,8 +43,7 @@
 源限定频道：频道名1, 频道名2 => EPG源地址
 猫示例1：tvmao, 猫频道名1, 猫频道名2,...
 猫示例2：tvmao, 自定义1:猫频道名1, 自定义2:猫频道名2, ..."
-            id="xml_urls" name="xml_urls" style="height: 122px;"><?php echo implode("\n", array_map('trim', $Config['xml_urls'])); ?>
-        </textarea>
+            id="xml_urls" name="xml_urls" style="height: 122px;"><?php echo implode("\n", array_map('trim', $Config['xml_urls'])); ?></textarea>
         <br><br>
 
         <div class="form-row">
@@ -310,7 +309,7 @@
             <textarea id="sourceUrlTextarea" placeholder="支持 .txt 和 .m3u 格式，光标离开后自动保存。
 地址前 # 临时停用，后 # 备注并作为分组前缀。快捷键：Ctrl+/ 。
 示例：https://xxx.xx/xx.m3u #前缀1:
-可通过 <?php echo $serverUrl . '/?token=' . $Config['token']; ?>&live&url=xxx 访问单个直播源地址。" style="height: 102px;"></textarea>
+可通过 <?php echo $serverUrl . '/?token=' . $Config['token']; ?>&live=txt/m3u&url=xxx 转换任意直播源，&latest=1 获取最新文件。" style="height: 102px;"></textarea>
         </div>
         <br>
         
@@ -437,7 +436,7 @@
         <div class="row">
             <div class="column">
                 <label for="token_range"><span class="blue-span" id="change_token_span" onclick="changeToken(`<?php echo $Config['token']; ?>`)">token</span> 范围：</label>
-                <select id="token_range" name="token_range" required onmouseup="showTokenRangeMessage(`<?php echo $Config['token']; ?>`, `<?php echo $serverUrl; ?>`)">
+                <select id="token_range" name="token_range" required onchange="showTokenRangeMessage(`<?php echo $Config['token']; ?>`, `<?php echo $serverUrl; ?>`)">
                     <option value="0" <?php if (isset($Config['token_range']) && $Config['token_range'] == 0) echo 'selected'; ?>>无</option>
                     <option value="1" <?php if (!isset($Config['token_range']) || $Config['token_range'] == 1) echo 'selected'; ?>>直播源</option>
                     <option value="2" <?php if (isset($Config['token_range']) && $Config['token_range'] == 2) echo 'selected'; ?>>EPG</option>

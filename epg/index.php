@@ -218,32 +218,37 @@ function liveFetchHandler($query_params) {
 
     header('Content-Type: text/plain');
 
-    // 如果存在 'url' 参数
+    // 计算文件路径
+    $isValidFile = false;
     if (!empty($query_params['url'])) {
         $url = $query_params['url'];
-        $filePath = (stripos($url, '/data/live/file/') !== false) 
-            ? $liveFileDir . basename($url)
-            : $liveFileDir . '/' . md5(urlencode($url)) . '.txt';
+        $filePath = sprintf('%s/%s.%s', $liveFileDir, md5(urlencode($url)), $query_params['live']);
+        if (($query_params['latest'] === '1' && doParseSourceInfo($url)) === true || 
+            file_exists($filePath) || doParseSourceInfo($url) === true) { // 判断是否需要获取最新文件
+            $isValidFile = true;
+        }
+    } else {
+        $filePath = $liveDir . ($query_params['live'] === 'txt' ? 'tv.txt' : ($query_params['live'] === 'm3u' ? 'tv.m3u' : ''));
+        $isValidFile = file_exists($filePath);
+    }
 
-        echo file_exists($filePath) ? file_get_contents($filePath) : "文件不存在";
+    // 如果文件存在或成功解析了源数据
+    if ($isValidFile) {
+        $content = file_get_contents($filePath);
+    } else {
+        echo "文件不存在或无效的 live 类型";
         exit;
     }
 
-    // 处理 'live' 参数
-    $filePath = $liveDir . (($query_params['live'] === 'txt') ? 'tv.txt' : ($query_params['live'] === 'm3u' ? 'tv.m3u' : ''));
-
-    if (file_exists($filePath)) {
-        $content = file_get_contents($filePath);
-        $tvgUrl = $serverUrl . ($query_params['live'] === 'm3u' ? '/t.xml.gz' : '/');
-        if ($query_params['live'] === 'm3u') {
-            $content = preg_replace('/(#EXTM3U x-tvg-url=")(.*?)(")/', '$1' . $tvgUrl . '$3', $content, 1);
-        } elseif ($query_params['live'] === 'txt') {
-            $content = preg_replace('/#genre#/', '#genre#,' . $tvgUrl, $content, 1);
-        }
-        echo $content;
-    } else {
-        echo "文件不存在或无效的 live 类型";
+    // 处理 TVG URL 替换
+    $tvgUrl = $serverUrl . ($query_params['live'] === 'm3u' ? '/t.xml.gz' : '/');
+    if ($query_params['live'] === 'm3u') {
+        $content = preg_replace('/(#EXTM3U x-tvg-url=")(.*?)(")/', '$1' . $tvgUrl . '$3', $content, 1);
+    } elseif ($query_params['live'] === 'txt') {
+        $content = preg_replace('/#genre#/', '#genre#,' . $tvgUrl, $content, 1);
     }
+
+    echo $content;
     exit;
 }
 

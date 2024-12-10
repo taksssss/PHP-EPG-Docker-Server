@@ -27,8 +27,8 @@ require_once 'public.php';
 set_time_limit(20*60);
 
 // 删除过期数据和日志
-function deleteOldData($db, $keep_days, &$log_messages) {
-    global $Config;
+function deleteOldData($db, &$log_messages) {
+    global $Config, $thresholdDate;
 
     // 删除 t.xml 和 t.xml.gz 文件
     if (!$Config['gen_xml']) {
@@ -39,7 +39,6 @@ function deleteOldData($db, $keep_days, &$log_messages) {
     }
 
     // 循环清理过期数据
-    $threshold_date = date('Y-m-d', strtotime("-$keep_days days + 1 day"));
     $tables = [
         'epg_data' => ['date', '清理EPG数据'],
         'update_log' => ['timestamp', '清理更新日志'],
@@ -47,8 +46,8 @@ function deleteOldData($db, $keep_days, &$log_messages) {
     ];
     foreach ($tables as $table => $values) {
         list($column, $logMessage) = $values;
-        $stmt = $db->prepare("DELETE FROM $table WHERE $column < :threshold_date");
-        $stmt->bindValue(':threshold_date', $threshold_date, PDO::PARAM_STR);
+        $stmt = $db->prepare("DELETE FROM $table WHERE $column < :thresholdDate");
+        $stmt->bindValue(':thresholdDate', $thresholdDate, PDO::PARAM_STR);
         $stmt->execute();
         logMessage($log_messages, "【{$logMessage}】 共 {$stmt->rowCount()} 条。");
     }
@@ -69,10 +68,7 @@ function getFormatTime($time, $overwrite_time_zone) {
     $time = $overwrite_time_zone ? substr($time, 0, -5) . $overwrite_time_zone : $time;
     $time = str_replace(' ', '', $time);
     $date = DateTime::createFromFormat('YmdHisO', $time)->setTimezone(new DateTimeZone('+0800'));
-    return [
-        'date' => $date->format('Y-m-d'),
-        'time' => $date->format('H:i')
-    ];
+    return [$date->format('Y-m-d'), $date->format('H:i')];
 }
 
 // 辅助函数：将日期和时间格式化为 XMLTV 格式
@@ -89,7 +85,8 @@ function getGenList($db) {
     }
 
     $channelsSimplified = explode("\n", t2s(implode("\n", $channels)));
-    $allEpgChannels = $db->query("SELECT DISTINCT channel FROM epg_data WHERE date = DATE('now')")->fetchAll(PDO::FETCH_COLUMN); // 避免匹配只有历史 EPG 的频道
+    $allEpgChannels = $db->query("SELECT DISTINCT channel FROM epg_data WHERE date = DATE('now')")
+        ->fetchAll(PDO::FETCH_COLUMN); // 避免匹配只有历史 EPG 的频道
 
     $gen_list_mapping = [];
     $cleanedChannels = array_map('cleanChannelName', $channelsSimplified);
@@ -146,6 +143,7 @@ function downloadXmlData($xml_url, $db, &$log_messages, $gen_list) {
                 return;
             }
         }
+
         // 获取文件大小（字节）并转换为 KB/MB
         $fileSize = strlen($xml_data);
         $fileSizeReadable = $fileSize >= 1048576 
@@ -172,9 +170,7 @@ function downloadXmlData($xml_url, $db, &$log_messages, $gen_list) {
 
 // 处理 XML 数据并逐步存入数据库
 function processXmlData($xml_url, $xml_data, $db, $gen_list) {
-    global $Config;
-    global $processedRecords;
-    global $channel_bind_epg;
+    global $Config, $processedRecords, $channel_bind_epg, $thresholdDate;
 
     // 统计处理数据量
     $processCount = 0;
@@ -196,7 +192,8 @@ function processXmlData($xml_url, $xml_data, $db, $gen_list) {
     }
 
     // 繁简转换和频道筛选
-    $simplifiedChannelNames = (isset($Config['all_chs']) && $Config['all_chs']) ? $cleanChannelNames : explode("\n", t2s(implode("\n", $cleanChannelNames)));
+    $simplifiedChannelNames = (isset($Config['all_chs']) && $Config['all_chs']) ? 
+        $cleanChannelNames : explode("\n", t2s(implode("\n", $cleanChannelNames)));
     $channelNamesMap = [];
     foreach ($cleanChannelNames as $channelId => $channelName) {
         $channelNameSimplified = array_shift($simplifiedChannelNames);
@@ -216,7 +213,8 @@ function processXmlData($xml_url, $xml_data, $db, $gen_list) {
         }
         $matchFound = false;
         foreach ($gen_list as $item) {
-            if (stripos($channelNameSimplified, $item) !== false || stripos($item, $channelNameSimplified) !== false) {
+            if (stripos($channelNameSimplified, $item) !== false || 
+                stripos($item, $channelNameSimplified) !== false) {
                 $matchFound = true;
                 break;
             }
@@ -237,39 +235,46 @@ function processXmlData($xml_url, $xml_data, $db, $gen_list) {
     $overwrite_time_zone = strpos($xml_data, 'epg.pw') !== false ? '+0800' : '';
 
     while ($reader->name === 'programme') {
-        $processCount++;
         $programme = new SimpleXMLElement($reader->readOuterXML());
-        $start = getFormatTime((string)$programme['start'], $overwrite_time_zone);
-        $end = getFormatTime((string)$programme['stop'], $overwrite_time_zone);
+        [$startDate, $startTime] = getFormatTime((string)$programme['start'], $overwrite_time_zone);
+
+        // 判断数据是否符合设定期限
+        if ($startDate < $thresholdDate) {
+            $reader->next('programme');
+            continue;
+        }
+
+        [$endDate, $endTime] = getFormatTime((string)$programme['stop'], $overwrite_time_zone);
         $channelId = (string)$programme['channel'];
         $channelName = $channelNamesMap[$channelId] ?? null;
-        $recordKey = $channelName . '-' . $start['date'];
+        $recordKey = $channelName . '-' . $startDate;
 
         // 优先处理跨天数据
-        if (isset($crossDayProgrammes[$channelId][$start['date']]) && !isset($processedRecords[$recordKey])) {
-            $currentChannelProgrammes[$channelId]['diyp_data'][$start['date']] = array_merge(
-                $currentChannelProgrammes[$channelId]['diyp_data'][$start['date']] ?? [],
-                $crossDayProgrammes[$channelId][$start['date']]
+        if (isset($crossDayProgrammes[$channelId][$startDate]) && !isset($processedRecords[$recordKey])) {
+            $currentChannelProgrammes[$channelId]['diyp_data'][$startDate] = array_merge(
+                $currentChannelProgrammes[$channelId]['diyp_data'][$startDate] ?? [],
+                $crossDayProgrammes[$channelId][$startDate]
             );
             $currentChannelProgrammes[$channelId]['channel_name'] = $channelName;
-            unset($crossDayProgrammes[$channelId][$start['date']]);
+            unset($crossDayProgrammes[$channelId][$startDate]);
         }
     
         if ($channelName && !isset($processedRecords[$recordKey])) {
             $programmeData = [
-                'start' => $start['time'],
-                'end' => $start['date'] === $end['date'] ? $end['time'] : '00:00',
+                'start' => $startTime,
+                'end' => $startDate === $endDate ? $endTime : '00:00',
                 'title' => (string)$programme->title,
-                'desc' => isset($programme->desc) && (string)$programme->desc !== (string)$programme->title ? (string)$programme->desc : ''
+                'desc' => isset($programme->desc) && 
+                    (string)$programme->desc !== (string)$programme->title ? (string)$programme->desc : ''
             ];
     
-            $currentChannelProgrammes[$channelId]['diyp_data'][$start['date']][] = $programmeData;
+            $currentChannelProgrammes[$channelId]['diyp_data'][$startDate][] = $programmeData;
     
             // 保存跨天的节目数据
-            if ($start['date'] !== $end['date'] && $end['time'] !== '00:00') {
-                $crossDayProgrammes[$channelId][$end['date']][] = [
+            if ($startDate !== $endDate && $endTime !== '00:00') {
+                $crossDayProgrammes[$channelId][$endDate][] = [
                     'start' => '00:00',
-                    'end' => $end['time'],
+                    'end' => $endTime,
                     'title' => $programmeData['title'],
                     'desc' => $programmeData['desc']
                 ];
@@ -285,6 +290,7 @@ function processXmlData($xml_url, $xml_data, $db, $gen_list) {
             }
         }
     
+        $processCount++;
         $reader->next('programme');
     }
     
@@ -329,7 +335,8 @@ function processIconListAndXMLTV($db, $gen_list_mapping, &$log_messages) {
     }
     
     // 更新 iconList.json 文件中的数据
-    if (file_put_contents($iconListPath, json_encode($iconList, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)) === false) {
+    if (file_put_contents($iconListPath, 
+        json_encode($iconList, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)) === false) {
         logMessage($log_messages, "【台标列表】 更新 iconList.json 时发生错误！！！");
     } else {
         logMessage($log_messages, "【台标列表】 已更新 iconList.json");
@@ -474,7 +481,8 @@ $startTime = microtime(true);
 $initialCount = $db->query("SELECT COUNT(*) FROM epg_data")->fetchColumn();
 
 // 删除过期数据
-deleteOldData($db, $Config['days_to_keep'], $log_messages);
+$thresholdDate = date('Y-m-d', strtotime("-{$Config['days_to_keep']} days +1 day"));
+deleteOldData($db, $log_messages);
 
 // 获取限定频道列表及映射关系
 $gen_res = getGenList($db);
@@ -498,8 +506,10 @@ foreach ($Config['xml_urls'] as $xml_url) {
         $tvmaostr = str_replace('tvmao,', '', $xml_url);
         foreach (explode(',', $tvmaostr) as $tvmao_info) {
             list($channel_name, $channel_id) = array_map('trim', explode(':', trim($tvmao_info)) + [null, $tvmao_info]);
-            $json_url = "https://sp0.baidu.com/8aQDcjqpAAV3otqbppnN2DJv/api.php?query=" . $channel_id . "&resource_id=12520&format=json";
-            downloadJSONData($json_url, $db, $log_messages, $channel_name);
+            $channel_id = str_replace('-', '', $channel_id);
+            $json_url = "https://sp0.baidu.com/8aQDcjqpAAV3otqbppnN2DJv/api.php?query=" 
+                . $channel_id . "&resource_id=12520&format=json";
+            downloadJSONData($json_url, $db, $log_messages, cleanChannelName($channel_name));
         }
         continue;
     }
@@ -523,9 +533,9 @@ processIconListAndXMLTV($db, $gen_list_mapping, $log_messages);
 
 // 判断是否同步更新直播源
 if (isset($Config['live_source_auto_sync']) && $Config['live_source_auto_sync'] == 1) {
-    $errorLog = doParseSourceInfo();
-    if ($errorLog) {
-        logMessage($log_messages, "【直播文件】 部分更新异常：" . rtrim(str_replace('<br>', '、', $errorLog), '、'));
+    $parseResult = doParseSourceInfo();
+    if ($parseResult !== true) {
+        logMessage($log_messages, "【直播文件】 部分更新异常：" . rtrim(str_replace('<br>', '、', $parseResult), '、'));
     } else {
         logMessage($log_messages, "【直播文件】 已同步更新");
     }

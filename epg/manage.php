@@ -368,9 +368,9 @@ try {
 
             case 'parse_source_info':
                 // 解析直播源
-                $errorLog = doParseSourceInfo();
-                if ($errorLog) {
-                    $dbResponse = ['success' => 'part', 'message' => $errorLog];
+                $parseResult = doParseSourceInfo();
+                if ($parseResult !== true) {
+                    $dbResponse = ['success' => 'part', 'message' => $parseResult];
                 } else {
                     $dbResponse = ['success' => 'full'];
                 }
@@ -686,7 +686,7 @@ try {
                         fputcsv($file, array_values($row));
                     }
                     fclose($file);
-                    generateLiveFiles(); // 重新生成 M3U 和 TXT 文件
+                    generateLiveFiles($content); // 重新生成 M3U 和 TXT 文件
                     echo json_encode(['success' => true]);
                 } else {
                     echo json_encode(['success' => false, 'message' => '无法打开文件']);
