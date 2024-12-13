@@ -50,14 +50,8 @@ foreach ($oldPids as $pid) {
     }
 }
 
-// 检查配置中是否存在 interval_time
-if (!isset($Config['interval_time'])) {
-    logCronMessage("不存在间隔时间。退出...");
-    exit;
-}
-
-// 从配置中获取间隔时间
-$interval_time = $Config['interval_time'];
+// 从配置中获取间隔时间，如果不存在则默认为0
+$interval_time = $Config['interval_time'] ?? 0;
 
 // 如果间隔时间为0，则不执行
 if ($interval_time == 0) {
@@ -66,13 +60,8 @@ if ($interval_time == 0) {
 }
 
 // 检查配置中是否存在首次执行时间和结束时间
-if (!isset($Config['start_time'])) {
-    logCronMessage("不存在start_time。退出...");
-    exit;
-}
-
-if (!isset($Config['end_time'])) {
-    logCronMessage("不存在end_time。退出...");
+if (!isset($Config['start_time']) || !isset($Config['end_time'])) {
+    logCronMessage("不存在首次执行时间或结束时间。退出...");
     exit;
 }
 

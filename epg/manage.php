@@ -217,7 +217,7 @@ try {
 
             case 'get_epg_by_channel':
                 // 查询
-                $channel = urldecode($_GET['channel']);
+                $channel = $_GET['channel'];
                 $date = urldecode($_GET['date']);
                 $stmt = $db->prepare("SELECT epg_diyp FROM epg_data WHERE channel = :channel AND date = :date");
                 $stmt->execute([':channel' => $channel, ':date' => $date]);
@@ -278,8 +278,8 @@ try {
                         'channels' => $channelBindEpg[$cleanEpgSrc] ?? ''
                     ];
                 }, array_filter($xmlUrls, function($epgSrc) {
-                    // 去除空行和包含 "tvmao" 的行
-                    return !empty(ltrim($epgSrc, '# ')) && strpos($epgSrc, 'tvmao') === false;
+                    // 去除空行和包含 tvmao、cntv 的行
+                    return !empty(ltrim($epgSrc, '# ')) && strpos($epgSrc, 'tvmao') === false && strpos($epgSrc, 'cntv') === false;
                 }));
                 $dbResponse = array_merge(
                     array_filter($dbResponse, function($item) { return strpos($item['epg_src'], '【已停用】') === false; }),
@@ -342,6 +342,11 @@ try {
                 // 读取 source.txt 文件内容
                 $sourceFilePath = $liveDir . 'source.txt';
                 $sourceContent = file_exists($sourceFilePath) ? file_get_contents($sourceFilePath) : '';
+
+                // 读取 template.txt 文件内容
+                $templateFilePath = $liveDir . 'template.txt';
+                $templateContent = file_exists($templateFilePath) ? file_get_contents($templateFilePath) : '';
+
                 // 读取 channels.csv 文件内容
                 $csvFilePath = $liveDir . 'channels.csv';
                 $channelsData = [];
@@ -363,7 +368,8 @@ try {
                     }
                     fclose($csvFile);
                 }
-                $dbResponse = ['source_content' => $sourceContent, 'channels' => $channelsData,];
+                
+                $dbResponse = ['source_content' => $sourceContent, 'template_content' => $templateContent, 'channels' => $channelsData,];
                 break;
 
             case 'parse_source_info':
@@ -509,7 +515,7 @@ try {
             'upload_icon' => isset($_FILES['iconFile']),
             'update_icon_list' => isset($_POST['update_icon_list']),
             'upload_source_file' => isset($_FILES['liveSourceFile']),
-            'save_source_url' => isset($_POST['save_source_url']),
+            'save_content_to_file' => isset($_POST['save_content_to_file']),
             'save_source_info' => isset($_POST['save_source_info']),
             'save_token' => isset($_POST['save_token']),
         ];
@@ -530,7 +536,6 @@ try {
                     'start_time' => $Config['start_time'],
                     'end_time' => $Config['end_time']
                 ]);
-
                 exit;
 
             case 'set_gen_list':
@@ -660,15 +665,15 @@ try {
                 }
                 exit;
 
-            case 'save_source_url':
-                // 保存直播源地址
-                $sourceFilePath = $liveDir . 'source.txt';
+            case 'save_content_to_file':
+                // 保存内容到文件
+                $filePath = __DIR__ . $_POST['file_path'] ?? '';
                 $content = $_POST['content'] ?? '';
-                if (file_put_contents($sourceFilePath, $content) !== false) {
-                    echo '内容已成功保存到 source.txt';
+                if (file_put_contents($filePath, str_replace("，", ",", $content)) !== false) {
+                    echo json_encode(['success' => true]);
                 } else {
                     http_response_code(500);
-                    echo '保存失败';
+                    echo json_encode(['success' => false]);
                 }
                 exit;
                 
@@ -679,18 +684,8 @@ try {
                     echo json_encode(['success' => false, 'message' => '无效的数据']);
                     exit;
                 }
-                $filePath = $liveDir . 'channels.csv';
-                if (($file = fopen($filePath, 'w')) !== false) {
-                    fputcsv($file, ['groupTitle', 'channelName', 'streamUrl', 'iconUrl', 'tvgId', 'tvgName', 'disable', 'modified', 'tag']);
-                    foreach ($content as $row) {
-                        fputcsv($file, array_values($row));
-                    }
-                    fclose($file);
-                    generateLiveFiles($content); // 重新生成 M3U 和 TXT 文件
-                    echo json_encode(['success' => true]);
-                } else {
-                    echo json_encode(['success' => false, 'message' => '无法打开文件']);
-                }
+                generateLiveFiles($content, 'tv'); // 重新生成 M3U 和 TXT 文件
+                echo json_encode(['success' => true]);
                 exit;
 
             case 'save_token':

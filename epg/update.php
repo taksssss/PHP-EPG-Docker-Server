@@ -65,6 +65,7 @@ function deleteOldData($db, &$log_messages) {
 
 // 格式化时间函数，同时转化为 UTC+8 时间
 function getFormatTime($time, $overwrite_time_zone) {
+    if (empty($time)) return ['', ''];
     $time = $overwrite_time_zone ? substr($time, 0, -5) . $overwrite_time_zone : $time;
     $time = str_replace(' ', '', $time);
     $date = DateTime::createFromFormat('YmdHisO', $time)->setTimezone(new DateTimeZone('+0800'));
@@ -239,7 +240,7 @@ function processXmlData($xml_url, $xml_data, $db, $gen_list) {
         [$startDate, $startTime] = getFormatTime((string)$programme['start'], $overwrite_time_zone);
 
         // 判断数据是否符合设定期限
-        if ($startDate < $thresholdDate) {
+        if (empty($startDate) || $startDate < $thresholdDate) {
             $reader->next('programme');
             continue;
         }
@@ -264,8 +265,7 @@ function processXmlData($xml_url, $xml_data, $db, $gen_list) {
                 'start' => $startTime,
                 'end' => $startDate === $endDate ? $endTime : '00:00',
                 'title' => (string)$programme->title,
-                'desc' => isset($programme->desc) && 
-                    (string)$programme->desc !== (string)$programme->title ? (string)$programme->desc : ''
+                'desc' => isset($programme->desc) ? (string)$programme->desc : ''
             ];
     
             $currentChannelProgrammes[$channelId]['diyp_data'][$startDate][] = $programmeData;
@@ -305,7 +305,7 @@ function processXmlData($xml_url, $xml_data, $db, $gen_list) {
 }
 
 // 从 epg_data 读取数据，生成 iconList.json 及 xmltv 文件
-function processIconListAndXMLTV($db, $gen_list_mapping, &$log_messages) {
+function processIconListAndXmltv($db, $gen_list_mapping, &$log_messages) {
     global $Config, $iconList, $iconListPath;
 
     $currentDate = date('Y-m-d'); // 获取当前日期
@@ -501,16 +501,9 @@ foreach ($Config['xml_urls'] as $xml_url) {
     $xml_url = trim($xml_url);
     if (empty($xml_url) || strpos($xml_url, '#') === 0) {
         continue;
-    } elseif (strpos($xml_url, 'tvmao') === 0) {
-        // 更新 tvmao 数据
-        $tvmaostr = str_replace('tvmao,', '', $xml_url);
-        foreach (explode(',', $tvmaostr) as $tvmao_info) {
-            list($channel_name, $channel_id) = array_map('trim', explode(':', trim($tvmao_info)) + [null, $tvmao_info]);
-            $channel_id = str_replace('-', '', $channel_id);
-            $json_url = "https://sp0.baidu.com/8aQDcjqpAAV3otqbppnN2DJv/api.php?query=" 
-                . $channel_id . "&resource_id=12520&format=json";
-            downloadJSONData($json_url, $db, $log_messages, cleanChannelName($channel_name));
-        }
+    } elseif (preg_match('/^(tvmao|cntv)/i', $xml_url, $matches)) {
+        $data_source = strtolower($matches[0]);
+        downloadJSONData($data_source, $xml_url, $db, $log_messages);
         continue;
     }
 
@@ -529,7 +522,7 @@ foreach ($Config['xml_urls'] as $xml_url) {
 }
 
 // 更新 iconList.json 及生成 xmltv 文件
-processIconListAndXMLTV($db, $gen_list_mapping, $log_messages);
+processIconListAndXmltv($db, $gen_list_mapping, $log_messages);
 
 // 判断是否同步更新直播源
 if (isset($Config['live_source_auto_sync']) && $Config['live_source_auto_sync'] == 1) {

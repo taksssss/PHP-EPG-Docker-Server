@@ -80,6 +80,14 @@ select[id="interval_hour"]{
     width: 70px;
     margin-right: 0px;
 }
+a, .blue-span {
+    color: blue;
+    cursor: pointer;
+    text-decoration: none;
+}
+a:hover, .blue-span:hover {
+    color: #0056b3;
+}
 .button-container {
     display: flex;
     gap: 15px;
@@ -93,7 +101,6 @@ select[id="interval_hour"]{
     padding: 10px;
     background-color: #2196F3;
     color: white;
-    text-decoration: none;
     border: none;
     border-radius: 10px;
     text-align: center;
@@ -152,7 +159,6 @@ input[type="text"] {
 .modal {
     display: none; /* 默认隐藏 */
     position: fixed;
-    z-index: 1;
     left: 0;
     top: 0;
     width: 100%;
@@ -172,8 +178,12 @@ input[type="text"] {
     box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2);
     top: 50%;
     transform: translateY(-50%);
-    width: 650px;
+    width: 660px;
     height: 530px;
+}
+.version-update-modal-content,
+.help-modal-content {
+    padding-left: 25px;
 }
 .cron-log-modal-content {
     width: 400px;
@@ -189,15 +199,10 @@ input[type="text"] {
     min-width: 150px;
     width: auto;
     height: auto;
-    text-align: center;
     line-height: 1.6;
 }
 .icon-modal-content {
     width: 700px;
-}
-.version-update-message {
-    height: 460px;
-    overflow: auto;
 }
 .close {
     color: #aaa;
@@ -208,7 +213,6 @@ input[type="text"] {
 .close:hover,
 .close:focus {
     color: black;
-    text-decoration: none;
     cursor: pointer;
 }
 .table-container {
@@ -312,35 +316,6 @@ input[type="text"] {
     white-space: nowrap; /* 禁止换行 */
     scrollbar-width: none; /* 隐藏滚动条 */
 }
-/* 工具提示容器 */
-.tooltip {
-    position: sticky;
-    display: flex;
-    width: 100%;
-}
-/* 工具提示文本 */
-.tooltip .tooltiptext {
-    visibility: hidden;
-    width: 120px;
-    background-color: #555;
-    color: #fff;
-    text-align: center;
-    border-radius: 5px;
-    padding: 5px;
-    position: absolute;
-    z-index: 1;
-    bottom: 110%; /* 上方显示 */
-    left: 50%;
-    margin-left: -60px;
-    opacity: 0;
-    transition: opacity 0.5s;
-    font-size: 14px; /* 设置字体大小 */
-}
-/* 显示工具提示 */
-.tooltip:hover .tooltiptext {
-    visibility: visible;
-    opacity: 1;
-}
 
 /* 分页控件样式 */
 #paginationContainer button {
@@ -360,14 +335,6 @@ input[type="text"] {
 #paginationContainer button[disabled] {
     color: #bbb;
     cursor: not-allowed;
-}
-.blue-span {
-    color: blue;
-    cursor: pointer;
-    font-size: 16px;
-}
-.blue-span:hover {
-    color: #0056b3;
 }
 
 /* 自定义滚动条样式 */

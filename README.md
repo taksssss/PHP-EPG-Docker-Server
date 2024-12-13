@@ -185,6 +185,23 @@ PHP 实现的 EPG（电子节目指南）服务端， `Docker` 部署，自带�
 > - `Ctrl + S`：保存设置
 > - `Ctrl + /`：对选中 EPG 地址设置（取消）注释
 
+## ☕ Buy Me a Coffee
+
+<picture>
+  <source
+    media="(prefers-color-scheme: dark)"
+    srcset="/pic/buymeacofee-dark.png"
+  />
+  <source
+    media="(prefers-color-scheme: light)"
+    srcset="/pic/buymeacofee.png"
+  />
+  <img
+    alt="Buy Me a Coffee"
+    src="/pic/buymeacofee.png"
+  />
+</picture>
+
 ## ⭐ Star History
 
 <picture>

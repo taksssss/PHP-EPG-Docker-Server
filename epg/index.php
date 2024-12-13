@@ -76,9 +76,6 @@ function getFormatTime($time) {
 
 // 从数据库读取 diyp、lovetv 数据，兼容未安装 memcached 的情况
 function readEPGData($date, $oriChannelName, $cleanChannelName, $db, $type) {
-    global $Config;
-    global $iconList;
-
     // 默认缓存 24 小时，更新数据时清空
     $cache_time = 24 * 3600;
 
@@ -300,8 +297,7 @@ function fetchHandler($query_params) {
         $retry = $response && !processResponse($response, $oriChannelName, $date, $type, $init);
         if ($retry && $Config['tvmao_default'] === 1 && $date >= date('Y-m-d')) {
             $matchChannelName = json_decode($response, true)['channel_name'] ?? $oriChannelName;
-            $json_url = "https://sp0.baidu.com/8aQDcjqpAAV3otqbppnN2DJv/api.php?query=$matchChannelName&resource_id=12520&format=json";
-            downloadJSONData($json_url, $db, $log_messages, $matchChannelName, $replaceFlag = false); // 只更新无数据的日期
+            downloadJSONData('tvmao', $matchChannelName, $db, $log_messages, $replaceFlag = false); // 只更新无数据的日期
             ob_end_clean(); // 清除缓存内容，避免显示
             $newResponse = readEPGData($date, $oriChannelName, $matchChannelName, $db, $type);
             processResponse($newResponse, $oriChannelName, $date, $type, $init);

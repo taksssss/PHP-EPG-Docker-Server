@@ -141,9 +141,9 @@ function handleKeydown(event) {
 
 // 格式化时间
 function formatTime(seconds) {
-    const formattedHours = String(Math.floor(seconds / 3600)).padStart(2, '0');
-    const formattedMinutes = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
-    return `${formattedHours}:${formattedMinutes}`;
+    const formattedHours = String(Math.floor(seconds / 3600));
+    const formattedMinutes = String(Math.floor((seconds % 3600) / 60));
+    return `${formattedHours}小时${formattedMinutes}分钟`;
 }
 
 // 更新 MySQL 按钮状态
@@ -157,21 +157,25 @@ function updateMySQLFields() {
 }
 
 // 显示带消息的模态框
-function showModalWithMessage(modalId, messageId, message) {
+function showModalWithMessage(modalId, messageId = '', message = '') {
+    if (messageId) {
+        document.getElementById(messageId).innerHTML = message;
+    }
+    
     var modal = document.getElementById(modalId);
-    var messageElement = document.getElementById(messageId);
-
-    messageElement.innerHTML = message;
-    modal.style.zIndex = 9999; // 确保 modal 在最上层
+    modal.style.zIndex = zIndex++; // 确保在最上层
     modal.style.display = "block";
 
+    var originalOnMouseDown = window.onmousedown;
     function handleModalClose() {
         modal.style.display = "none";
+        window.onmousedown = originalOnMouseDown; // 恢复原事件
     }
+
     var closeBtn = modal.querySelector(".close");
-    closeBtn.onclick = handleModalClose;
-    window.onclick = function (event) {
-        if (event.target == modal) {
+    closeBtn.onmousedown = handleModalClose;
+    window.onmousedown = function(event) {
+        if (event.target === modal) {
             handleModalClose();
         }
     };
@@ -182,11 +186,7 @@ function showMessageModal(message) {
     showModalWithMessage("messageModal", "messageModalMessage", message);
 }
 
-// 显示版本更新日志模态框
-function showVersionLogModal(message) {
-    showModalWithMessage("versionLogModal", "versionLogMessage", message);
-}
-
+let zIndex = 100;
 // 显示模态框公共函数
 function showModal(type, $popup = true, $data = '') {
     var modal, logSpan, logContent;
@@ -208,7 +208,6 @@ function showModal(type, $popup = true, $data = '') {
             document.getElementById('prevDate').onclick = () => updateDate(-1);
             document.getElementById('nextDate').onclick = () => updateDate(1);
 
-            document.getElementById("channelModal").style.display = "none";
             break;
 
         case 'update':
@@ -238,13 +237,12 @@ function showModal(type, $popup = true, $data = '') {
         case 'channelmatch':
             modal = document.getElementById("channelMatchModal");
             fetchData('manage.php?get_channel_match=true', updateChannelMatchList);
-            document.getElementById("moreSettingModal").style.display = "none";
             break;
         case 'live':
             modal = document.getElementById("liveSourceManageModal");
             fetchData('manage.php?get_live_data=true', updateLiveSourceModal);
             break;
-        case 'moresetting':            
+        case 'moresetting':
             updateMySQLFields(); // 设置 MySQL 相关输入框状态
             document.getElementById('db_type').addEventListener('change', updateMySQLFields);
             modal = document.getElementById("moreSettingModal");
@@ -257,19 +255,17 @@ function showModal(type, $popup = true, $data = '') {
     if (!$popup) {
         return;
     }
+    modal.style.zIndex = zIndex++; // 确保 modal 在最上层
     modal.style.display = "block";
 
+    var originalOnMouseDown = window.onmousedown;
     function handleModalClose() {
         modal.style.display = "none";
-        if (type === 'channelmatch') {
-            showModal('moresetting');
-        } else if (type === 'epg') {
-            showModal('channel');
-        }
+        window.onmousedown = originalOnMouseDown; // 恢复原事件
     }
     
-    logSpan = modal.querySelector(".close");
-    logSpan.onclick = handleModalClose;
+    closeBtn = modal.querySelector(".close");
+    closeBtn.onmousedown = handleModalClose;
     window.onmousedown = function(event) {
         if (event.target === modal) {
             handleModalClose();
@@ -294,7 +290,7 @@ function showVersionLog(doCheckUpdate = false) {
         .then(data => {
             if (data.success) {
                 if (!doCheckUpdate || data.is_updated) {
-                    showVersionLogModal(data.content);
+                    showModalWithMessage("versionLogModal", "versionLogMessage", data.content);
                 }
             } else {
                 showMessageModal(data.message || '获取版本日志失败');
@@ -303,6 +299,11 @@ function showVersionLog(doCheckUpdate = false) {
         .catch(() => {
             showMessageModal('无法获取版本日志，请稍后重试');
         });
+}
+
+// 显示使用说明
+function showHelpModal() {
+    showModalWithMessage("helpModal");
 }
 
 // 更新 EPG 内容
@@ -466,7 +467,7 @@ function displayPage(data, page) {
                         : 'table-cell-clickable';
                 }
 
-                const editable = (col === 'disable' || col === 'modified') ? '' : 'contenteditable="true"';
+                const editable = ['disable', 'modified'].includes(col) ? '' : 'contenteditable="true"';
                 const clickableClass = (col === 'disable' || col === 'modified') ? 'table-cell-clickable' : '';
 
                 return `<td ${editable} class="${clickableClass} ${cellClass}">
@@ -573,6 +574,7 @@ let allLiveData = []; // 用于存储直播源数据
 // 更新模态框内容并初始化分页
 function updateLiveSourceModal(data) {
     document.getElementById('sourceUrlTextarea').value = data.source_content || '';
+    document.getElementById('liveTemplateTextarea').value = data.template_content || '';
     const channels = Array.isArray(data.channels) ? data.channels : [];
     allLiveData = channels;  // 将所有数据保存在全局变量中
     currentPage = 1; // 重置为第一页
@@ -632,7 +634,8 @@ document.getElementById('sourceUrlTextarea').addEventListener('blur', function()
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
-            save_source_url: 'true',
+            save_content_to_file: 'true',
+            file_path: '/data/live/source.txt',
             content: sourceContent
         })
     })
@@ -652,7 +655,7 @@ function saveLiveSourceInfo() {
         })
     })
     .then(response => response.json())
-    .then(data => showMessageModal(data.success ? '保存成功<br>已生成 M3U 及 TXT 文件<br>设置保持后重新解析不变' : '保存失败'))
+    .then(data => showMessageModal(data.success ? '保存成功<br>已生成 M3U 及 TXT 文件' : '保存失败'))
     .catch(error => showMessageModal('保存过程中出现错误: ' + error));
 }
 
@@ -672,18 +675,66 @@ function cleanUnusedSource() {
     });
 }
 
-// 复制文本并提示
-function copyText(text) {
-    const input = document.createElement('input');
-    input.value = text;
-    document.body.appendChild(input);
-    input.select();
-    document.execCommand('copy');
-    document.body.removeChild(input);
-    const fileName = text.includes('live=txt') ? 'tv.txt' : text.includes('live=m3u') ? 'tv.m3u' : 'file.txt';
-    showMessageModal(`${text}<br>地址已复制，可直接粘贴。&ensp;
-        <a href="${text}" class="blue-span" target="_blank">查看</a>&ensp;
-        <a href="${text}" class="blue-span" download="${fileName}">下载</a>`);
+// 显示直播源信息
+function showLiveInfo(token, serverUrl) {
+    var m3uUrl = `${serverUrl}/?token=${token}&live=m3u`;
+    var txtUrl = `${serverUrl}/?token=${token}&live=txt`;
+    message = `M3U：<br><a href="${m3uUrl}" target="_blank">${m3uUrl}</a>
+                &ensp;<a href="${m3uUrl}" download="tv.m3u">下载</a><br>
+                TXT：<br><a href="${txtUrl}" target="_blank">${txtUrl}</a>
+                &ensp;&ensp;<a href="${txtUrl}" download="tv.txt">下载</a><br>
+                转换：<br>${m3uUrl}/txt&url=xxx`;
+    showMessageModal(message);
+}
+
+// 显示 token 范围信息
+function showTokenRangeMessage(token, serverUrl) {
+    var tokenRange = document.getElementById("token_range").value;
+    var message = '';
+    var baseUrl = serverUrl + '/?token=' + token;
+    if (tokenRange == "1" || tokenRange == "3") {
+        message += `直播源地址：<br><a href="${baseUrl}&live=m3u" target="_blank">${baseUrl}&live=m3u</a><br>
+                    <a href="${baseUrl}&live=txt" target="_blank">${baseUrl}&live=txt</a>`;
+    }
+    if (tokenRange == "2" || tokenRange == "3") {
+        if (message) message += '<br>';
+        message += `EPG地址：<br><a href="${baseUrl}" target="_blank">${baseUrl}</a>`;
+    }
+    if (message) {
+        showMessageModal(message);
+    }
+}
+
+// 显示直播源模板
+function showLiveTemplate() {
+    showModalWithMessage("liveTemplateModal");
+}
+
+// 保存编辑后的直播源模板
+function saveLiveTemplate() {
+    liveTemplateContent = document.getElementById('liveTemplateTextarea').value;
+    // 内容写入 template.txt 文件
+    fetch('manage.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+            save_content_to_file: 'true',
+            file_path: '/data/live/template.txt',
+            content: liveTemplateContent
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            parseSourceInfo("保存成功<br>正在重新解析...");
+            document.getElementById('liveTemplateModal').style.display = 'none';
+        } else {
+            showMessageModal('保存失败');
+        }
+    })
+    .catch(error => {
+        showMessageModal('保存失败: ' + error);
+    });
 }
 
 // 搜索频道
@@ -975,10 +1026,10 @@ async function parseSource() {
 }
 
 // 解析 txt、m3u 直播源，并生成直播列表（包含分组、地址等信息）
-function parseSourceInfo() {
-    showMessageModal("在线源解析较慢<br>请耐心等待");
+function parseSourceInfo(message = '') {
+    showMessageModal(message || "在线源解析较慢<br>请耐心等待...");
 
-    fetch('manage.php?parse_source_info=true')
+    fetch(`manage.php?parse_source_info=true`)
     .then(response => response.json())
     .then(data => {
         showModal('live');
@@ -1126,8 +1177,7 @@ function showTokenRangeMessage(token, serverUrl) {
         message += `EPG地址：<br><a href="${baseUrl}" target="_blank">${baseUrl}</a>`;
     }
     if (message) {
-        showMessageModal('');
-        document.getElementById('messageModalMessage').innerHTML = `<div style="text-align: left">${message}</div>`;
+        showMessageModal(message);
     }
 }
 
