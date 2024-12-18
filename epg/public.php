@@ -101,14 +101,14 @@ function cleanChannelName($channel, $t2s = false) {
         if (strpos($search, 'regex:') === 0) {
             $pattern = substr($search, 6);
             if (preg_match($pattern, $channel_ori)) {
-                return preg_replace($pattern, $replace, $channel_ori);
+                return strtoupper(preg_replace($pattern, $replace, $channel_ori));
             }
         } else {
             // 普通映射，可能为多对一
             $channels = array_map('trim', explode(',', $search));
             foreach ($channels as $singleChannel) {
                 if (strcasecmp($channel, str_replace($channel_replacements, '', $singleChannel)) === 0) {
-                    return $replace;
+                    return strtoupper($replace);
                 }
             }
         }
@@ -470,7 +470,7 @@ function doParseSourceInfo($urlLine = null) {
                         // 检查该行是否已经修改
                         $existingRow = isset($existingData[$tag]) ? $existingData[$tag] : null;
                         $rowData = $existingRow ? $existingRow : [
-                            'groupTitle' => trim($groupPrefix . $groupTitle),
+                            'groupTitle' => trim(($groupPrefix && strpos($groupTitle, $groupPrefix) !== 0 ? $groupPrefix : '') . $groupTitle),
                             'channelName' => $liveChannelNameProcess ? $channelName : $originalChannelName,
                             'streamUrl' => $streamUrl,
                             'iconUrl' => $iconUrl ?? (preg_match('/tvg-logo="([^"]+)"/', $channelInfo, $match) ? $match[1] : ''),
@@ -513,7 +513,7 @@ function doParseSourceInfo($urlLine = null) {
                     // 检查该行是否已经修改
                     $existingRow = isset($existingData[$tag]) ? $existingData[$tag] : null;
                     $rowData = $existingRow ? $existingRow : [
-                        'groupTitle' => trim($groupPrefix . $groupTitle),
+                        'groupTitle' => trim(($groupPrefix && strpos($groupTitle, $groupPrefix) !== 0 ? $groupPrefix : '') . $groupTitle),
                         'channelName' => $liveChannelNameProcess ? $channelName : $originalChannelName,
                         'streamUrl' => $streamUrl,
                         'iconUrl' => $iconUrl,
@@ -546,6 +546,10 @@ function doParseSourceInfo($urlLine = null) {
 function generateLiveFiles($channelData, $fileName) {
     global $liveDir;
 
+    // 默认参数
+    $fuzzyMatchingEnable = true;
+    $commentEnabled = true;
+
     // 读取 template.txt 文件内容
     $templateFilePath = $liveDir . 'template.txt';
     $templateGroups = [];
@@ -555,6 +559,16 @@ function generateLiveFiles($channelData, $fileName) {
         foreach (explode("\n", $templateContent) as $line) {
             $line = trim($line, " ,");
             if (empty($line)) continue;
+
+            if (strpos($line, '$') === 0) {
+                if (strpos($line, '精确匹配') !== false) { // 关闭模糊匹配
+                    $fuzzyMatchingEnable = false;
+                }
+                if (strpos($line, '关闭备注') !== false) { // 关闭备注
+                    $commentEnabled = false;
+                }
+                continue;
+            }
 
             if (strpos($line, '#') === 0) {
                 $currentGroup = substr($line, 1);  // 提取分组名
@@ -582,12 +596,13 @@ function generateLiveFiles($channelData, $fileName) {
 
                     // 检查频道是否匹配
                     $cleanChannelNameData = cleanChannelName($channelNameData);
-                    if ($cleanChannelNameData === $cleanChannelName || 
+                    if ($channelNameData === $channelName ||
+                        $fuzzyMatchingEnable && ($cleanChannelNameData === $cleanChannelName || 
                         $cleanChannelName !== 'CGTN' && stripos($cleanChannelName, 'CCTV') === false &&
                         (stripos($cleanChannelNameData, $cleanChannelName) !== false || 
-                        stripos($cleanChannelName, $cleanChannelNameData) !== false)) {
+                        stripos($cleanChannelName, $cleanChannelNameData) !== false))) {
                         
-                        $streamUrl .= strpos($streamUrl, '$') === false ? "\${$groupTitle}" : ""; // 更新流 URL
+                        $streamUrl .= ($commentEnabled && strpos($streamUrl, '$') === false) ? "\${$groupTitle}" : ""; // 更新流 URL
                         $row['groupTitle'] = $templateGroup;
                         $row['channelName'] = $channelName;
                         $row['streamUrl'] = $streamUrl;
